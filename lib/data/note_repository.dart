@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
-import '../models/note_summary.dart';
+import '../models/note.dart';
 import '../models/subject.dart';
 import '../widgets/nest_drawer.dart';
 import 'app_database.dart';
@@ -46,12 +46,20 @@ class NoteRepository extends ChangeNotifier {
     return null;
   }
 
+  Subject? subjectById(int id) {
+    for (final s in _subjects) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
   // ------------------------------------------------------------------- load
 
   /// Reads everything belonging to the signed-in account.
   Future<void> load() async {
     if (!_auth.isSignedIn) {
       _subjects = const [];
+      _notes = const [];
       semesterLabel = null;
       reminderChoice = null;
       setupDone = false;
@@ -72,12 +80,14 @@ class NoteRepository extends ChangeNotifier {
     setupDone = map[_kSetupDone] == '1';
 
     await _reloadSubjects();
+    await _reloadNotes();
     notifyListeners();
   }
 
   /// Clears in-memory state on sign out.
   void clear() {
     _subjects = const [];
+    _notes = const [];
     semesterLabel = null;
     reminderChoice = null;
     setupDone = false;
@@ -92,6 +102,17 @@ class NoteRepository extends ChangeNotifier {
       orderBy: 'created_at ASC',
     );
     _subjects = rows.map(Subject.fromMap).toList();
+    _applyCounts();
+  }
+
+  /// Fills each subject's note count and mastery from the loaded notes.
+  void _applyCounts() {
+    _subjects = _subjects
+        .map((s) => s.copyWith(
+              noteCount: noteCountForSubject(s.id),
+              mastery: masteryForSubject(s.id),
+            ))
+        .toList();
   }
 
   Future<void> _setSetting(String key, String? value) async {
@@ -175,20 +196,158 @@ class NoteRepository extends ChangeNotifier {
   /// The palette slot to offer next, so two subjects rarely share a colour.
   int get nextColorIndex => _subjects.length;
 
-  // ------------------------------------------------------ notes (not built)
+  // ----------------------------------------------------------------- notes
 
-  final List<NoteSummary> _notes = [];
+  List<Note> _notes = const [];
+
+  /// Live notes, newest first. Trash is kept out of every normal list.
+  List<Note> notes() => List.unmodifiable(_notes);
 
   bool get hasNotes => _notes.isNotEmpty;
 
-  List<NoteSummary> recentNotes({int limit = 5}) =>
+  List<Note> recentNotes({int limit = 5}) =>
       List.unmodifiable(_notes.take(limit));
 
-  List<NoteSummary> notesForSubject(String code) =>
-      List.unmodifiable(_notes.where((n) => n.subjectCode == code));
+  List<Note> notesForSubject(int? subjectId) => List.unmodifiable(
+        subjectId == null
+            ? _notes
+            : _notes.where((n) => n.subjectId == subjectId),
+      );
+
+  Note? noteById(int id) {
+    for (final n in _notes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
 
   int get unrevisedCount =>
       _notes.where((n) => n.status != StudyStatus.mastered).length;
+
+  int get importantUnrevisedCount => _notes
+      .where((n) => n.important && n.status != StudyStatus.mastered)
+      .length;
+
+  int noteCountForSubject(int? subjectId) =>
+      _notes.where((n) => n.subjectId == subjectId).length;
+
+  double masteryForSubject(int? subjectId) {
+    final list = _notes.where((n) => n.subjectId == subjectId).toList();
+    if (list.isEmpty) return 0;
+    final done =
+        list.where((n) => n.status == StudyStatus.mastered).length;
+    return done / list.length;
+  }
+
+  Future<void> _reloadNotes() async {
+    final rows = await _db.db.query(
+      'notes',
+      where: 'user_id = ? AND deleted_at IS NULL',
+      whereArgs: [_auth.requireUserId],
+      orderBy: 'updated_at DESC',
+    );
+    _notes = rows.map(Note.fromMap).toList();
+    _applyCounts();
+  }
+
+  /// Creates a note and returns it with its new id.
+  Future<Note> createNote({
+    required String title,
+    String body = '',
+    int? subjectId,
+    String? topic,
+    List<String> tags = const [],
+  }) async {
+    final now = DateTime.now();
+    final note = Note(
+      userId: _auth.requireUserId,
+      subjectId: subjectId,
+      topic: topic?.trim().isEmpty == true ? null : topic?.trim(),
+      title: title.trim(),
+      body: body,
+      tags: tags,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final id = await _db.db.insert('notes', note.toMap());
+    await _reloadNotes();
+    notifyListeners();
+    return note.copyWith(id: id);
+  }
+
+  Future<void> updateNote(Note note) async {
+    if (note.id == null) return;
+    await _db.db.update(
+      'notes',
+      note.copyWith(updatedAt: DateTime.now()).toMap(),
+      where: 'id = ?',
+      whereArgs: [note.id],
+    );
+    await _reloadNotes();
+    notifyListeners();
+  }
+
+  Future<void> setStatus(Note note, StudyStatus status) =>
+      updateNote(note.copyWith(status: status));
+
+  Future<void> toggleImportant(Note note) =>
+      updateNote(note.copyWith(important: !note.important));
+
+  /// Records that the note was opened, so Exam Mode can raise stale notes.
+  Future<void> markOpened(Note note) async {
+    if (note.id == null) return;
+    await _db.db.update(
+      'notes',
+      {'opened_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [note.id],
+    );
+    await _reloadNotes();
+  }
+
+  // ----------------------------------------------------------------- trash
+
+  /// Moves a note to Trash rather than removing it.
+  Future<void> deleteNote(Note note) async {
+    if (note.id == null) return;
+    await _db.db.update(
+      'notes',
+      {'deleted_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [note.id],
+    );
+    await _reloadNotes();
+    notifyListeners();
+  }
+
+  Future<List<Note>> trashedNotes() async {
+    final rows = await _db.db.query(
+      'notes',
+      where: 'user_id = ? AND deleted_at IS NOT NULL',
+      whereArgs: [_auth.requireUserId],
+      orderBy: 'deleted_at DESC',
+    );
+    return rows.map(Note.fromMap).toList();
+  }
+
+  Future<void> restoreNote(Note note) async {
+    if (note.id == null) return;
+    await _db.db.update(
+      'notes',
+      {'deleted_at': null},
+      where: 'id = ?',
+      whereArgs: [note.id],
+    );
+    await _reloadNotes();
+    notifyListeners();
+  }
+
+  /// Removes the row for good. Only reachable from Trash, after a warning.
+  Future<void> deleteNoteForever(Note note) async {
+    if (note.id == null) return;
+    await _db.db.delete('notes', where: 'id = ?', whereArgs: [note.id]);
+    notifyListeners();
+  }
 
   // ------------------------------------------------------- exam (not built)
 

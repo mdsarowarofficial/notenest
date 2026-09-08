@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 1;
+  static const _version = 2;
 
   Database? _db;
 
@@ -101,10 +101,46 @@ class AppDatabase {
       'CREATE UNIQUE INDEX idx_subjects_code '
       'ON subjects (user_id, LOWER(code))',
     );
+
+    await _createNotes(db);
+  }
+
+  /// Version 2 added the notes table.
+  Future<void> _createNotes(Database db) async {
+    await db.execute('''
+      CREATE TABLE notes (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        subject_id INTEGER,
+        topic      TEXT,
+        title      TEXT    NOT NULL,
+        body       TEXT    NOT NULL DEFAULT '',
+        tags       TEXT    NOT NULL DEFAULT '',
+        type       TEXT    NOT NULL DEFAULT 'text',
+        important  INTEGER NOT NULL DEFAULT 0,
+        status     TEXT    NOT NULL DEFAULT 'new',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        opened_at  INTEGER,
+        deleted_at INTEGER,
+        FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
+      )
+    ''');
+    // Every list query filters on owner and whether the note is in Trash.
+    await db.execute(
+      'CREATE INDEX idx_notes_user ON notes (user_id, deleted_at, updated_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_notes_subject ON notes (subject_id)',
+    );
   }
 
   Future<void> _upgrade(Database db, int from, int to) async {
-    // Migrations go here as the schema grows, one `if (from < n)` per version.
+    // One step per version, so an installed app keeps its data.
+    if (from < 2) {
+      await _createNotes(db);
+    }
   }
 
   /// Removes one account and everything filed under it.

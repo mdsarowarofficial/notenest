@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
+import '../../theme/nest_theme.dart';
 import '../../widgets/nest_empty_state.dart';
+import '../../widgets/note_tile.dart';
+import 'note_detail.dart';
+import 'note_editor.dart';
 
-/// Requirement 6 — every note the student owns.
+/// Every note the student owns. Requirement 6.
 ///
-/// Phase 1 fills this in: read notes for [subjectCode] from the repository,
-/// show them with search, filter and sort, and open the editor on tap. The
-/// shell already passes the drawer's selected subject in, so nothing outside
-/// this file needs to change then.
+/// When a subject is picked in the drawer the list narrows to that subject;
+/// otherwise it shows everything, newest first.
 class NotesPage extends StatelessWidget {
   const NotesPage({
     super.key,
@@ -22,17 +24,73 @@ class NotesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = NoteRepository.instance;
-    final subject = repo.subjectByCode(subjectCode);
 
-    return NestEmptyState(
-      icon: Icons.auto_stories_rounded,
-      title: subject?.name ?? 'Notes',
-      message: subject == null
-          ? 'Every note you keep, grouped by subject and topic.'
-          : 'Notes for ${subject.code} will appear here once you write your '
-              'first one.',
-      actionLabel: 'Add a note',
-      onAction: onCapture,
+    return ListenableBuilder(
+      listenable: repo,
+      builder: (context, _) {
+        final subject = repo.subjectByCode(subjectCode);
+        final notes = subject == null
+            ? repo.notes()
+            : repo.notesForSubject(subject.id);
+
+        if (notes.isEmpty) {
+          return NestEmptyState(
+            icon: Icons.auto_stories_rounded,
+            title: subject?.name ?? 'Notes',
+            message: subject == null
+                ? 'Every note you keep will appear here, grouped by subject '
+                    'and topic.'
+                : 'Nothing filed under ${subject.code} yet.',
+            actionLabel: repo.hasSubjects ? 'Write a note' : null,
+            onAction: repo.hasSubjects
+                ? () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            NoteEditorPage(initialSubjectId: subject?.id),
+                      ),
+                    )
+                : null,
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(22, 8, 22, 120),
+          children: [
+            Row(
+              children: [
+                if (subject != null) ...[
+                  Container(
+                    width: 5,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: subject.color,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    subject?.name ?? 'All notes',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                Text('${notes.length}', style: nestEyebrow),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final note in notes)
+              NoteTile(
+                note: note,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => NoteDetailPage(noteId: note.id!),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

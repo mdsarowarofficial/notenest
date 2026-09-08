@@ -9,8 +9,10 @@ import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
 import '../shared/shared_page.dart';
+import '../notes/note_editor.dart';
 import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
+import '../trash/trash_page.dart';
 
 /// Holds the drawer, the navigation bar and the four destinations.
 ///
@@ -73,7 +75,17 @@ class _HomeShellState extends State<HomeShell> {
     }
     final kind = await showCaptureSheet(context);
     if (kind == null || !mounted) return;
-    _toast('${kind.name} capture is not built yet');
+
+    if (kind == CaptureKind.text) {
+      final subject = _repo.subjectByCode(_drawerSelection);
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => NoteEditorPage(initialSubjectId: subject?.id),
+        ),
+      );
+      return;
+    }
+    _toast('${kind.name} capture is coming in the next step');
   }
 
   Future<void> _addSubject() async {
@@ -103,8 +115,15 @@ class _HomeShellState extends State<HomeShell> {
             Navigator.pop(context);
           },
           onSelectLink: (l) {
-            setState(() => _drawerSelection = l.id);
             Navigator.pop(context);
+            if (l.id == 'trash') {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TrashPage()),
+              );
+              return;
+            }
+            setState(() => _drawerSelection = l.id);
+            _toast('${l.label} is not built yet');
           },
           onAddSubject: _addSubject,
           onOpenProfile: () {
