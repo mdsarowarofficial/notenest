@@ -4,9 +4,7 @@ import '../../theme/nest_theme.dart';
 
 /// The four ways a note can start. Requirement 5.
 ///
-/// Only the text option is built. The other three return their kind so the
-/// caller can say what is coming, and each will open its own screen once the
-/// media modules land.
+/// Text, photo and PDF all open real screens. Voice is the one still to come.
 enum CaptureKind { text, photo, pdf, voice }
 
 Future<CaptureKind?> showCaptureSheet(BuildContext context) {
@@ -27,9 +25,9 @@ class _CaptureSheet extends StatelessWidget {
     _CaptureOption(CaptureKind.text, 'Write a note',
         'Start with a blank page', Icons.edit_rounded, true),
     _CaptureOption(CaptureKind.photo, 'Photograph handwriting',
-        'Crop and straighten a page', Icons.photo_camera_rounded, false),
+        'Crop and straighten a page', Icons.photo_camera_rounded, true),
     _CaptureOption(CaptureKind.pdf, 'Add a PDF',
-        'Slides, books, question papers', Icons.picture_as_pdf_rounded, false),
+        'Slides, books, question papers', Icons.picture_as_pdf_rounded, true),
     _CaptureOption(CaptureKind.voice, 'Record the lecture',
         'Turns speech into a study note', Icons.mic_rounded, false),
   ];

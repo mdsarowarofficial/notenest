@@ -4,6 +4,7 @@ import '../../data/note_repository.dart';
 import '../../models/note.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/note_tile.dart';
+import 'attachment_strip.dart';
 import 'note_editor.dart';
 
 /// Read a note and change how it sits in the revision cycle. Requirement 7.
@@ -164,6 +165,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
               _StatusPicker(note: note),
               const SizedBox(height: 22),
               Container(height: 1, color: NestColor.rule),
+              const SizedBox(height: 18),
+              AttachmentStrip(note: note),
               const SizedBox(height: 18),
               if (note.body.trim().isEmpty)
                 Text('This note has no body yet.', style: t.bodySmall)

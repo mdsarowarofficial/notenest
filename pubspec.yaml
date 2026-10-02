@@ -8,11 +8,16 @@ environment:
 
 dependencies:
   crypto: ^3.0.7
+  file_picker: ^13.1.0
   flutter:
     sdk: flutter
+  image_cropper: ^12.2.1
+  image_picker: ^1.2.3
   path: ^1.9.1
+  path_provider: ^2.1.6
   sqflite: ^2.4.3
   sqflite_common_ffi_web: ^1.1.2
+  syncfusion_flutter_pdfviewer: ^35.1.37
 
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.

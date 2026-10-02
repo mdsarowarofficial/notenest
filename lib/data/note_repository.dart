@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
+import '../models/attachment.dart';
 import '../models/note.dart';
 import '../models/subject.dart';
 import '../widgets/nest_drawer.dart';
 import 'app_database.dart';
+import 'attachment_store.dart';
 import 'auth_repository.dart';
 
 /// The one place every screen asks for data.
@@ -305,6 +307,80 @@ class NoteRepository extends ChangeNotifier {
     await _reloadNotes();
   }
 
+  // ----------------------------------------------------------- attachments
+
+  /// Files belonging to one note, in capture order.
+  Future<List<Attachment>> attachmentsFor(int noteId) async {
+    final rows = await _db.db.query(
+      'attachments',
+      where: 'note_id = ?',
+      whereArgs: [noteId],
+      orderBy: 'position ASC, id ASC',
+    );
+    return rows.map(Attachment.fromMap).toList();
+  }
+
+  Future<int> attachmentCount(int noteId) async {
+    final rows = await _db.db.rawQuery(
+      'SELECT COUNT(*) AS c FROM attachments WHERE note_id = ?',
+      [noteId],
+    );
+    return (rows.first['c'] as int?) ?? 0;
+  }
+
+  /// Records a file that [AttachmentStore] has already copied in.
+  Future<Attachment> addAttachment({
+    required Note note,
+    required AttachmentType type,
+    required String fileName,
+    required String storedName,
+    int sizeBytes = 0,
+    int? pageCount,
+  }) async {
+    final position = await attachmentCount(note.id!);
+    final attachment = Attachment(
+      noteId: note.id!,
+      type: type,
+      fileName: fileName,
+      storedName: storedName,
+      sizeBytes: sizeBytes,
+      pageCount: pageCount,
+      position: position,
+      createdAt: DateTime.now(),
+    );
+    final id = await _db.db.insert('attachments', attachment.toMap());
+
+    // A note takes the kind of its first attachment, so lists can show what
+    // the material actually is.
+    if (position == 0 && note.type == NoteType.text) {
+      await updateNote(note.copyWith(type: _noteTypeFor(type)));
+    } else {
+      notifyListeners();
+    }
+    return attachment.copyWith(id: id);
+  }
+
+  NoteType _noteTypeFor(AttachmentType type) {
+    switch (type) {
+      case AttachmentType.image:
+        return NoteType.image;
+      case AttachmentType.pdf:
+        return NoteType.pdf;
+      case AttachmentType.audio:
+        return NoteType.voice;
+    }
+  }
+
+  /// Removes the row and the file together, so nothing is left orphaned.
+  Future<void> removeAttachment(Attachment attachment) async {
+    await _db.db
+        .delete('attachments', where: 'id = ?', whereArgs: [attachment.id]);
+    if (AttachmentStore.isSupported) {
+      await AttachmentStore.delete(attachment.storedName);
+    }
+    notifyListeners();
+  }
+
   // ----------------------------------------------------------------- trash
 
   /// Moves a note to Trash rather than removing it.
@@ -342,9 +418,15 @@ class NoteRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Removes the row for good. Only reachable from Trash, after a warning.
+  /// Removes the row for good, with its files. Only reachable from Trash.
   Future<void> deleteNoteForever(Note note) async {
     if (note.id == null) return;
+    if (AttachmentStore.isSupported) {
+      for (final a in await attachmentsFor(note.id!)) {
+        await AttachmentStore.delete(a.storedName);
+      }
+    }
+    // The attachment rows go with the note through ON DELETE CASCADE.
     await _db.db.delete('notes', where: 'id = ?', whereArgs: [note.id]);
     notifyListeners();
   }

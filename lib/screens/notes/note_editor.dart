@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../models/note.dart';
 import '../../theme/nest_theme.dart';
+import '../capture/media_capture.dart';
+import 'attachment_strip.dart';
 
 /// Write or edit a text note. Requirement 5.1.
 ///
@@ -29,6 +31,8 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
 
   int? _subjectId;
   Note? _note;
+  final _stripKey = GlobalKey<AttachmentStripState>();
+
   Timer? _autosave;
   bool _dirty = false;
   bool _saving = false;
@@ -104,6 +108,44 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       _dirty = false;
       _savedAt = DateTime.now();
     });
+  }
+
+  /// A file needs a note to belong to, so an empty draft is saved first.
+  Future<Note?> _ensureSaved() async {
+    if (_note == null && _isEmpty) {
+      _note = await _repo.createNote(
+        title: 'Untitled note',
+        subjectId: _subjectId,
+        topic: _topic.text,
+      );
+      if (mounted) setState(() {});
+    } else {
+      await _persist();
+    }
+    return _note;
+  }
+
+  Future<void> _addPage() async {
+    final note = await _ensureSaved();
+    if (note == null || !mounted) return;
+
+    final source = await askImageSource(context);
+    if (source == null || !mounted) return;
+
+    final added = await MediaCapture.captureHandwriting(
+      context,
+      note: note,
+      source: source,
+    );
+    if (added && mounted) _stripKey.currentState?.reload();
+  }
+
+  Future<void> _addPdf() async {
+    final note = await _ensureSaved();
+    if (note == null || !mounted) return;
+
+    final added = await MediaCapture.attachPdf(context, note: note);
+    if (added && mounted) _stripKey.currentState?.reload();
   }
 
   Future<void> _saveAndClose() async {
@@ -290,6 +332,33 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
+            ),
+            const SizedBox(height: 22),
+            if (_note != null)
+              AttachmentStrip(
+                key: _stripKey,
+                note: _note!,
+                editable: true,
+              ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _addPage,
+                    icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                    label: const Text('Add page'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _addPdf,
+                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                    label: const Text('Add PDF'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

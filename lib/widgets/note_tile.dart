@@ -57,6 +57,14 @@ class NoteTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          if (note.type != NoteType.text) ...[
+                            Icon(
+                              _typeIcon(note.type),
+                              size: 14,
+                              color: NestColor.inkFaint,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           Flexible(
                             child: Text(
                               note.title.isEmpty ? 'Untitled note' : note.title,
@@ -112,6 +120,19 @@ class NoteTile extends StatelessWidget {
         if (showRule) const PaperRule(indent: 19),
       ],
     );
+  }
+}
+
+IconData _typeIcon(NoteType type) {
+  switch (type) {
+    case NoteType.image:
+      return Icons.photo_rounded;
+    case NoteType.pdf:
+      return Icons.picture_as_pdf_rounded;
+    case NoteType.voice:
+      return Icons.mic_rounded;
+    case NoteType.text:
+      return Icons.notes_rounded;
   }
 }
 

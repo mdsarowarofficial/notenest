@@ -9,6 +9,7 @@ import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
 import '../shared/shared_page.dart';
+import '../capture/media_capture.dart';
 import '../notes/note_editor.dart';
 import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
@@ -76,8 +77,9 @@ class _HomeShellState extends State<HomeShell> {
     final kind = await showCaptureSheet(context);
     if (kind == null || !mounted) return;
 
+    final subject = _repo.subjectByCode(_drawerSelection);
+
     if (kind == CaptureKind.text) {
-      final subject = _repo.subjectByCode(_drawerSelection);
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => NoteEditorPage(initialSubjectId: subject?.id),
@@ -85,7 +87,50 @@ class _HomeShellState extends State<HomeShell> {
       );
       return;
     }
-    _toast('${kind.name} capture is coming in the next step');
+
+    if (kind == CaptureKind.voice) {
+      _toast('Lecture recording is coming in the next step');
+      return;
+    }
+
+    // Photo and PDF both need a note to attach to, so one is created first and
+    // the editor opens on it with the file already in place.
+    final note = await _repo.createNote(
+      title: kind == CaptureKind.photo ? 'Handwritten note' : 'PDF note',
+      subjectId: subject?.id,
+    );
+    if (!mounted) return;
+
+    var added = false;
+    if (kind == CaptureKind.photo) {
+      final source = await askImageSource(context);
+      if (source == null) {
+        await _repo.deleteNoteForever(note);
+        return;
+      }
+      if (!mounted) return;
+      added = await MediaCapture.captureHandwriting(
+        context,
+        note: note,
+        source: source,
+      );
+    } else {
+      added = await MediaCapture.attachPdf(context, note: note);
+    }
+
+    if (!mounted) return;
+
+    // Nothing was picked, so the placeholder note should not survive.
+    if (!added) {
+      await _repo.deleteNoteForever(note);
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NoteEditorPage(existing: _repo.noteById(note.id!)),
+      ),
+    );
   }
 
   Future<void> _addSubject() async {

@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 2;
+  static const _version = 3;
 
   Database? _db;
 
@@ -103,6 +103,7 @@ class AppDatabase {
     );
 
     await _createNotes(db);
+    await _createAttachments(db);
   }
 
   /// Version 2 added the notes table.
@@ -136,10 +137,34 @@ class AppDatabase {
     );
   }
 
+  /// Version 3 added files attached to notes.
+  Future<void> _createAttachments(Database db) async {
+    await db.execute('''
+      CREATE TABLE attachments (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id     INTEGER NOT NULL,
+        type        TEXT    NOT NULL,
+        file_name   TEXT    NOT NULL,
+        stored_name TEXT    NOT NULL,
+        size_bytes  INTEGER NOT NULL DEFAULT 0,
+        page_count  INTEGER,
+        position    INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_attachments_note ON attachments (note_id, position)',
+    );
+  }
+
   Future<void> _upgrade(Database db, int from, int to) async {
     // One step per version, so an installed app keeps its data.
     if (from < 2) {
       await _createNotes(db);
+    }
+    if (from < 3) {
+      await _createAttachments(db);
     }
   }
 
