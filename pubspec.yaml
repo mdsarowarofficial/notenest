@@ -4,7 +4,10 @@ publish_to: "none"
 version: 0.1.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  # Raised from 3.0.0 for Activity 06: the audio and speech packages below
+  # declare a newer floor of their own, and leaving the app's floor at 3.0.0
+  # makes pub quietly resolve to an older version of them with a different API.
+  sdk: ">=3.6.0 <4.0.0"
 
 dependencies:
   crypto: ^3.0.7
@@ -18,6 +21,15 @@ dependencies:
   sqflite: ^2.4.3
   sqflite_common_ffi_web: ^1.1.2
   syncfusion_flutter_pdfviewer: ^35.1.37
+
+  # Activity 06 — Voice & Smart Notes.
+  # record writes the lecture to an m4a file, audioplayers plays it back, and
+  # speech_to_text drives the device's own recogniser for dictation. Nothing
+  # here sends audio to a server of ours; speech_to_text hands the microphone
+  # to whatever recogniser the platform already provides.
+  audioplayers: ^6.8.1
+  record: ^7.1.2
+  speech_to_text: ^7.5.0
 
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.

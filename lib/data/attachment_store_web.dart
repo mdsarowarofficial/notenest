@@ -6,6 +6,11 @@ class AttachmentStore {
 
   static bool get isSupported => false;
 
+  static String nameOf(String path) => path;
+
+  static Future<String> newFilePath(String extension) =>
+      throw UnsupportedError('Attachments need the mobile app');
+
   static Future<String> saveFile(String sourcePath, String extension) =>
       throw UnsupportedError('Attachments need the mobile app');
 

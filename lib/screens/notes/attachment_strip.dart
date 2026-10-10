@@ -7,6 +7,7 @@ import '../../data/note_repository.dart';
 import '../../models/attachment.dart';
 import '../../models/note.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/audio_player_bar.dart';
 import '../viewer/image_viewer.dart';
 import '../viewer/pdf_viewer.dart';
 
@@ -106,6 +107,13 @@ class AttachmentStripState extends State<AttachmentStrip> {
         final items = snapshot.data ?? const <Attachment>[];
         if (items.isEmpty) return const SizedBox.shrink();
 
+        // A recording is not something you look at, so it gets a player across
+        // the width rather than a square in the thumbnail row.
+        final recordings =
+            items.where((a) => a.type == AttachmentType.audio).toList();
+        final files =
+            items.where((a) => a.type != AttachmentType.audio).toList();
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -117,20 +125,47 @@ class AttachmentStripState extends State<AttachmentStrip> {
               ],
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 118,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => _Thumb(
-                  attachment: items[i],
-                  editable: widget.editable,
-                  onOpen: () => _open(items, items[i]),
-                  onRemove: () => _remove(items[i]),
+            for (final recording in recordings)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AudioPlayerBar(
+                        // The key ties the player to the file, so replacing a
+                        // recording rebuilds the player instead of leaving the
+                        // old one pointing at a deleted file.
+                        key: ValueKey(recording.storedName),
+                        attachment: recording,
+                      ),
+                    ),
+                    if (widget.editable) ...[
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: 'Remove recording',
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        color: NestColor.inkSoft,
+                        onPressed: () => _remove(recording),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ),
+            if (files.isNotEmpty)
+              SizedBox(
+                height: 118,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: files.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, i) => _Thumb(
+                    attachment: files[i],
+                    editable: widget.editable,
+                    onOpen: () => _open(files, files[i]),
+                    onRemove: () => _remove(files[i]),
+                  ),
+                ),
+              ),
           ],
         );
       },

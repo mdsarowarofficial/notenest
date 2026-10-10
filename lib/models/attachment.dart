@@ -4,6 +4,17 @@ enum AttachmentType { image, pdf, audio }
 extension AttachmentTypeData on AttachmentType {
   String get key => name;
 
+  String get label {
+    switch (this) {
+      case AttachmentType.image:
+        return 'Photo';
+      case AttachmentType.pdf:
+        return 'PDF';
+      case AttachmentType.audio:
+        return 'Recording';
+    }
+  }
+
   static AttachmentType fromKey(String? key) {
     switch (key) {
       case 'pdf':
@@ -31,6 +42,7 @@ class Attachment {
     required this.storedName,
     this.sizeBytes = 0,
     this.pageCount,
+    this.durationMs,
     this.position = 0,
     required this.createdAt,
   });
@@ -48,10 +60,19 @@ class Attachment {
   final int sizeBytes;
   final int? pageCount;
 
+  /// How long a recording runs. Null for anything that is not audio.
+  ///
+  /// Stored rather than read back from the file, so a list of recordings can
+  /// show its lengths without opening every file.
+  final int? durationMs;
+
   /// Order within the note, so multi-page captures stay in sequence.
   final int position;
 
   final DateTime createdAt;
+
+  Duration? get duration =>
+      durationMs == null ? null : Duration(milliseconds: durationMs!);
 
   String get readableSize {
     if (sizeBytes <= 0) return '';
@@ -70,6 +91,7 @@ class Attachment {
         storedName: storedName,
         sizeBytes: sizeBytes,
         pageCount: pageCount,
+        durationMs: durationMs,
         position: position ?? this.position,
         createdAt: createdAt,
       );
@@ -82,6 +104,7 @@ class Attachment {
         'stored_name': storedName,
         'size_bytes': sizeBytes,
         'page_count': pageCount,
+        'duration_ms': durationMs,
         'position': position,
         'created_at': createdAt.millisecondsSinceEpoch,
       };
@@ -94,6 +117,7 @@ class Attachment {
         storedName: m['stored_name'] as String? ?? '',
         sizeBytes: m['size_bytes'] as int? ?? 0,
         pageCount: m['page_count'] as int?,
+        durationMs: m['duration_ms'] as int?,
         position: m['position'] as int? ?? 0,
         createdAt:
             DateTime.fromMillisecondsSinceEpoch(m['created_at'] as int? ?? 0),

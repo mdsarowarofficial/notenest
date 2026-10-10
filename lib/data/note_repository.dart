@@ -495,6 +495,7 @@ class NoteRepository extends ChangeNotifier {
     required String storedName,
     int sizeBytes = 0,
     int? pageCount,
+    int? durationMs,
   }) async {
     final position = await attachmentCount(note.id!);
     final attachment = Attachment(
@@ -504,6 +505,7 @@ class NoteRepository extends ChangeNotifier {
       storedName: storedName,
       sizeBytes: sizeBytes,
       pageCount: pageCount,
+      durationMs: durationMs,
       position: position,
       createdAt: DateTime.now(),
     );

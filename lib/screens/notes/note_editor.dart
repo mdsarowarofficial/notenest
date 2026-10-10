@@ -7,8 +7,11 @@ import '../../models/note.dart';
 import '../../models/note_query.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_tags.dart';
+import '../capture/dictation_page.dart';
 import '../capture/media_capture.dart';
+import '../capture/record_page.dart';
 import 'attachment_strip.dart';
+import 'transcript_editor.dart';
 
 /// Write or edit a text note. Requirement 5.1.
 ///
@@ -96,7 +99,13 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
         tags: _tags,
       );
     } else {
-      final updated = _note!.copyWith(
+      // Start from the row as it stands rather than from the copy this screen
+      // was opened with. Attaching a photo, a PDF or a recording changes the
+      // note's type behind the editor's back, and starting from the stale copy
+      // would quietly write that change back out — a note full of lecture
+      // photos would go back to being a plain text note on the next keystroke.
+      final current = _repo.noteById(_note!.id!) ?? _note!;
+      final updated = current.copyWith(
         title: title,
         body: _body.text,
         topic: _topic.text.trim(),
@@ -153,6 +162,64 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
 
     final added = await MediaCapture.attachPdf(context, note: note);
     if (added && mounted) _stripKey.currentState?.reload();
+  }
+
+  Future<void> _record() async {
+    final note = await _ensureSaved();
+    if (note == null || !mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => RecordPage(existing: note)),
+    );
+    if (mounted) _stripKey.currentState?.reload();
+  }
+
+  /// Dictating inside an open note appends to what is already written rather
+  /// than replacing it, which the transcript editor handles.
+  Future<void> _dictate() async {
+    final note = await _ensureSaved();
+    if (note == null || !mounted) return;
+
+    final transcript = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const DictationPage()),
+    );
+    if (transcript == null || transcript.trim().isEmpty || !mounted) return;
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TranscriptEditorPage(
+          transcript: transcript,
+          existing: _repo.noteById(note.id!) ?? note,
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    _reloadFromDatabase();
+  }
+
+  /// Pulls the note back out of the database into the text fields.
+  ///
+  /// The transcript editor writes to the same note this screen is editing. The
+  /// controllers here would still hold the text from before the dictation, and
+  /// the autosave timer would write that back over the appended transcript the
+  /// moment anything else was typed. So after something else has changed the
+  /// note, this screen reads it again rather than trusting what it holds.
+  void _reloadFromDatabase() {
+    final fresh = _note?.id == null ? null : _repo.noteById(_note!.id!);
+    if (fresh == null) return;
+
+    _note = fresh;
+    _title.text = fresh.title;
+    _body.text = fresh.body;
+    _topic.text = fresh.topic ?? '';
+    setState(() {
+      _tags = normalizeTags(fresh.tags);
+      _subjectId = fresh.subjectId;
+      // Setting the controllers above fires the dirty listener, but nothing
+      // here is an unsaved edit — it is what the database already holds.
+      _dirty = false;
+      _savedAt = DateTime.now();
+    });
   }
 
   Future<void> _saveAndClose() async {
@@ -374,6 +441,26 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                     onPressed: _addPdf,
                     icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
                     label: const Text('Add PDF'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _record,
+                    icon: const Icon(Icons.mic_rounded, size: 18),
+                    label: const Text('Record'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _dictate,
+                    icon: const Icon(Icons.graphic_eq_rounded, size: 18),
+                    label: const Text('Dictate'),
                   ),
                 ),
               ],

@@ -5,9 +5,12 @@ import '../../theme/nest_theme.dart';
 import '../../widgets/nest_drawer.dart';
 import '../../widgets/nest_nav_bar.dart';
 import '../capture/capture_sheet.dart';
+import '../capture/dictation_page.dart';
+import '../capture/record_page.dart';
 import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
+import '../notes/transcript_editor.dart';
 import '../search/search_page.dart';
 import '../shared/shared_page.dart';
 import '../capture/media_capture.dart';
@@ -95,8 +98,28 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    if (kind == CaptureKind.voice) {
-      _toast('Lecture recording is coming in the next step');
+    if (kind == CaptureKind.record) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RecordPage(initialSubjectId: subject?.id),
+        ),
+      );
+      return;
+    }
+
+    if (kind == CaptureKind.dictate) {
+      final transcript = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const DictationPage()),
+      );
+      if (transcript == null || transcript.trim().isEmpty || !mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TranscriptEditorPage(
+            transcript: transcript,
+            initialSubjectId: subject?.id,
+          ),
+        ),
+      );
       return;
     }
 

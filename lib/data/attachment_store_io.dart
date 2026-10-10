@@ -29,6 +29,20 @@ class AttachmentStore {
     return 'a_$stamp$ext';
   }
 
+  /// The name part of a path, used to turn the recorder's output path back
+  /// into the bare name the database stores.
+  static String nameOf(String path) => p.basename(path);
+
+  /// A full path for a file that is about to be written, inside the attachment
+  /// folder.
+  ///
+  /// The recorder writes its audio straight here, so a finished recording does
+  /// not have to be copied in afterwards the way a picked image does.
+  static Future<String> newFilePath(String extension) async {
+    final dir = await _dir();
+    return p.join(dir.path, _newName(extension));
+  }
+
   /// Copies a file in and returns the name it was stored under.
   static Future<String> saveFile(String sourcePath, String extension) async {
     final dir = await _dir();

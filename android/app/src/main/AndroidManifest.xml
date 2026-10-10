@@ -1,4 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lecture recording and dictation both need the microphone. Android
+         still asks the student the first time either is used; this only
+         declares that the app may ask. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- The device speech recogniser sends audio to Google's service unless an
+         offline language pack is installed, so it needs the network. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- A microphone is not required to install the app: a device without one
+         can still use every other part of NoteNest. -->
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false"/>
+
     <application
         android:label="notenest"
         android:name="${applicationName}"
@@ -45,6 +61,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+
+        <!-- From Android 11 an app can only see the other apps it declares an
+             interest in. Without this the speech plugin cannot find the
+             device's recognition service at all, and dictation reports that no
+             recogniser is available even on a phone that plainly has one. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>

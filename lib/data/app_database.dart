@@ -5,15 +5,15 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 /// Opens the local SQLite database and owns the schema.
 ///
-/// Adding a table later means raising [_version] and adding a step to
-/// [_upgrade], so an installed app is migrated instead of wiped.
+/// Adding a table or a column later means raising [_version] and adding a step
+/// to [_upgrade], so an installed app is migrated instead of wiped.
 class AppDatabase {
   AppDatabase._();
 
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 3;
+  static const _version = 4;
 
   Database? _db;
 
@@ -137,7 +137,8 @@ class AppDatabase {
     );
   }
 
-  /// Version 3 added files attached to notes.
+  /// Version 3 added files attached to notes. Version 4 added `duration_ms`
+  /// to it, for how long a recording runs.
   Future<void> _createAttachments(Database db) async {
     await db.execute('''
       CREATE TABLE attachments (
@@ -148,6 +149,7 @@ class AppDatabase {
         stored_name TEXT    NOT NULL,
         size_bytes  INTEGER NOT NULL DEFAULT 0,
         page_count  INTEGER,
+        duration_ms INTEGER,
         position    INTEGER NOT NULL DEFAULT 0,
         created_at  INTEGER NOT NULL,
         FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
@@ -164,7 +166,15 @@ class AppDatabase {
       await _createNotes(db);
     }
     if (from < 3) {
+      // The table is created at its current shape, duration_ms included, which
+      // is why the next step has to skip an install that passed through here.
       await _createAttachments(db);
+    }
+    if (from >= 3 && from < 4) {
+      // Only an install that already had the version 3 attachments table needs
+      // the column adding; adding it to the table just created above would
+      // fail as a duplicate column.
+      await db.execute('ALTER TABLE attachments ADD COLUMN duration_ms INTEGER');
     }
   }
 

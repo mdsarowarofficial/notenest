@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../data/attachment_store.dart';
 import '../../theme/nest_theme.dart';
 
-/// The four ways a note can start. Requirement 5.
+/// The ways a note can start. Requirement 5 and Requirement 8.
 ///
-/// Text, photo and PDF all open real screens. Voice is the one still to come.
-enum CaptureKind { text, photo, pdf, voice }
+/// Recording and dictation are deliberately separate choices rather than one
+/// "voice" option. They are not two steps of the same thing: recording keeps
+/// an audio file you can play back, dictation writes words into the note. The
+/// device's recogniser cannot read an audio file back on Android, so one
+/// cannot be turned into the other afterwards and the student has to pick
+/// before the lecture, not after.
+enum CaptureKind { text, photo, pdf, record, dictate }
 
 Future<CaptureKind?> showCaptureSheet(BuildContext context) {
   return showModalBottomSheet<CaptureKind>(
@@ -21,19 +27,48 @@ Future<CaptureKind?> showCaptureSheet(BuildContext context) {
 class _CaptureSheet extends StatelessWidget {
   const _CaptureSheet();
 
-  static const _options = <_CaptureOption>[
-    _CaptureOption(CaptureKind.text, 'Write a note',
-        'Start with a blank page', Icons.edit_rounded, true),
-    _CaptureOption(CaptureKind.photo, 'Photograph handwriting',
-        'Crop and straighten a page', Icons.photo_camera_rounded, true),
-    _CaptureOption(CaptureKind.pdf, 'Add a PDF',
-        'Slides, books, question papers', Icons.picture_as_pdf_rounded, true),
-    _CaptureOption(CaptureKind.voice, 'Record the lecture',
-        'Turns speech into a study note', Icons.mic_rounded, false),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    // A recording is a file, and the browser build has nowhere to keep files,
+    // so that is said here rather than two screens later.
+    final filesWork = AttachmentStore.isSupported;
+
+    final options = <_CaptureOption>[
+      const _CaptureOption(
+        CaptureKind.text,
+        'Write a note',
+        'Start with a blank page',
+        Icons.edit_rounded,
+      ),
+      _CaptureOption(
+        CaptureKind.photo,
+        'Photograph handwriting',
+        'Crop and straighten a page',
+        Icons.photo_camera_rounded,
+        badge: filesWork ? null : 'PHONE',
+      ),
+      _CaptureOption(
+        CaptureKind.pdf,
+        'Add a PDF',
+        'Slides, books, question papers',
+        Icons.picture_as_pdf_rounded,
+        badge: filesWork ? null : 'PHONE',
+      ),
+      _CaptureOption(
+        CaptureKind.record,
+        'Record the lecture',
+        'Keeps the audio to play back later',
+        Icons.mic_rounded,
+        badge: filesWork ? null : 'PHONE',
+      ),
+      const _CaptureOption(
+        CaptureKind.dictate,
+        'Dictate into text',
+        'Speak and it becomes a study note',
+        Icons.graphic_eq_rounded,
+      ),
+    ];
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
@@ -57,14 +92,14 @@ class _CaptureSheet extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 18),
-            for (final o in _options)
+            for (final o in options)
               Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(NestRadius.tile),
                   onTap: () => Navigator.pop(context, o.kind),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
                     child: Row(
                       children: [
                         Container(
@@ -78,7 +113,7 @@ class _CaptureSheet extends StatelessWidget {
                           child: Icon(
                             o.icon,
                             size: 20,
-                            color: o.ready
+                            color: o.badge == null
                                 ? NestColor.pen
                                 : NestColor.inkFaint,
                           ),
@@ -90,13 +125,15 @@ class _CaptureSheet extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    o.title,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall,
+                                  Flexible(
+                                    child: Text(
+                                      o.title,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
+                                    ),
                                   ),
-                                  if (!o.ready) ...[
+                                  if (o.badge != null) ...[
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
@@ -106,7 +143,7 @@ class _CaptureSheet extends StatelessWidget {
                                         borderRadius:
                                             BorderRadius.circular(6),
                                       ),
-                                      child: Text('SOON',
+                                      child: Text(o.badge!,
                                           style: nestEyebrow.copyWith(
                                               fontSize: 9.5)),
                                     ),
@@ -138,13 +175,19 @@ class _CaptureSheet extends StatelessWidget {
 
 class _CaptureOption {
   const _CaptureOption(
-      this.kind, this.title, this.subtitle, this.icon, this.ready);
+    this.kind,
+    this.title,
+    this.subtitle,
+    this.icon, {
+    this.badge,
+  });
 
   final CaptureKind kind;
   final String title;
   final String subtitle;
   final IconData icon;
 
-  /// Whether the option opens a real screen yet.
-  final bool ready;
+  /// A short word shown beside the title when the option is limited on this
+  /// platform. Null when it works here.
+  final String? badge;
 }
