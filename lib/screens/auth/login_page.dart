@@ -396,7 +396,7 @@ class AuthErrorLine extends StatelessWidget {
       decoration: BoxDecoration(
         color: NestColor.o(NestColor.redPen, 0.08),
         borderRadius: BorderRadius.circular(NestRadius.tile),
-        border: Border(
+        border: const Border(
           left: BorderSide(color: NestColor.redPen, width: 3),
         ),
       ),

@@ -15,10 +15,12 @@ class TodayPage extends StatelessWidget {
     super.key,
     required this.onOpenNotes,
     required this.onCapture,
+    required this.onSearch,
   });
 
   final VoidCallback onOpenNotes;
   final VoidCallback onCapture;
+  final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,15 @@ class TodayPage extends StatelessWidget {
             Text(_headline(repo, days), style: t.displaySmall),
             const SizedBox(height: 10),
             Text(_subline(repo), style: t.bodyMedium),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            // A notebook is only useful if you can find things in it, so the
+            // way in sits on the landing screen rather than only in the bar.
+            if (repo.hasNotes) ...[
+              _SearchRow(onTap: onSearch, count: repo.notes().length),
+              const SizedBox(height: 22),
+            ] else
+              const SizedBox(height: 4),
 
             if (!repo.hasSubjects)
               _StartCard(
@@ -70,7 +80,7 @@ class TodayPage extends StatelessWidget {
               const SizedBox(height: 26),
               Row(
                 children: [
-                  Text('RECENT', style: nestEyebrow),
+                  const Text('RECENT', style: nestEyebrow),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Container(height: 1, color: NestColor.rule),
@@ -112,6 +122,49 @@ class TodayPage extends StatelessWidget {
     }
     if (!repo.hasNotes) return 'No notes yet in any subject.';
     return 'Set an exam date in Exam Mode to see a countdown here.';
+  }
+}
+
+/// The way into search, drawn as an empty line waiting to be written on.
+class _SearchRow extends StatelessWidget {
+  const _SearchRow({required this.onTap, required this.count});
+
+  final VoidCallback onTap;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(NestRadius.tile),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: NestColor.card,
+          borderRadius: BorderRadius.circular(NestRadius.tile),
+          border: Border.all(color: NestColor.rule),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search_rounded,
+                size: 19, color: NestColor.inkFaint),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? 'Search your 1 note'
+                    : 'Search your $count notes',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: NestColor.inkSoft,
+                ),
+              ),
+            ),
+            Text('FIND', style: nestEyebrow.copyWith(color: NestColor.pen)),
+          ],
+        ),
+      ),
+    );
   }
 }
 

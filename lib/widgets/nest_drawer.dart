@@ -184,7 +184,7 @@ class NestDrawer extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 2),
-                    Text('VIEW PROFILE', style: nestEyebrow),
+                    const Text('VIEW PROFILE', style: nestEyebrow),
                   ],
                 ),
               ),
@@ -229,7 +229,7 @@ class NestDrawer extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                Text('MASTERED', style: nestEyebrow),
+                const Text('MASTERED', style: nestEyebrow),
                 const Spacer(),
                 Text(
                   '${(mastered * 100).round()}%',

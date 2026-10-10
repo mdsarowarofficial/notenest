@@ -8,6 +8,7 @@ import '../capture/capture_sheet.dart';
 import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
+import '../search/search_page.dart';
 import '../shared/shared_page.dart';
 import '../capture/media_capture.dart';
 import '../notes/note_editor.dart';
@@ -66,6 +67,12 @@ class _HomeShellState extends State<HomeShell> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 104),
       ),
+    );
+  }
+
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SearchPage()),
     );
   }
 
@@ -198,7 +205,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
           actions: [
             IconButton(
-              onPressed: () {},
+              onPressed: _openSearch,
               icon: const Icon(Icons.search_rounded),
               tooltip: 'Search notes',
             ),
@@ -211,6 +218,7 @@ class _HomeShellState extends State<HomeShell> {
             TodayPage(
               onOpenNotes: () => setState(() => _tab = 1),
               onCapture: _openCapture,
+              onSearch: _openSearch,
             ),
             NotesPage(subjectCode: _drawerSelection, onCapture: _openCapture),
             const SharedPage(),

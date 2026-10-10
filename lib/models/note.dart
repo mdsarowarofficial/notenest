@@ -50,6 +50,21 @@ enum NoteType { text, image, pdf, voice }
 extension NoteTypeData on NoteType {
   String get key => name;
 
+  /// What the student is shown. "text" is the word that is stored; "Written"
+  /// is the one that reads correctly in a filter chip or a sentence.
+  String get label {
+    switch (this) {
+      case NoteType.text:
+        return 'Written';
+      case NoteType.image:
+        return 'Photo';
+      case NoteType.pdf:
+        return 'PDF';
+      case NoteType.voice:
+        return 'Voice';
+    }
+  }
+
   static NoteType fromKey(String? key) {
     switch (key) {
       case 'image':

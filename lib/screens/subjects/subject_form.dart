@@ -117,7 +117,7 @@ class _SubjectFormState extends State<_SubjectForm> {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
-            Text('SUBJECT NAME', style: nestEyebrow),
+            const Text('SUBJECT NAME', style: nestEyebrow),
             const SizedBox(height: 8),
             _field(
               controller: _name,
@@ -126,7 +126,7 @@ class _SubjectFormState extends State<_SubjectForm> {
               capitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 18),
-            Text('SUBJECT CODE', style: nestEyebrow),
+            const Text('SUBJECT CODE', style: nestEyebrow),
             const SizedBox(height: 8),
             _field(
               controller: _code,
@@ -135,7 +135,7 @@ class _SubjectFormState extends State<_SubjectForm> {
               capitalization: TextCapitalization.characters,
             ),
             const SizedBox(height: 18),
-            Text('INDEX TAB COLOUR', style: nestEyebrow),
+            const Text('INDEX TAB COLOUR', style: nestEyebrow),
             const SizedBox(height: 10),
             Row(
               children: [

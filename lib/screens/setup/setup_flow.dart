@@ -222,7 +222,7 @@ class _SetupFlowState extends State<SetupFlow> {
           children: [
             Row(
               children: [
-                Text('SUBJECTS', style: nestEyebrow),
+                const Text('SUBJECTS', style: nestEyebrow),
                 const Spacer(),
                 if (subjects.isNotEmpty)
                   Text('${subjects.length}', style: nestEyebrow),
@@ -302,7 +302,7 @@ class _SetupFlowState extends State<SetupFlow> {
       default:
         return _Sheet(
           children: [
-            Text('REVISION REMINDER', style: nestEyebrow),
+            const Text('REVISION REMINDER', style: nestEyebrow),
             const SizedBox(height: 12),
             for (final r in _reminders)
               Padding(

@@ -241,7 +241,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 30),
               Row(
                 children: [
-                  Text('YOUR SUBJECTS', style: nestEyebrow),
+                  const Text('YOUR SUBJECTS', style: nestEyebrow),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Container(height: 1, color: NestColor.rule),

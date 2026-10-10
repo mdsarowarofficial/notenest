@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
 import '../../models/note.dart';
+import '../../models/note_query.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/nest_tags.dart';
 import '../../widgets/note_tile.dart';
+import '../search/search_page.dart';
 import 'attachment_strip.dart';
 import 'note_editor.dart';
 
@@ -62,6 +65,16 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
           label: 'Undo',
           onPressed: () => _repo.restoreNote(note),
         ),
+      ),
+    );
+  }
+
+  /// Tapping a tag is how a student walks from one note to the rest of the
+  /// material filed under the same idea.
+  void _openTag(String tag) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SearchPage(initial: NoteQuery(tag: tag)),
       ),
     );
   }
@@ -161,6 +174,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              if (note.tags.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                NestTagChips(tags: note.tags, onTap: _openTag),
+              ],
               const SizedBox(height: 22),
               _StatusPicker(note: note),
               const SizedBox(height: 22),
@@ -198,7 +215,7 @@ class _StatusPicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('STUDY STATUS', style: nestEyebrow),
+        const Text('STUDY STATUS', style: nestEyebrow),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,

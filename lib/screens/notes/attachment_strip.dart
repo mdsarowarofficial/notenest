@@ -111,7 +111,7 @@ class AttachmentStripState extends State<AttachmentStrip> {
           children: [
             Row(
               children: [
-                Text('ATTACHED', style: nestEyebrow),
+                const Text('ATTACHED', style: nestEyebrow),
                 const SizedBox(width: 8),
                 Text('${items.length}', style: nestEyebrow),
               ],

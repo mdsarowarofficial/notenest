@@ -3,18 +3,22 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/attachment.dart';
 import '../models/note.dart';
+import '../models/note_query.dart';
 import '../models/subject.dart';
 import '../widgets/nest_drawer.dart';
 import 'app_database.dart';
 import 'attachment_store.dart';
 import 'auth_repository.dart';
 
+/// SQLite treats `%` and `_` inside LIKE as wildcards, so a student searching
+/// for "50%" would otherwise match every note. Each needle escapes them with a
+/// backslash and every LIKE declares that backslash as its escape character.
+const _likeEscape = "ESCAPE '\\'";
+
 /// The one place every screen asks for data.
 ///
 /// Everything is scoped to the signed-in account, so two students sharing a
-/// phone never see each other's subjects. Notes are still empty because the
-/// notes table does not exist yet; when it does, only this file and the note
-/// screens change.
+/// phone never see each other's subjects or notes.
 class NoteRepository extends ChangeNotifier {
   NoteRepository._();
 
@@ -23,6 +27,7 @@ class NoteRepository extends ChangeNotifier {
   static const _kSemester = 'semester_label';
   static const _kReminder = 'revision_reminder';
   static const _kSetupDone = 'setup_done';
+  static const _kRecentSearches = 'recent_searches';
 
   final _db = AppDatabase.instance;
   final _auth = AuthRepository.instance;
@@ -60,12 +65,7 @@ class NoteRepository extends ChangeNotifier {
   /// Reads everything belonging to the signed-in account.
   Future<void> load() async {
     if (!_auth.isSignedIn) {
-      _subjects = const [];
-      _notes = const [];
-      semesterLabel = null;
-      reminderChoice = null;
-      setupDone = false;
-      notifyListeners();
+      clear();
       return;
     }
 
@@ -80,6 +80,7 @@ class NoteRepository extends ChangeNotifier {
     semesterLabel = map[_kSemester];
     reminderChoice = map[_kReminder];
     setupDone = map[_kSetupDone] == '1';
+    _recentSearches = _splitSearches(map[_kRecentSearches]);
 
     await _reloadSubjects();
     await _reloadNotes();
@@ -90,6 +91,7 @@ class NoteRepository extends ChangeNotifier {
   void clear() {
     _subjects = const [];
     _notes = const [];
+    _recentSearches = const [];
     semesterLabel = null;
     reminderChoice = null;
     setupDone = false;
@@ -241,6 +243,14 @@ class NoteRepository extends ChangeNotifier {
     return done / list.length;
   }
 
+  int countWithStatus(StudyStatus status) =>
+      _notes.where((n) => n.status == status).length;
+
+  int countWithType(NoteType type) =>
+      _notes.where((n) => n.type == type).length;
+
+  int get importantCount => _notes.where((n) => n.important).length;
+
   Future<void> _reloadNotes() async {
     final rows = await _db.db.query(
       'notes',
@@ -267,7 +277,7 @@ class NoteRepository extends ChangeNotifier {
       topic: topic?.trim().isEmpty == true ? null : topic?.trim(),
       title: title.trim(),
       body: body,
-      tags: tags,
+      tags: normalizeTags(tags),
       createdAt: now,
       updatedAt: now,
     );
@@ -295,7 +305,8 @@ class NoteRepository extends ChangeNotifier {
   Future<void> toggleImportant(Note note) =>
       updateNote(note.copyWith(important: !note.important));
 
-  /// Records that the note was opened, so Exam Mode can raise stale notes.
+  /// Records that the note was opened, so Exam Mode and the "Recently opened"
+  /// order have something to work from.
   Future<void> markOpened(Note note) async {
     if (note.id == null) return;
     await _db.db.update(
@@ -305,6 +316,154 @@ class NoteRepository extends ChangeNotifier {
       whereArgs: [note.id],
     );
     await _reloadNotes();
+  }
+
+  // ------------------------------------------------------- search and filter
+
+  /// Narrows and orders the notes already held in memory.
+  ///
+  /// The Notes tab uses this rather than [searchNotes] so that switching a
+  /// filter redraws at once instead of waiting on the database. Both paths
+  /// answer the same [NoteQuery]; this one is for a list already on screen,
+  /// the SQL one for searching the whole notebook.
+  List<Note> queryNotes(NoteQuery query) =>
+      List.unmodifiable(query.apply(_notes));
+
+  /// Runs the query against the database. Requirement 6.1.
+  ///
+  /// Free text is split into words and each word must appear in the title, the
+  /// body, the topic or the tags, so the order the student types them in does
+  /// not matter.
+  Future<List<Note>> searchNotes(NoteQuery query, {int limit = 300}) async {
+    if (!_auth.isSignedIn) return const [];
+
+    final where = <String>['user_id = ?', 'deleted_at IS NULL'];
+    final args = <Object?>[_auth.requireUserId];
+
+    if (query.subjectId != null) {
+      where.add('subject_id = ?');
+      args.add(query.subjectId);
+    }
+    if (query.type != null) {
+      where.add('type = ?');
+      args.add(query.type!.key);
+    }
+    if (query.status != null) {
+      where.add('status = ?');
+      args.add(query.status!.key);
+    }
+    if (query.importantOnly) {
+      where.add('important = 1');
+    }
+    if (query.tag != null) {
+      // Tags live in one comma-joined column. Padding both the column and the
+      // needle with commas makes the match exact, so "db" no longer matches
+      // the tag "dbms".
+      where.add("(',' || tags || ',') LIKE ? $_likeEscape");
+      args.add('%,${_escapeLike(normalizeTag(query.tag!))},%');
+    }
+    for (final term in query.terms) {
+      where.add(
+        '(title LIKE ? $_likeEscape '
+        'OR body LIKE ? $_likeEscape '
+        "OR IFNULL(topic, '') LIKE ? $_likeEscape "
+        'OR tags LIKE ? $_likeEscape)',
+      );
+      final needle = '%${_escapeLike(term)}%';
+      args.addAll([needle, needle, needle, needle]);
+    }
+
+    final rows = await _db.db.query(
+      'notes',
+      where: where.join(' AND '),
+      whereArgs: args,
+      orderBy: query.sort.orderBy,
+      limit: limit,
+    );
+    return rows.map(Note.fromMap).toList();
+  }
+
+  static String _escapeLike(String value) => value
+      .replaceAll('\\', '\\\\')
+      .replaceAll('%', '\\%')
+      .replaceAll('_', '\\_');
+
+  // ------------------------------------------------------------------ tags
+
+  /// Every tag in use, in alphabetical order, for suggestions and filters.
+  List<String> allTags() {
+    final seen = <String>{};
+    for (final n in _notes) {
+      for (final t in n.tags) {
+        final clean = normalizeTag(t);
+        if (clean.isNotEmpty) seen.add(clean);
+      }
+    }
+    final list = seen.toList()..sort();
+    return List.unmodifiable(list);
+  }
+
+  /// Tags ordered by how many notes carry them, so the filter bar offers the
+  /// ones the student actually uses rather than the alphabet.
+  List<String> topTags({int limit = 8}) {
+    final counts = <String, int>{};
+    for (final n in _notes) {
+      for (final t in n.tags) {
+        final clean = normalizeTag(t);
+        if (clean.isEmpty) continue;
+        counts[clean] = (counts[clean] ?? 0) + 1;
+      }
+    }
+    final list = counts.keys.toList()
+      ..sort((a, b) {
+        final byCount = counts[b]!.compareTo(counts[a]!);
+        return byCount != 0 ? byCount : a.compareTo(b);
+      });
+    return List.unmodifiable(list.take(limit));
+  }
+
+  int noteCountForTag(String tag) {
+    final wanted = normalizeTag(tag);
+    return _notes
+        .where((n) => n.tags.any((t) => normalizeTag(t) == wanted))
+        .length;
+  }
+
+  Future<void> updateTags(Note note, List<String> tags) =>
+      updateNote(note.copyWith(tags: normalizeTags(tags)));
+
+  // -------------------------------------------------------- recent searches
+
+  List<String> _recentSearches = const [];
+
+  List<String> recentSearches() => List.unmodifiable(_recentSearches);
+
+  static List<String> _splitSearches(String? stored) {
+    if (stored == null || stored.trim().isEmpty) return const [];
+    return stored
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// Keeps the last few searches so a repeated lookup is one tap.
+  Future<void> rememberSearch(String text) async {
+    final q = text.trim();
+    if (q.length < 2 || !_auth.isSignedIn) return;
+
+    final kept = _recentSearches
+        .where((s) => s.toLowerCase() != q.toLowerCase())
+        .toList();
+    _recentSearches = [q, ...kept].take(8).toList();
+    await _setSetting(_kRecentSearches, _recentSearches.join('\n'));
+    notifyListeners();
+  }
+
+  Future<void> clearRecentSearches() async {
+    _recentSearches = const [];
+    if (_auth.isSignedIn) await _setSetting(_kRecentSearches, '');
+    notifyListeners();
   }
 
   // ----------------------------------------------------------- attachments

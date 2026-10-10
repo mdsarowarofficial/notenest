@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
 import '../../models/note.dart';
+import '../../models/note_query.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/nest_tags.dart';
 import '../capture/media_capture.dart';
 import 'attachment_strip.dart';
 
@@ -30,6 +32,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   late final TextEditingController _topic;
 
   int? _subjectId;
+  List<String> _tags = const [];
   Note? _note;
   final _stripKey = GlobalKey<AttachmentStripState>();
 
@@ -45,6 +48,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
     _title = TextEditingController(text: _note?.title ?? '');
     _body = TextEditingController(text: _note?.body ?? '');
     _topic = TextEditingController(text: _note?.topic ?? '');
+    _tags = normalizeTags(_note?.tags ?? const []);
     _subjectId = _note?.subjectId ??
         widget.initialSubjectId ??
         (_repo.subjects().isNotEmpty ? _repo.subjects().first.id : null);
@@ -89,12 +93,14 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
         body: _body.text,
         subjectId: _subjectId,
         topic: _topic.text,
+        tags: _tags,
       );
     } else {
       final updated = _note!.copyWith(
         title: title,
         body: _body.text,
         topic: _topic.text.trim(),
+        tags: _tags,
         subjectId: _subjectId,
         clearSubject: _subjectId == null,
       );
@@ -117,6 +123,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
         title: 'Untitled note',
         subjectId: _subjectId,
         topic: _topic.text,
+        tags: _tags,
       );
       if (mounted) setState(() {});
     } else {
@@ -227,7 +234,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('SUBJECT', style: nestEyebrow),
+                      const Text('SUBJECT', style: nestEyebrow),
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -289,7 +296,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('TOPIC', style: nestEyebrow),
+                      const Text('TOPIC', style: nestEyebrow),
                       const SizedBox(height: 6),
                       TextField(
                         controller: _topic,
@@ -313,6 +320,17 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 18),
+            const Text('TAGS', style: nestEyebrow),
+            const SizedBox(height: 7),
+            NestTagField(
+              tags: _tags,
+              suggestions: _repo.allTags(),
+              onChanged: (next) => setState(() {
+                _tags = next;
+                _dirty = true;
+              }),
             ),
             const SizedBox(height: 20),
             Container(height: 1, color: NestColor.rule),
