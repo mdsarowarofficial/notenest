@@ -12,6 +12,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        // Required by flutter_local_notifications, which uses java.time to
+        // work out when a reminder is due. Desugaring rewrites those calls so
+        // they also run on Android versions that never shipped java.time.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -27,6 +32,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Desugaring adds a support library to the app, which can push a
+        // debug build past the single-dex method limit. On minSdk 21 and above
+        // this costs nothing at runtime.
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -42,6 +52,12 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+// The desugaring support library itself. This block belongs at the top level,
+// outside `android { }`.
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {
