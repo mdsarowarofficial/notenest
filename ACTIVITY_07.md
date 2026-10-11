@@ -92,6 +92,22 @@ with a button through to Note requests, instead of a dead screen or a "coming
 soon" toast. This is the one Gantt item of the five that is genuinely deferred,
 and it is deferred to Activity 09 where it belongs.
 
+## A correction carried over from Activity 06
+
+The dictation screen used to say the words were recognised on the device "so
+nothing is sent anywhere". That was wrong, and it has been reworded.
+
+The recogniser does belong to the device, but on Android and in the browser it
+normally passes the audio on to the platform's speech service — Google's, in
+practice. Only an installed **offline language pack** keeps it local, and
+Bengali packs are not on every phone. Recording is unaffected: that writes a
+file and touches no network.
+
+It is worth stating in the report as a privacy limitation rather than leaving
+it implied. An app that handles a student's lecture audio should say where that
+audio goes, and "the recogniser is on the device" is not the same claim as "the
+audio stays on the device".
+
 ## Known limitations
 
 - **The receiver has to find the file.** NoteNest does not register itself as a

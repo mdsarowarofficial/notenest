@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 5;
+  static const _version = 6;
 
   Database? _db;
 
@@ -104,6 +104,33 @@ class AppDatabase {
 
     await _createNotes(db);
     await _createAttachments(db);
+    await _createExams(db);
+  }
+
+  /// Version 6 added exams, which also carry the academic calendar: a quiz or
+  /// an assignment is the same row with a different `kind`.
+  Future<void> _createExams(Database db) async {
+    await db.execute('''
+      CREATE TABLE exams (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        subject_id INTEGER,
+        title      TEXT    NOT NULL,
+        exam_date  INTEGER NOT NULL,
+        kind       TEXT    NOT NULL DEFAULT 'exam',
+        note       TEXT,
+        -- Days before the date to remind, or NULL for no reminder.
+        remind_days INTEGER,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
+      )
+    ''');
+    // The countdown asks for the soonest date, and the calendar asks for a
+    // month of them; both are this index.
+    await db.execute(
+      'CREATE INDEX idx_exams_user_date ON exams (user_id, exam_date)',
+    );
   }
 
   /// Version 2 added the notes table. Version 5 added the three sharing
@@ -192,6 +219,11 @@ class AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_notes_shared '
         'ON notes (user_id, shared_by, shared_at)',
       );
+    }
+    if (from < 6) {
+      // A whole new table, so no guard is needed — nothing below version 6
+      // has it, and version 6 installs go through _create instead.
+      await _createExams(db);
     }
   }
 

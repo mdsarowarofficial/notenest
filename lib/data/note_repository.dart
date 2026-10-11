@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/attachment.dart';
+import '../models/exam.dart';
 import '../models/note.dart';
 import '../models/note_bundle.dart';
 import '../models/note_query.dart';
@@ -85,6 +86,7 @@ class NoteRepository extends ChangeNotifier {
 
     await _reloadSubjects();
     await _reloadNotes();
+    await _reloadExams();
     notifyListeners();
   }
 
@@ -92,6 +94,7 @@ class NoteRepository extends ChangeNotifier {
   void clear() {
     _subjects = const [];
     _notes = const [];
+    _exams = const [];
     _recentSearches = const [];
     semesterLabel = null;
     reminderChoice = null;
@@ -726,18 +729,121 @@ class NoteRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ------------------------------------------------------- exam (not built)
+  // -------------------------------------------------------------- exams
 
-  DateTime? nextExamDate;
-  String? nextExamSubject;
+  List<Exam> _exams = const [];
 
-  int? get daysToNextExam {
-    final exam = nextExamDate;
-    if (exam == null) return null;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return DateTime(exam.year, exam.month, exam.day).difference(today).inDays;
+  /// Every exam, quiz and assignment, soonest first. Past ones are kept —
+  /// "what did I sit last week" is a fair thing to ask.
+  List<Exam> exams() => List.unmodifiable(_exams);
+
+  List<Exam> upcomingExams() =>
+      List.unmodifiable(_exams.where((e) => !e.isPast));
+
+  /// The next one due, or null when nothing is scheduled.
+  Exam? get nextExam {
+    for (final e in _exams) {
+      if (!e.isPast) return e;
+    }
+    return null;
   }
+
+  DateTime? get nextExamDate => nextExam?.date;
+
+  String? get nextExamSubject {
+    final exam = nextExam;
+    if (exam == null) return null;
+    final subject =
+        exam.subjectId == null ? null : subjectById(exam.subjectId!);
+    return subject?.code ?? exam.title;
+  }
+
+  int? get daysToNextExam => nextExam?.daysAway;
+
+  List<Exam> examsForSubject(int subjectId) =>
+      List.unmodifiable(_exams.where((e) => e.subjectId == subjectId));
+
+  /// Everything on one day, for the calendar.
+  List<Exam> examsOn(DateTime day) {
+    final target = atMidnight(day);
+    return List.unmodifiable(
+      _exams.where((e) => atMidnight(e.date) == target),
+    );
+  }
+
+  Future<void> _reloadExams() async {
+    final rows = await _db.db.query(
+      'exams',
+      where: 'user_id = ?',
+      whereArgs: [_auth.requireUserId],
+      orderBy: 'exam_date ASC',
+    );
+    _exams = rows.map(Exam.fromMap).toList();
+  }
+
+  /// Exams whose reminder window has opened, soonest first.
+  ///
+  /// This is what the app can do on its own: the reminder is shown the next
+  /// time the student opens NoteNest. A notification that arrives while the
+  /// app is closed needs a scheduled alarm from the operating system, which is
+  /// the one piece of Activity 08 still outstanding.
+  List<Exam> dueReminders() =>
+      List.unmodifiable(_exams.where((e) => e.reminderIsDue));
+
+  Future<Exam> addExam({
+    required String title,
+    required DateTime date,
+    int? subjectId,
+    ExamKind kind = ExamKind.exam,
+    String? note,
+    int? remindDays,
+  }) async {
+    final exam = Exam(
+      userId: _auth.requireUserId,
+      subjectId: subjectId,
+      title: title.trim(),
+      date: atMidnight(date),
+      kind: kind,
+      note: note?.trim().isEmpty == true ? null : note?.trim(),
+      remindDays: remindDays,
+      createdAt: DateTime.now(),
+    );
+    final id = await _db.db.insert('exams', exam.toMap());
+    await _reloadExams();
+    notifyListeners();
+    return exam.copyWith(id: id);
+  }
+
+  Future<void> updateExam(Exam exam) async {
+    if (exam.id == null) return;
+    await _db.db
+        .update('exams', exam.toMap(), where: 'id = ?', whereArgs: [exam.id]);
+    await _reloadExams();
+    notifyListeners();
+  }
+
+  Future<void> deleteExam(Exam exam) async {
+    if (exam.id == null) return;
+    await _db.db.delete('exams', where: 'id = ?', whereArgs: [exam.id]);
+    await _reloadExams();
+    notifyListeners();
+  }
+
+  /// The notes to revise for an exam, in the order Exam Mode recommends.
+  ///
+  /// An exam with no subject covers the whole notebook, which is what a
+  /// student means by "finals".
+  List<Note> revisionQueue(Exam exam) {
+    final pool = exam.subjectId == null
+        ? _notes
+        : _notes.where((n) => n.subjectId == exam.subjectId).toList();
+    return List.unmodifiable(revisionOrder(pool));
+  }
+
+  /// How many of those are not yet Mastered.
+  int remainingFor(Exam exam) => revisionQueue(exam)
+      .where((n) => n.status != StudyStatus.mastered)
+      .length;
 
   bool get isSynced => false;
 

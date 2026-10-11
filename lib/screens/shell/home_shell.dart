@@ -287,6 +287,7 @@ class _HomeShellState extends State<HomeShell> {
               onOpenNotes: () => setState(() => _tab = 1),
               onCapture: _openCapture,
               onSearch: _openSearch,
+              onOpenExams: () => setState(() => _tab = 3),
             ),
             NotesPage(subjectCode: _drawerSelection, onCapture: _openCapture),
             const SharedPage(),

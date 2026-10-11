@@ -265,9 +265,16 @@ class _DictationPageState extends State<DictationPage> {
                 listening
                     ? 'Words appear as the device recognises them. Pauses are '
                         'fine — it starts itself again.'
-                    : 'The words are recognised on this device, so nothing is '
-                        'sent anywhere. You can fix the text on the next '
-                        'screen.',
+                    // Deliberately not "nothing leaves your phone". The
+                    // recogniser belongs to the device, but on Android and in
+                    // the browser it normally passes the audio on to the
+                    // platform speech service — only an installed offline
+                    // language pack keeps it local. Claiming otherwise would
+                    // be a privacy promise the app cannot keep.
+                    : 'The listening is done by the recogniser built into '
+                        'this device. Unless it has an offline language pack, '
+                        'that passes the audio on to the platform speech '
+                        'service. You can fix the words on the next screen.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),

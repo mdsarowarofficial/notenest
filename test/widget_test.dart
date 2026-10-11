@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:notenest/models/attachment.dart';
+import 'package:notenest/models/exam.dart';
 import 'package:notenest/models/note.dart';
 import 'package:notenest/models/note_bundle.dart';
 import 'package:notenest/models/note_query.dart';
@@ -587,6 +588,250 @@ void main() {
       expect(readableBytes(900), '900 B');
       expect(readableBytes(2048), '2 KB');
       expect(readableBytes(3 * 1024 * 1024), '3.0 MB');
+    });
+  });
+
+  group('exam dates', () {
+    test('a date is a day, not a moment', () {
+      expect(atMidnight(DateTime(2026, 5, 4, 23, 59)), DateTime(2026, 5, 4));
+    });
+
+    test('whole days are counted regardless of the time of day', () {
+      final from = DateTime(2026, 6, 10, 23, 30);
+      expect(daysUntil(DateTime(2026, 6, 12, 1), from: from), 2);
+      expect(daysUntil(DateTime(2026, 6, 10, 0, 1), from: from), 0);
+      expect(daysUntil(DateTime(2026, 6, 8), from: from), -2);
+    });
+
+    test('a daylight-saving shift in between does not lose a day', () {
+      // 8 March 2026 is a clocks-forward date in several timezones. Measured
+      // in local hours the gap below is 47, which would round down to 1.
+      expect(
+        daysUntil(DateTime(2026, 3, 10), from: DateTime(2026, 3, 8)),
+        2,
+      );
+    });
+
+    test('the countdown reads as a sentence would', () {
+      expect(countdownLabel(0), 'Today');
+      expect(countdownLabel(1), 'Tomorrow');
+      expect(countdownLabel(6), 'in 6 days');
+      expect(countdownLabel(-1), 'Yesterday');
+      expect(countdownLabel(-4), '4 days ago');
+    });
+
+    test('an exam survives the trip to the database and back', () {
+      final exam = Exam(
+        userId: 1,
+        subjectId: 3,
+        title: 'Mid term',
+        date: DateTime(2026, 5, 4, 14, 30),
+        kind: ExamKind.quiz,
+        remindDays: 3,
+        createdAt: DateTime(2026, 4, 1),
+      );
+      final back = Exam.fromMap({...exam.toMap(), 'id': 7});
+
+      expect(back.id, 7);
+      expect(back.title, 'Mid term');
+      expect(back.subjectId, 3);
+      expect(back.kind, ExamKind.quiz);
+      expect(back.remindDays, 3);
+      // The time of day was dropped on the way in, which is the point.
+      expect(back.date, DateTime(2026, 5, 4));
+    });
+
+    test('an unrecognised kind falls back to an exam rather than crashing', () {
+      expect(ExamKindData.fromKey('assignment'), ExamKind.assignment);
+      expect(ExamKindData.fromKey('viva'), ExamKind.exam);
+      expect(ExamKindData.fromKey(null), ExamKind.exam);
+    });
+
+    test('today is today, and last week is past', () {
+      Exam on(DateTime d) => Exam(
+            userId: 1,
+            title: 'T',
+            date: d,
+            createdAt: DateTime(2026),
+          );
+      final now = DateTime.now();
+      expect(on(now).isToday, isTrue);
+      expect(on(now).isPast, isFalse);
+      expect(on(now.subtract(const Duration(days: 7))).isPast, isTrue);
+    });
+  });
+
+  group('reminders', () {
+    Exam withReminder(int daysFromNow, int? lead) => Exam(
+          userId: 1,
+          title: 'Mid term',
+          date: DateTime.now().add(Duration(days: daysFromNow)),
+          remindDays: lead,
+          createdAt: DateTime(2026),
+        );
+
+    test('no reminder is never due', () {
+      expect(withReminder(1, null).hasReminder, isFalse);
+      expect(withReminder(1, null).reminderIsDue, isFalse);
+    });
+
+    test('a reminder is due once its window opens', () {
+      expect(withReminder(5, 3).reminderIsDue, isFalse);
+      expect(withReminder(3, 3).reminderIsDue, isTrue);
+      expect(withReminder(1, 3).reminderIsDue, isTrue);
+      expect(withReminder(0, 3).reminderIsDue, isTrue);
+    });
+
+    test('a reminder stops once the date has passed', () {
+      expect(withReminder(-1, 3).reminderIsDue, isFalse);
+      expect(withReminder(-30, 7).reminderIsDue, isFalse);
+    });
+
+    test('the lead is stored as days, so moving the exam moves it', () {
+      final exam = withReminder(10, 7);
+      final moved = exam.copyWith(date: DateTime.now());
+      expect(moved.remindDays, 7);
+      expect(moved.reminderIsDue, isTrue);
+    });
+
+    test('a reminder can be cleared, which copyWith alone cannot do', () {
+      final exam = withReminder(2, 1);
+      expect(exam.copyWith(clearReminder: true).remindDays, isNull);
+      // Passing null without the flag means "leave it as it was".
+      expect(exam.copyWith(remindDays: null).remindDays, 1);
+    });
+
+    test('the lead reads the way it would be spoken', () {
+      expect(reminderLabel(null), 'Off');
+      expect(reminderLabel(1), '1 day before');
+      expect(reminderLabel(3), '3 days before');
+      expect(reminderLabel(7), '1 week before');
+    });
+  });
+
+  group('revision order', () {
+    test('what the student starred outranks anything the app worked out', () {
+      final ordered = revisionOrder([
+        note(id: 1, status: StudyStatus.read, openedDaysAgo: 1),
+        note(
+          id: 2,
+          status: StudyStatus.mastered,
+          important: true,
+          openedDaysAgo: 0,
+        ),
+        note(id: 3, status: StudyStatus.review, openedDaysAgo: 2),
+        note(id: 4, status: StudyStatus.newNote),
+      ]);
+      // 2 is starred even though it is Mastered and was just opened; then the
+      // status ranking takes over: Review, New, Read.
+      expect(ordered.map((n) => n.id), [2, 3, 4, 1]);
+    });
+
+    test('Review sits above New, because the student said so themselves', () {
+      final ordered = revisionOrder([
+        note(id: 1, status: StudyStatus.newNote),
+        note(id: 2, status: StudyStatus.mastered),
+        note(id: 3, status: StudyStatus.review),
+        note(id: 4, status: StudyStatus.read),
+      ]);
+      expect(ordered.map((n) => n.id), [3, 1, 4, 2]);
+    });
+
+    test('a note never opened comes before one opened long ago', () {
+      final ordered = revisionOrder([
+        note(id: 1, status: StudyStatus.read, openedDaysAgo: 9),
+        note(id: 2, status: StudyStatus.read),
+        note(id: 3, status: StudyStatus.read, openedDaysAgo: 1),
+      ]);
+      expect(ordered.map((n) => n.id), [2, 1, 3]);
+    });
+
+    test('the order does not shuffle between builds', () {
+      final ordered = revisionOrder([
+        note(id: 1, updatedDaysAgo: 1),
+        note(id: 2, updatedDaysAgo: 5),
+      ]);
+      expect(ordered.map((n) => n.id), [2, 1]);
+    });
+
+    test('mastered notes are kept at the bottom, not hidden', () {
+      final ordered = revisionOrder([
+        note(id: 1, status: StudyStatus.mastered),
+        note(id: 2, status: StudyStatus.newNote),
+      ]);
+      expect(ordered.length, 2);
+      expect(ordered.last.id, 1);
+    });
+
+    test('the list handed in is left alone', () {
+      final input = [
+        note(id: 1, status: StudyStatus.read),
+        note(id: 2, status: StudyStatus.review),
+      ];
+      revisionOrder(input);
+      expect(input.map((n) => n.id), [1, 2]);
+    });
+  });
+
+  group('daily target', () {
+    test('nothing left means nothing to do today', () {
+      expect(dailyTarget(remaining: 0, daysLeft: 5), 0);
+    });
+
+    test('a part day still counts as a day', () {
+      expect(dailyTarget(remaining: 10, daysLeft: 3), 4);
+      expect(dailyTarget(remaining: 9, daysLeft: 3), 3);
+      expect(dailyTarget(remaining: 1, daysLeft: 10), 1);
+    });
+
+    test('with no days left, everything is today', () {
+      expect(dailyTarget(remaining: 7, daysLeft: 0), 7);
+      expect(dailyTarget(remaining: 7, daysLeft: -3), 7);
+    });
+  });
+
+  group('progress and verdict', () {
+    test('an empty subject is not zero per cent of something', () {
+      expect(masteredShare(const []), 0);
+    });
+
+    test('mastered share counts only what is marked mastered', () {
+      expect(
+        masteredShare([
+          note(id: 1, status: StudyStatus.mastered),
+          note(id: 2, status: StudyStatus.read),
+          note(id: 3, status: StudyStatus.review),
+          note(id: 4, status: StudyStatus.newNote),
+        ]),
+        0.25,
+      );
+    });
+
+    test('the verdict says what is true, not what is encouraging', () {
+      expect(
+        revisionVerdict(remaining: 0, daysLeft: 3, total: 0),
+        'No notes in this subject yet.',
+      );
+      expect(
+        revisionVerdict(remaining: 0, daysLeft: 3, total: 5),
+        'Everything here is marked Mastered.',
+      );
+      expect(
+        revisionVerdict(remaining: 3, daysLeft: 0, total: 5),
+        '3 left and the exam is today.',
+      );
+      expect(
+        revisionVerdict(remaining: 3, daysLeft: -2, total: 5),
+        '3 still not mastered.',
+      );
+      expect(
+        revisionVerdict(remaining: 3, daysLeft: 5, total: 5),
+        'One note a day clears this in time.',
+      );
+      expect(
+        revisionVerdict(remaining: 10, daysLeft: 3, total: 12),
+        '4 notes a day clears this in time.',
+      );
     });
   });
 }

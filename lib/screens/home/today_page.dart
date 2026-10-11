@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
+import '../../models/exam.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
@@ -16,11 +17,13 @@ class TodayPage extends StatelessWidget {
     required this.onOpenNotes,
     required this.onCapture,
     required this.onSearch,
+    required this.onOpenExams,
   });
 
   final VoidCallback onOpenNotes;
   final VoidCallback onCapture;
   final VoidCallback onSearch;
+  final VoidCallback onOpenExams;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,7 @@ class TodayPage extends StatelessWidget {
         final t = Theme.of(context).textTheme;
         final days = repo.daysToNextExam;
         final recent = repo.recentNotes(limit: 5);
+        final reminders = repo.dueReminders();
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 120),
@@ -42,6 +46,14 @@ class TodayPage extends StatelessWidget {
             const SizedBox(height: 10),
             Text(_subline(repo), style: t.bodyMedium),
             const SizedBox(height: 20),
+
+            // The reminders the student set themselves, shown on the screen
+            // they land on rather than buried in Exam Mode.
+            for (final exam in reminders) ...[
+              _ReminderStrip(exam: exam, onTap: onOpenExams),
+              const SizedBox(height: 10),
+            ],
+            if (reminders.isNotEmpty) const SizedBox(height: 10),
 
             // A notebook is only useful if you can find things in it, so the
             // way in sits on the landing screen rather than only in the bar.
@@ -121,7 +133,65 @@ class TodayPage extends StatelessWidget {
       return 'Add a subject to begin.';
     }
     if (!repo.hasNotes) return 'No notes yet in any subject.';
-    return 'Set an exam date in Exam Mode to see a countdown here.';
+    final exam = repo.nextExam;
+    if (exam == null) {
+      return 'Set an exam date in Exam Mode to see a countdown here.';
+    }
+    return '${exam.title} · ${countdownLabel(exam.daysAway)}. '
+        'Exam Mode has the revision order.';
+  }
+}
+
+/// A reminder the student asked for, on the screen they open first.
+class _ReminderStrip extends StatelessWidget {
+  const _ReminderStrip({required this.exam, required this.onTap});
+
+  final Exam exam;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final soon = exam.daysAway <= 1;
+    final accent = soon ? NestColor.redPen : NestColor.pen;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(NestRadius.tile),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: NestColor.o(accent, 0.07),
+          borderRadius: BorderRadius.circular(NestRadius.tile),
+          border: Border.all(color: NestColor.o(accent, 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_active_rounded, size: 18, color: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${exam.kind.label} · ${countdownLabel(exam.daysAway)}',
+                    style: nestEyebrow.copyWith(color: accent),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    exam.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: NestColor.inkFaint),
+          ],
+        ),
+      ),
+    );
   }
 }
 
