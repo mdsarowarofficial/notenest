@@ -7,6 +7,7 @@ import '../../theme/nest_theme.dart';
 import '../../widgets/nest_tags.dart';
 import '../../widgets/note_tile.dart';
 import '../search/search_page.dart';
+import '../share/share_note_sheet.dart';
 import 'attachment_strip.dart';
 import 'note_editor.dart';
 
@@ -113,6 +114,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                 onPressed: () => _repo.toggleImportant(note),
               ),
               IconButton(
+                tooltip: 'Share with a classmate',
+                icon: const Icon(Icons.ios_share_rounded),
+                onPressed: () => showShareNoteSheet(context, note),
+              ),
+              IconButton(
                 tooltip: 'Edit',
                 icon: const Icon(Icons.edit_rounded),
                 onPressed: () => Navigator.of(context).push(
@@ -174,6 +180,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              if (note.isShared) ...[
+                const SizedBox(height: 14),
+                _SharedBanner(note: note),
+              ],
               if (note.tags.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 NestTagChips(tags: note.tags, onTap: _openTag),
@@ -200,6 +210,60 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Keeps a borrowed note visibly borrowed.
+///
+/// Credit is the one thing that is easy to lose when notes pass around a
+/// class, so whoever wrote it stays named on it for as long as it is in the
+/// notebook — not just in the inbox it arrived through.
+class _SharedBanner extends StatelessWidget {
+  const _SharedBanner({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final reference = note.sharePolicy == SharePolicy.reference;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: NestColor.o(NestColor.highlight, 0.20),
+        borderRadius: BorderRadius.circular(NestRadius.tile),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.people_outline_rounded,
+              size: 16, color: NestColor.inkSoft),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Shared by ${note.sharedBy}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                if (note.sharedAt != null || reference) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (note.sharedAt != null)
+                        'Arrived ${relativeDay(note.sharedAt!)}',
+                      if (reference) 'asked to be kept as reference',
+                    ].join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

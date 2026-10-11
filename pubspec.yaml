@@ -31,6 +31,12 @@ dependencies:
   record: ^7.1.2
   speech_to_text: ^7.5.0
 
+  # Activity 07 — Sharing & Collaboration.
+  # There is no NoteNest server, so a note is handed over as a file through
+  # whatever app the students already use. share_plus opens the system share
+  # sheet; file_picker, already here for PDFs, reads the file on the way back.
+  share_plus: ^13.3.1
+
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.
   # google_fonts: ^6.2.1

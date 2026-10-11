@@ -20,6 +20,8 @@ class AttachmentStore {
   static Future<String> fullPath(String storedName) =>
       throw UnsupportedError('Attachments need the mobile app');
 
+  static Future<Uint8List?> readBytes(String storedName) async => null;
+
   static Future<int> sizeOf(String storedName) async => 0;
 
   static Future<void> delete(String storedName) async {}

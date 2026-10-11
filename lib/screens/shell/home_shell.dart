@@ -12,6 +12,7 @@ import '../home/today_page.dart';
 import '../notes/notes_page.dart';
 import '../notes/transcript_editor.dart';
 import '../search/search_page.dart';
+import '../share/request_note_sheet.dart';
 import '../shared/shared_page.dart';
 import '../capture/media_capture.dart';
 import '../notes/note_editor.dart';
@@ -76,6 +77,44 @@ class _HomeShellState extends State<HomeShell> {
   void _openSearch() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SearchPage()),
+    );
+  }
+
+  /// Says plainly why study groups are not here, rather than showing an empty
+  /// screen that looks broken.
+  ///
+  /// Sharing one note works because the file travels through an app the
+  /// student already has. A group is different: it has to exist somewhere both
+  /// phones can see, and there is no such place until cloud sync is built.
+  void _explainStudyGroups() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: NestColor.card,
+        title: const Text('Study groups need an account server'),
+        content: const Text(
+          'Sending one note works without a server — the file goes through '
+          'WhatsApp or email like anything else.\n\n'
+          'A group is different. It has to live somewhere both phones can '
+          'reach, so everyone sees the same members and the same notes. That '
+          'is cloud sync, and it is the next stage of the project.\n\n'
+          'Until then, share notes one at a time from any note, and ask for '
+          'one with Note requests.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              showRequestNoteSheet(context);
+            },
+            child: const Text('Ask for a note'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -191,14 +230,20 @@ class _HomeShellState extends State<HomeShell> {
           },
           onSelectLink: (l) {
             Navigator.pop(context);
-            if (l.id == 'trash') {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TrashPage()),
-              );
-              return;
+            switch (l.id) {
+              case 'trash':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TrashPage()),
+                );
+              case 'inbox':
+                setState(() => _tab = 2);
+              case 'requests':
+                showRequestNoteSheet(context);
+              case 'groups':
+                _explainStudyGroups();
+              default:
+                _toast('${l.label} is not built yet');
             }
-            setState(() => _drawerSelection = l.id);
-            _toast('${l.label} is not built yet');
           },
           onAddSubject: _addSubject,
           onOpenProfile: () {

@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 4;
+  static const _version = 5;
 
   Database? _db;
 
@@ -106,24 +106,28 @@ class AppDatabase {
     await _createAttachments(db);
   }
 
-  /// Version 2 added the notes table.
+  /// Version 2 added the notes table. Version 5 added the three sharing
+  /// columns at the bottom of it.
   Future<void> _createNotes(Database db) async {
     await db.execute('''
       CREATE TABLE notes (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id    INTEGER NOT NULL,
-        subject_id INTEGER,
-        topic      TEXT,
-        title      TEXT    NOT NULL,
-        body       TEXT    NOT NULL DEFAULT '',
-        tags       TEXT    NOT NULL DEFAULT '',
-        type       TEXT    NOT NULL DEFAULT 'text',
-        important  INTEGER NOT NULL DEFAULT 0,
-        status     TEXT    NOT NULL DEFAULT 'new',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        opened_at  INTEGER,
-        deleted_at INTEGER,
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id      INTEGER NOT NULL,
+        subject_id   INTEGER,
+        topic        TEXT,
+        title        TEXT    NOT NULL,
+        body         TEXT    NOT NULL DEFAULT '',
+        tags         TEXT    NOT NULL DEFAULT '',
+        type         TEXT    NOT NULL DEFAULT 'text',
+        important    INTEGER NOT NULL DEFAULT 0,
+        status       TEXT    NOT NULL DEFAULT 'new',
+        created_at   INTEGER NOT NULL,
+        updated_at   INTEGER NOT NULL,
+        opened_at    INTEGER,
+        deleted_at   INTEGER,
+        shared_by    TEXT,
+        shared_at    INTEGER,
+        share_policy TEXT,
         FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
       )
@@ -134,6 +138,10 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE INDEX idx_notes_subject ON notes (subject_id)',
+    );
+    // The Shared inbox asks for exactly this.
+    await db.execute(
+      'CREATE INDEX idx_notes_shared ON notes (user_id, shared_by, shared_at)',
     );
   }
 
@@ -162,19 +170,28 @@ class AppDatabase {
 
   Future<void> _upgrade(Database db, int from, int to) async {
     // One step per version, so an installed app keeps its data.
+    //
+    // The `from >=` guards matter. A table created by a step above is created
+    // at its *current* shape, columns from later versions included, so a later
+    // ALTER would fail on it as a duplicate column. Each ALTER therefore runs
+    // only for installs that already had the older table.
     if (from < 2) {
       await _createNotes(db);
     }
     if (from < 3) {
-      // The table is created at its current shape, duration_ms included, which
-      // is why the next step has to skip an install that passed through here.
       await _createAttachments(db);
     }
     if (from >= 3 && from < 4) {
-      // Only an install that already had the version 3 attachments table needs
-      // the column adding; adding it to the table just created above would
-      // fail as a duplicate column.
       await db.execute('ALTER TABLE attachments ADD COLUMN duration_ms INTEGER');
+    }
+    if (from >= 2 && from < 5) {
+      await db.execute('ALTER TABLE notes ADD COLUMN shared_by TEXT');
+      await db.execute('ALTER TABLE notes ADD COLUMN shared_at INTEGER');
+      await db.execute('ALTER TABLE notes ADD COLUMN share_policy TEXT');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_notes_shared '
+        'ON notes (user_id, shared_by, shared_at)',
+      );
     }
   }
 

@@ -79,6 +79,40 @@ extension NoteTypeData on NoteType {
   }
 }
 
+/// What the sender asked the receiver to do with a shared note.
+///
+/// This is a request, not a lock. NoteNest has no server, so there is nothing
+/// to enforce it with — the receiver's copy is an ordinary note on their own
+/// phone. The screens say this plainly rather than implying the file is
+/// protected, because a permission that is only a label should not look like
+/// one that is not.
+enum SharePolicy { open, reference }
+
+extension SharePolicyData on SharePolicy {
+  String get key => name;
+
+  String get label {
+    switch (this) {
+      case SharePolicy.open:
+        return 'Free to edit and pass on';
+      case SharePolicy.reference:
+        return 'Please keep as reference';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case SharePolicy.open:
+        return 'OPEN';
+      case SharePolicy.reference:
+        return 'REFERENCE';
+    }
+  }
+
+  static SharePolicy fromKey(String? key) =>
+      key == 'reference' ? SharePolicy.reference : SharePolicy.open;
+}
+
 /// One note in the student's notebook.
 class Note {
   const Note({
@@ -96,6 +130,9 @@ class Note {
     required this.updatedAt,
     this.openedAt,
     this.deletedAt,
+    this.sharedBy,
+    this.sharedAt,
+    this.sharePolicy,
   });
 
   final int? id;
@@ -117,7 +154,22 @@ class Note {
   /// Set when the note is in Trash. Null means it is live.
   final DateTime? deletedAt;
 
+  /// Who shared this note, if it came from someone else. Null for the
+  /// student's own notes.
+  ///
+  /// Kept so credit is not lost. A note that came from a classmate stays
+  /// visibly theirs, however long it sits in the notebook.
+  final String? sharedBy;
+
+  /// When it was imported.
+  final DateTime? sharedAt;
+
+  /// What the sender asked for. Null for the student's own notes.
+  final SharePolicy? sharePolicy;
+
   bool get isDeleted => deletedAt != null;
+
+  bool get isShared => sharedBy != null && sharedBy!.isNotEmpty;
 
   bool get isEmpty => title.trim().isEmpty && body.trim().isEmpty;
 
@@ -136,6 +188,9 @@ class Note {
     DateTime? openedAt,
     DateTime? deletedAt,
     bool clearDeleted = false,
+    String? sharedBy,
+    DateTime? sharedAt,
+    SharePolicy? sharePolicy,
   }) =>
       Note(
         id: id ?? this.id,
@@ -152,6 +207,9 @@ class Note {
         updatedAt: updatedAt ?? this.updatedAt,
         openedAt: openedAt ?? this.openedAt,
         deletedAt: clearDeleted ? null : (deletedAt ?? this.deletedAt),
+        sharedBy: sharedBy ?? this.sharedBy,
+        sharedAt: sharedAt ?? this.sharedAt,
+        sharePolicy: sharePolicy ?? this.sharePolicy,
       );
 
   Map<String, Object?> toMap() => {
@@ -169,10 +227,14 @@ class Note {
         'updated_at': updatedAt.millisecondsSinceEpoch,
         'opened_at': openedAt?.millisecondsSinceEpoch,
         'deleted_at': deletedAt?.millisecondsSinceEpoch,
+        'shared_by': sharedBy,
+        'shared_at': sharedAt?.millisecondsSinceEpoch,
+        'share_policy': sharePolicy?.key,
       };
 
   factory Note.fromMap(Map<String, Object?> m) {
     final rawTags = (m['tags'] as String? ?? '').trim();
+    final policy = m['share_policy'] as String?;
     return Note(
       id: m['id'] as int?,
       userId: m['user_id'] as int,
@@ -194,6 +256,12 @@ class Note {
       deletedAt: m['deleted_at'] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(m['deleted_at'] as int),
+      sharedBy: m['shared_by'] as String?,
+      sharedAt: m['shared_at'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(m['shared_at'] as int),
+      sharePolicy:
+          policy == null ? null : SharePolicyData.fromKey(policy),
     );
   }
 }

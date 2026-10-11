@@ -63,6 +63,16 @@ class AttachmentStore {
     return p.join(dir.path, storedName);
   }
 
+  /// Reads a stored file back, or null if it is no longer there.
+  ///
+  /// Needed when packing a note to share: the bytes have to travel inside the
+  /// shared file, because the receiving phone has no access to this one.
+  static Future<Uint8List?> readBytes(String storedName) async {
+    final file = File(await fullPath(storedName));
+    if (!await file.exists()) return null;
+    return file.readAsBytes();
+  }
+
   static Future<int> sizeOf(String storedName) async {
     final file = File(await fullPath(storedName));
     return await file.exists() ? await file.length() : 0;

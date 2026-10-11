@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:notenest/models/attachment.dart';
 import 'package:notenest/models/note.dart';
+import 'package:notenest/models/note_bundle.dart';
 import 'package:notenest/models/note_query.dart';
 import 'package:notenest/models/transcript.dart';
 import 'package:notenest/theme/nest_theme.dart';
@@ -375,6 +380,213 @@ void main() {
         formatClock(const Duration(hours: 1, minutes: 2, seconds: 11)),
         '1:02:11',
       );
+    });
+  });
+
+  // -------------------------------------------- Activity 07: shared notes
+
+  NoteBundle sample({
+    String title = 'Normalization',
+    String sharedBy = 'Rafi',
+    List<BundleFile> files = const [],
+    SharePolicy policy = SharePolicy.open,
+  }) =>
+      NoteBundle(
+        title: title,
+        body: 'First normal form means every column holds one value.',
+        topic: 'Normal forms',
+        tags: const ['dbms', 'exam'],
+        subjectName: 'Database Systems',
+        subjectCode: 'CSE112',
+        sharedBy: sharedBy,
+        policy: policy,
+        files: files,
+        writtenAt: DateTime(2026, 3, 12),
+      );
+
+  group('packing a note for a classmate', () {
+    test('survives the round trip intact', () {
+      final before = sample();
+      final after = NoteBundle.decode(before.encode());
+
+      expect(after.title, before.title);
+      expect(after.body, before.body);
+      expect(after.topic, before.topic);
+      expect(after.tags, before.tags);
+      expect(after.subjectCode, 'CSE112');
+      expect(after.subjectName, 'Database Systems');
+      expect(after.sharedBy, 'Rafi');
+      expect(after.writtenAt, before.writtenAt);
+    });
+
+    test('carries attachments as bytes, not as paths', () {
+      final bytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final before = sample(files: [
+        BundleFile(
+          type: AttachmentType.image,
+          fileName: 'page1.jpg',
+          bytes: bytes,
+        ),
+      ]);
+      final after = NoteBundle.decode(before.encode());
+
+      expect(after.files.length, 1);
+      expect(after.files.first.bytes, bytes);
+      expect(after.files.first.type, AttachmentType.image);
+      expect(after.fileBytes, 5);
+    });
+
+    test('the sharing request travels with the note', () {
+      final after = NoteBundle.decode(
+        sample(policy: SharePolicy.reference).encode(),
+      );
+      expect(after.policy, SharePolicy.reference);
+    });
+
+    test('names the file after the note', () {
+      expect(sample(title: 'Normal Forms!').suggestedFileName,
+          'normal-forms.notenest');
+      expect(sample(title: '   ').suggestedFileName, 'note.notenest');
+    });
+  });
+
+  group('a file from another phone is not trusted', () {
+    BundleError errorFrom(String source) {
+      try {
+        NoteBundle.decode(source);
+      } on BundleException catch (e) {
+        return e.error;
+      }
+      fail('expected the file to be refused');
+    }
+
+    test('refuses something that is not JSON at all', () {
+      expect(errorFrom('this is a photo, not a note'), BundleError.notJson);
+    });
+
+    test('refuses JSON that is not a NoteNest note', () {
+      expect(errorFrom('{"hello":"world"}'), BundleError.wrongFormat);
+    });
+
+    test('refuses a note from a newer NoteNest instead of half-reading it',
+        () {
+      final source = sample().encode().replaceFirst(
+            '"version": ${NoteBundle.formatVersion}',
+            '"version": ${NoteBundle.formatVersion + 1}',
+          );
+      expect(errorFrom(source), BundleError.tooNew);
+    });
+
+    test('refuses a note with no title and no body', () {
+      expect(
+        errorFrom(
+          '{"format":"${NoteBundle.formatName}","version":1,'
+          '"note":{"title":"","body":""}}',
+        ),
+        BundleError.missingNote,
+      );
+    });
+
+    test('refuses attachment data that is not really base64', () {
+      expect(
+        errorFrom(
+          '{"format":"${NoteBundle.formatName}","version":1,'
+          '"note":{"title":"Hi","body":"there"},'
+          '"attachments":[{"type":"image","fileName":"a.jpg",'
+          '"data":"!!!not base64!!!"}]}',
+        ),
+        BundleError.corrupt,
+      );
+    });
+
+    test('strips directories out of an attachment name', () {
+      // The "../../" trick: a crafted name must never reach the file system.
+      final before = sample(files: [
+        BundleFile(
+          type: AttachmentType.image,
+          fileName: '../../../etc/passwd',
+          bytes: Uint8List.fromList([9]),
+        ),
+      ]);
+      final after = NoteBundle.decode(before.encode());
+
+      expect(after.files.first.fileName, 'passwd');
+      expect(after.files.first.fileName.contains('/'), isFalse);
+      expect(after.files.first.fileName.contains('..'), isFalse);
+    });
+
+    test('a name of only dots cannot become a file name', () {
+      final after = NoteBundle.decode(
+        sample(files: [
+          BundleFile(
+            type: AttachmentType.pdf,
+            fileName: '..',
+            bytes: Uint8List.fromList([9]),
+          ),
+        ]).encode(),
+      );
+      expect(after.files.first.fileName, 'attachment');
+      expect(after.files.first.safeExtension, 'pdf');
+    });
+
+    test('an extension is only ever plain letters and digits', () {
+      final after = NoteBundle.decode(
+        sample(files: [
+          BundleFile(
+            type: AttachmentType.image,
+            fileName: 'note.j/p g',
+            bytes: Uint8List.fromList([9]),
+          ),
+        ]).encode(),
+      );
+      // Stripping the directory leaves "p g", which has no extension at all,
+      // so the type's own default is used rather than anything from the name.
+      expect(after.files.first.fileName, 'p g');
+      expect(after.files.first.safeExtension, 'jpg');
+    });
+
+    test('an oversized note is refused rather than loaded', () {
+      final big = base64Encode(
+        Uint8List(NoteBundle.maxTotalBytes + 1024),
+      );
+      expect(
+        errorFrom(
+          '{"format":"${NoteBundle.formatName}","version":1,'
+          '"note":{"title":"Big","body":"x"},'
+          '"attachments":[{"type":"pdf","fileName":"b.pdf","data":"$big"}]}',
+        ),
+        BundleError.tooBig,
+      );
+    });
+
+    test('an unnamed sender still gets a name to show', () {
+      final after = NoteBundle.decode(
+        '{"format":"${NoteBundle.formatName}","version":1,'
+        '"note":{"title":"Hi","body":"there"}}',
+      );
+      expect(after.sharedBy, 'A classmate');
+      expect(after.policy, SharePolicy.open);
+    });
+
+    test('over-long text is cut rather than rejected', () {
+      final after = NoteBundle.decode(
+        NoteBundle(
+          title: 'T' * 400,
+          body: 'b',
+          sharedBy: 'Rafi',
+          writtenAt: DateTime(2026),
+        ).encode(),
+      );
+      expect(after.title.length, NoteBundle.maxTitle);
+    });
+  });
+
+  group('readable sizes', () {
+    test('reads the way a student expects', () {
+      expect(readableBytes(0), '0 KB');
+      expect(readableBytes(900), '900 B');
+      expect(readableBytes(2048), '2 KB');
+      expect(readableBytes(3 * 1024 * 1024), '3.0 MB');
     });
   });
 }

@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
   file_selector_windows
   record_windows
+  share_plus
   speech_to_text_windows
   syncfusion_pdfviewer_windows
   url_launcher_windows

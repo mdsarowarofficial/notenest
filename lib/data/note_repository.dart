@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/attachment.dart';
 import '../models/note.dart';
+import '../models/note_bundle.dart';
 import '../models/note_query.dart';
 import '../models/subject.dart';
 import '../widgets/nest_drawer.dart';
@@ -431,6 +432,139 @@ class NoteRepository extends ChangeNotifier {
 
   Future<void> updateTags(Note note, List<String> tags) =>
       updateNote(note.copyWith(tags: normalizeTags(tags)));
+
+  // --------------------------------------------------------------- sharing
+
+  /// Notes that arrived from someone else, newest arrival first.
+  List<Note> inboxNotes() {
+    final list = _notes.where((n) => n.isShared).toList()
+      ..sort((a, b) =>
+          (b.sharedAt ?? b.updatedAt).compareTo(a.sharedAt ?? a.updatedAt));
+    return List.unmodifiable(list);
+  }
+
+  /// Who has shared notes with this student, and how many each.
+  ///
+  /// Derived from the notes themselves rather than kept as a separate contact
+  /// list, so it cannot drift out of step with what is actually filed.
+  Map<String, int> sharers() {
+    final counts = <String, int>{};
+    for (final n in _notes) {
+      final who = n.sharedBy;
+      if (who == null || who.isEmpty) continue;
+      counts[who] = (counts[who] ?? 0) + 1;
+    }
+    return Map.unmodifiable(counts);
+  }
+
+  int get sharedCount => _notes.where((n) => n.isShared).length;
+
+  /// Packs a note, and optionally its files, into a bundle to hand over.
+  Future<NoteBundle> packForSharing(
+    Note note, {
+    bool includeFiles = true,
+  }) async {
+    final subject =
+        note.subjectId == null ? null : subjectById(note.subjectId!);
+
+    final files = <BundleFile>[];
+    if (includeFiles && note.id != null && AttachmentStore.isSupported) {
+      for (final a in await attachmentsFor(note.id!)) {
+        final bytes = await AttachmentStore.readBytes(a.storedName);
+        // A missing file should not stop the note being shared; the text is
+        // the part that matters most.
+        if (bytes == null) continue;
+        files.add(BundleFile(
+          type: a.type,
+          fileName: a.fileName,
+          bytes: bytes,
+          durationMs: a.durationMs,
+        ));
+      }
+    }
+
+    return NoteBundle(
+      title: note.title,
+      body: note.body,
+      topic: note.topic,
+      tags: note.tags,
+      type: note.type,
+      subjectName: subject?.name,
+      subjectCode: subject?.code,
+      // A note that was itself shared keeps its original author, so passing it
+      // on does not quietly rename whoever wrote it.
+      sharedBy: note.sharedBy ?? userName,
+      policy: note.sharePolicy ?? SharePolicy.open,
+      files: files,
+      writtenAt: note.createdAt,
+    );
+  }
+
+  /// Writes a received bundle into the notebook as a new note.
+  ///
+  /// The sender's subject travels by name and code, never by id, so it is
+  /// matched against this account's own subjects by code and created only if
+  /// there is no match. That way a classmate's "CSE112" lands in the student's
+  /// own CSE112 instead of making a second one.
+  Future<Note> importBundle(NoteBundle bundle) async {
+    final code = bundle.subjectCode?.trim() ?? '';
+    var subject = code.isEmpty ? null : subjectByCode(code);
+
+    if (subject == null && code.isNotEmpty) {
+      subject = await addSubject(
+        name: (bundle.subjectName?.trim().isNotEmpty ?? false)
+            ? bundle.subjectName!.trim()
+            : code,
+        code: code,
+        colorIndex: nextColorIndex,
+      );
+    }
+
+    final now = DateTime.now();
+    final note = Note(
+      userId: _auth.requireUserId,
+      subjectId: subject?.id,
+      topic: bundle.topic,
+      title: bundle.title,
+      body: bundle.body,
+      tags: normalizeTags(bundle.tags),
+      type: bundle.type,
+      // The receiver has not read it yet, whatever the sender had marked it.
+      status: StudyStatus.newNote,
+      createdAt: bundle.writtenAt,
+      updatedAt: now,
+      sharedBy: bundle.sharedBy,
+      sharedAt: now,
+      sharePolicy: bundle.policy,
+    );
+
+    final id = await _db.db.insert('notes', note.toMap());
+
+    if (AttachmentStore.isSupported) {
+      for (var i = 0; i < bundle.files.length; i++) {
+        final f = bundle.files[i];
+        final storedName =
+            await AttachmentStore.saveBytes(f.bytes, f.safeExtension);
+        await _db.db.insert(
+          'attachments',
+          Attachment(
+            noteId: id,
+            type: f.type,
+            fileName: f.fileName,
+            storedName: storedName,
+            sizeBytes: f.sizeBytes,
+            durationMs: f.durationMs,
+            position: i,
+            createdAt: now,
+          ).toMap(),
+        );
+      }
+    }
+
+    await _reloadNotes();
+    notifyListeners();
+    return note.copyWith(id: id);
+  }
 
   // -------------------------------------------------------- recent searches
 
