@@ -20,6 +20,11 @@ Future<CaptureKind?> showCaptureSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
+    // Without this a bottom sheet is capped at a little over half the screen,
+    // and five options do not fit in that on a short phone — the sheet then
+    // overflows instead of growing. With it the sheet takes the height it
+    // needs, and the scroll view inside takes over if even that is too much.
+    isScrollControlled: true,
     builder: (_) => const _CaptureSheet(),
   );
 }
@@ -70,12 +75,18 @@ class _CaptureSheet extends StatelessWidget {
     ];
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: ConstrainedBox(
+        // Never taller than most of the screen, so the note underneath stays
+        // visible and the sheet still reads as a sheet.
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.82,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Center(
               child: Container(
                 width: 44,
@@ -166,7 +177,8 @@ class _CaptureSheet extends StatelessWidget {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

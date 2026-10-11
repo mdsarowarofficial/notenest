@@ -172,49 +172,22 @@ class _RecordPageState extends State<RecordPage> {
                             'app. In the browser build you can still use '
                             'Dictate, which writes straight into the note.',
                       ),
-                    const Spacer(),
-                    Text(
-                      _recorder.isPaused
-                          ? 'PAUSED'
-                          : _recorder.isRecording
-                              ? 'RECORDING'
-                              : 'READY',
-                      style: nestEyebrow.copyWith(
-                        color: _recorder.isRecording
-                            ? NestColor.redPen
-                            : NestColor.inkFaint,
+                    // The timer, the meter and the buttons add up to more than
+                    // a short phone has, especially once a notice is showing.
+                    // Centred when there is room, scrollable when there is
+                    // not — a Spacer alone would just overflow.
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, box) => SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints:
+                                BoxConstraints(minHeight: box.maxHeight),
+                            child: _display(context),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      formatClock(_recorder.elapsed),
-                      style: const TextStyle(
-                        fontFamily: NestFont.mono,
-                        fontSize: 54,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -1,
-                        color: NestColor.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    NestLevelMeter(
-                      history: _recorder.history,
-                      live: _recorder.isRecording,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _recorder.isRecording
-                          ? 'The line moves with your voice, so you can see it '
-                              'is hearing the room.'
-                          : _recorder.isPaused
-                              ? 'Paused. The time stops where it is and '
-                                  'carries on when you resume.'
-                              : 'Nothing is being recorded yet.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const Spacer(),
                     Row(
                       children: [
                         Expanded(
@@ -253,6 +226,61 @@ class _RecordPageState extends State<RecordPage> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// The state, the clock and the level trace — everything the student watches
+/// while recording.
+extension on _RecordPageState {
+  Widget _display(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          _recorder.isPaused
+              ? 'PAUSED'
+              : _recorder.isRecording
+                  ? 'RECORDING'
+                  : 'READY',
+          style: nestEyebrow.copyWith(
+            color: _recorder.isRecording
+                ? NestColor.redPen
+                : NestColor.inkFaint,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          formatClock(_recorder.elapsed),
+          style: const TextStyle(
+            fontFamily: NestFont.mono,
+            fontSize: 54,
+            height: 1,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -1,
+            color: NestColor.ink,
+          ),
+        ),
+        const SizedBox(height: 28),
+        NestLevelMeter(
+          history: _recorder.history,
+          live: _recorder.isRecording,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _recorder.isRecording
+              ? 'The line moves with your voice, so you can see it is hearing '
+                  'the room.'
+              : _recorder.isPaused
+                  ? 'Paused. The time stops where it is and carries on when '
+                      'you resume.'
+                  : 'Nothing is being recorded yet.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 }

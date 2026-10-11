@@ -313,7 +313,15 @@ StructuredNote structureTranscript(String raw) {
 String structuredBody(StructuredNote note) {
   final out = <String>[];
 
-  if (note.keyPoints.isNotEmpty) {
+  // Key points are a summary of the transcript, so they only earn their place
+  // when they leave something out. A recogniser that returns no punctuation
+  // hands back one long sentence; if that sentence also carries a cue it is
+  // both the only key point and the whole transcript, and printing both
+  // sections would show the student the same line twice under two headings.
+  final summarizes =
+      note.keyPoints.isNotEmpty && note.keyPoints.length < note.sentenceCount;
+
+  if (summarizes) {
     out.add('KEY POINTS');
     for (final point in note.keyPoints) {
       out.add('• $point');
@@ -322,7 +330,7 @@ String structuredBody(StructuredNote note) {
   }
 
   if (note.blocks.isNotEmpty) {
-    if (note.keyPoints.isNotEmpty) out.add('TRANSCRIPT');
+    if (summarizes) out.add('TRANSCRIPT');
     for (var i = 0; i < note.blocks.length; i++) {
       final block = note.blocks[i];
       if (block.bulleted) {

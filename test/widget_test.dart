@@ -332,6 +332,23 @@ void main() {
       expect(occurrences, 2);
     });
 
+    test('no Key points heading when it would repeat the whole transcript',
+        () {
+      // What the recogniser actually returns when it supplies no punctuation:
+      // one long sentence, which is both the only key point and the entire
+      // transcript. Printing both sections would show the same line twice.
+      final structured = structureTranscript(
+        'normalisation removes redundancy this is important for the exam.',
+      );
+      expect(structured.sentenceCount, 1);
+      expect(structured.keyPoints.length, 1);
+
+      final body = structuredBody(structured);
+      expect(body.contains('KEY POINTS'), isFalse);
+      expect(body.contains('TRANSCRIPT'), isFalse);
+      expect('for the exam'.allMatches(body).length, 1);
+    });
+
     test('nothing in, nothing out', () {
       final structured = structureTranscript('   ');
       expect(structured.isEmpty, isTrue);

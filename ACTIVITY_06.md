@@ -128,6 +128,49 @@ next keystroke. The editor now reloads the note when the transcript editor
 reports that it saved, and the transcript editor returns there rather than
 pushing another screen on top.
 
+## Future work — speaker separation, and why it is not here
+
+The obvious next step is the one a student actually wants: start recording, and
+have the app work out on its own that the lecturer is speaking, then a student,
+and lay the class out as a dialogue. It was investigated and deliberately not
+built. The reasons are worth stating, because "why didn't you do it" is a fair
+question to ask of this feature.
+
+**The device recogniser cannot do it at all.** It returns text and nothing
+else — `recognizedWords`, `finalResult`, `confidence`. No speaker, no
+timestamps, no audio characteristics. Separating voices is not a matter of
+writing better code against this plugin; the information needed to do it never
+reaches the app. The recogniser also holds the microphone, so audio cannot be
+analysed in parallel.
+
+**A cloud service can do it, but not in Bengali.** AssemblyAI, Deepgram and
+Google Cloud all offer speaker labels, and the free credit would cover far more
+than a demo needs — AssemblyAI gives $50 without a card, and speaker labels add
+$0.02 to a $0.15 hour. The blocker is the language. AssemblyAI's own supported
+languages page places Bengali in its lowest band, **"Fair accuracy (>50% WER)"**
+— more than half the words wrong — and does not confirm that speaker labels work
+for Bengali at all. A transcript of a Bengali class would not be usable, at any
+price.
+
+**Classroom audio is the hard case for diarization anyway.** It works well with
+a few speakers close to one microphone. A phone on a desk, a room with echo, and
+several students talking at once is the situation these systems handle worst.
+
+**Shipping an API key inside the app is not safe.** Anyone can pull a key out of
+an APK and spend the credit. Doing it properly needs a server that holds the key
+and proxies the request, which is Activity 09 work and a project of its own.
+
+**Filling in misheard words with a language model was also rejected.** It is
+possible, but when a model has not understood something it does not leave a gap
+— it writes something plausible. In a lecture note that is the worst failure
+there is: the student revises from a sentence the lecturer never said and has no
+way of telling. A visible gap is safer than an invented fact, which is why the
+transcript editor shows exactly what was heard and lets the student fix it.
+
+What would make this feasible: on-device diarization models reaching phones, or
+Bengali accuracy on a cloud service improving to the level English is at now.
+Neither is a code change in this project.
+
 ## Known limitations
 
 - **Dictation needs the device recogniser.** On Chrome that is the browser's
