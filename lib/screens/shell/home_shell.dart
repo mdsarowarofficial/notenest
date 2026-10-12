@@ -7,6 +7,8 @@ import '../../widgets/nest_nav_bar.dart';
 import '../capture/capture_sheet.dart';
 import '../capture/dictation_page.dart';
 import '../capture/record_page.dart';
+import '../convert/convert_page.dart';
+import '../cover/cover_page.dart';
 import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
@@ -231,6 +233,14 @@ class _HomeShellState extends State<HomeShell> {
           onSelectLink: (l) {
             Navigator.pop(context);
             switch (l.id) {
+              case 'cover':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CoverPageScreen()),
+                );
+              case 'convert':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ConvertPage()),
+                );
               case 'trash':
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const TrashPage()),

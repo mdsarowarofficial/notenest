@@ -37,6 +37,31 @@ dependencies:
   # sheet; file_picker, already here for PDFs, reads the file on the way back.
   share_plus: ^13.3.1
 
+  # Activity 09 — Documents: cover pages, and PDF ↔ Word.
+  #
+  # `pdf` writes the file. It does not draw the text — Flutter does, and the
+  # page is captured as an image — because `pdf` has no OpenType shaping
+  # engine and would break Bengali conjuncts apart (dart_pdf issue #198).
+  #
+  # `archive` and `xml` read and write a .docx, which is a zip of XML parts.
+  #
+  # `syncfusion_flutter_pdf` pulls the text out of a PDF. It was already here
+  # as a dependency of syncfusion_flutter_pdfviewer, pinned to the same
+  # version; it is named now because this code imports it directly, and a
+  # package you import is one you should declare.
+  archive: ^4.5.1
+  image: ^4.12.0
+  pdf: ^3.13.1
+  syncfusion_flutter_pdf: ^35.1.37
+  xml: ^7.0.1
+
+  # Activity 10 — the cloud side. Declared here so this file never drops them
+  # again: a zip that ships pubspec.yaml overwrites whatever `flutter pub add`
+  # put in, and that is exactly how firebase_core went missing once already.
+  cloud_firestore: ^6.10.0
+  firebase_auth: ^6.7.0
+  firebase_core: ^4.15.0
+
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.
   # google_fonts: ^6.2.1
@@ -48,3 +73,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # About 10,250 institutions in 200 countries, names and domains only —
+    # roughly 670 KB. Carried in the app so picking a university works with no
+    # connection. Logos are deliberately not here; see data/brand_store.dart.
+    - assets/universities.json

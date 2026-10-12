@@ -4,8 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
+import 'package:notenest/models/cover_spec.dart';
+import 'package:notenest/models/doc_text.dart';
 import 'package:notenest/models/exam.dart';
+import 'package:notenest/models/university.dart';
 import 'package:notenest/models/note.dart';
 import 'package:notenest/models/note_bundle.dart';
 import 'package:notenest/models/note_query.dart';
@@ -832,6 +836,517 @@ void main() {
         revisionVerdict(remaining: 10, daysLeft: 3, total: 12),
         '4 notes a day clears this in time.',
       );
+    });
+  });
+
+  group('cover page', () {
+    const filled = CoverSpec(
+      institution: 'Daffodil International University',
+      department: 'Department of CSE',
+      courseCode: 'CSE 112',
+      courseTitle: 'Data Structures',
+      kind: CoverKind.labReport,
+      serial: '3',
+      title: 'Linked lists',
+      studentName: 'Md. Sarowar Hossain',
+      studentId: '221-15-1234',
+      teacherName: 'Dr. A. Rahman',
+    );
+
+    test('the course line only shows a dash when both halves exist', () {
+      expect(filled.courseLine, 'CSE 112 — Data Structures');
+      expect(
+        const CoverSpec(courseCode: 'CSE 112').courseLine,
+        'CSE 112',
+      );
+      expect(
+        const CoverSpec(courseTitle: 'Data Structures').courseLine,
+        'Data Structures',
+      );
+      expect(const CoverSpec().courseLine, '');
+    });
+
+    test('the numbered field is named after what is being handed in', () {
+      expect(CoverKind.assignment.serialLabel, 'Assignment No.');
+      expect(CoverKind.labReport.serialLabel, 'Experiment No.');
+      // A thesis has no number, so the field is hidden rather than invented.
+      expect(CoverKind.thesis.serialLabel, isNull);
+    });
+
+    test('the numbered line is hidden when the kind has no number', () {
+      expect(filled.serialLine, 'Experiment No. 3');
+      expect(filled.copyWith(serial: '').serialLine, isNull);
+      expect(filled.copyWith(kind: CoverKind.thesis).serialLine, isNull);
+    });
+
+    test('empty rows are left off the page rather than printed blank', () {
+      expect(filled.submittedBy, const [
+        CoverRow('Name', 'Md. Sarowar Hossain'),
+        CoverRow('ID', '221-15-1234'),
+      ]);
+      expect(filled.submittedTo, const [CoverRow('Name', 'Dr. A. Rahman')]);
+      expect(const CoverSpec().submittedBy, isEmpty);
+    });
+
+    test('what is missing is named, and does not block the export', () {
+      expect(filled.missing, isEmpty);
+      expect(filled.isComplete, isTrue);
+
+      final bare = const CoverSpec().missing;
+      expect(bare, contains('Institution'));
+      expect(bare, contains('Course'));
+      expect(bare, contains('Your name'));
+      // The label follows the kind, as the form does.
+      expect(const CoverSpec(kind: CoverKind.labReport).missing,
+          contains('Experiment name'));
+    });
+
+    test('the file name is safe and readable', () {
+      expect(filled.suggestedFileName, 'CSE-112-lab-report-3.pdf');
+      // Nothing to name it after still produces a usable file name.
+      expect(const CoverSpec().suggestedFileName, 'assignment.pdf');
+      // Slashes and colons would break a file name on some systems.
+      expect(
+        const CoverSpec(courseCode: 'CSE/112: Part 1').suggestedFileName,
+        'CSE112-Part-1-assignment.pdf',
+      );
+    });
+
+    test('a draft survives being stored and read back', () {
+      final back = CoverSpec.decode(filled.encode());
+      expect(back.institution, filled.institution);
+      expect(back.kind, CoverKind.labReport);
+      expect(back.serial, '3');
+      expect(back.accentIndex, filled.accentIndex);
+      expect(back.showBorder, isTrue);
+    });
+
+    test('a corrupt draft hands back an empty form rather than throwing', () {
+      expect(CoverSpec.decode(null).institution, '');
+      expect(CoverSpec.decode('').institution, '');
+      expect(CoverSpec.decode('not json at all').institution, '');
+      expect(CoverSpec.decode('[1,2,3]').institution, '');
+      expect(CoverSpec.decode('{"kind":42}').kind, CoverKind.assignment);
+    });
+
+    test('the next draft keeps who you are and clears what you handed in', () {
+      final next = filled.copyWith(submittedOn: DateTime(2026, 3, 2)).asNextDraft;
+      expect(next.institution, filled.institution);
+      expect(next.studentId, filled.studentId);
+      expect(next.teacherName, filled.teacherName);
+      // These are the fields that would be wrong next week.
+      expect(next.title, '');
+      expect(next.serial, '');
+      expect(next.submittedOn, isNull);
+    });
+
+    test('a date can be cleared, which copyWith alone cannot do', () {
+      final dated = filled.copyWith(submittedOn: DateTime(2026, 3, 2));
+      expect(dated.copyWith(clearDate: true).submittedOn, isNull);
+      // Passing null without the flag means "leave it as it was" — the same
+      // distinction as Exam.clearReminder, and the bug this test was written
+      // after finding.
+      expect(
+        dated.copyWith(submittedOn: null).submittedOn,
+        DateTime(2026, 3, 2),
+      );
+    });
+
+    test('an accent index out of range wraps instead of crashing', () {
+      expect(const CoverSpec(accentIndex: 0).accent, coverAccents.first);
+      expect(
+        const CoverSpec(accentIndex: 99).accent,
+        coverAccents[99 % coverAccents.length],
+      );
+    });
+
+    test('a mixed colour is opaque and in range at every hue', () {
+      for (var h = 0.0; h < 360; h += 7) {
+        final argb = argbFromHue(h);
+        expect(argb >> 24 & 0xFF, 0xFF, reason: 'hue $h should be opaque');
+        expect(argb & 0xFFFFFF, inInclusiveRange(0, 0xFFFFFF));
+      }
+    });
+
+    test('the hue wheel wraps instead of breaking', () {
+      expect(argbFromHue(360), argbFromHue(0));
+      expect(argbFromHue(-120), argbFromHue(240));
+      expect(argbFromHue(400), argbFromHue(40));
+    });
+
+    test('each sixth of the wheel gives a different colour', () {
+      final seen = {
+        for (final h in [0.0, 60.0, 120.0, 180.0, 240.0, 300.0]) argbFromHue(h),
+      };
+      expect(seen.length, 6);
+    });
+
+    test('a mixed colour outranks the swatch, and clears back to it', () {
+      const mixed = CoverSpec(accentIndex: 2, customAccent: 0xFF112233);
+      expect(mixed.accent, 0xFF112233);
+      expect(mixed.copyWith(clearCustomAccent: true).accent, coverAccents[2]);
+      // Passing null without the flag leaves it alone, as everywhere else.
+      expect(mixed.copyWith(customAccent: null).accent, 0xFF112233);
+    });
+
+    test('the page options survive being stored and read back', () {
+      const styled = CoverSpec(
+        density: CoverDensity.compact,
+        signatureStyle: SignatureStyle.level,
+        frameStyle: FrameStyle.corners,
+        customAccent: 0xFF445566,
+      );
+      final back = CoverSpec.decode(styled.encode());
+      expect(back.density, CoverDensity.compact);
+      expect(back.signatureStyle, SignatureStyle.level);
+      expect(back.frameStyle, FrameStyle.corners);
+      expect(back.customAccent, 0xFF445566);
+    });
+
+    test('an unknown option falls back rather than crashing', () {
+      expect(CoverDensityData.fromKey('enormous'), CoverDensity.normal);
+      expect(SignatureStyleData.fromKey(null), SignatureStyle.staggered);
+      expect(FrameStyleData.fromKey('zigzag'), FrameStyle.dotted);
+      // Tighter really is tighter, and airier really is airier.
+      expect(CoverDensity.compact.scale, lessThan(CoverDensity.normal.scale));
+      expect(CoverDensity.airy.scale, greaterThan(CoverDensity.normal.scale));
+    });
+
+    test('the date is written out without a weekday', () {
+      expect(coverDateLabel(DateTime(2026, 10, 12)), '12 October 2026');
+    });
+  });
+
+  group('university search', () {
+    const all = [
+      University(name: 'City University', countryCode: 'BD', domain: 'cityuniversity.edu.bd'),
+      University(name: 'City University of New York', countryCode: 'US'),
+      University(name: 'Daffodil International University', countryCode: 'BD'),
+      University(name: 'North South University', countryCode: 'BD'),
+      University(name: 'University of Dhaka', countryCode: 'BD'),
+      University(name: 'Dhaka University of Engineering and Technology',
+          countryCode: 'BD'),
+      University(name: 'Oxford City College', countryCode: 'GB'),
+    ];
+
+    test('an exact name beats a name that merely starts with it', () {
+      expect(universityScore('City University', 'city university'), 0);
+      expect(universityScore('City University of New York', 'city university'), 1);
+    });
+
+    test('a word anywhere in the name counts, but less than the first', () {
+      expect(universityScore('North South University', 'north'), 1);
+      expect(universityScore('North South University', 'south'), 2);
+      // "versity" is inside a word, so it is the weakest kind of match.
+      expect(universityScore('North South University', 'versity'), 3);
+    });
+
+    test('several words match in any order', () {
+      expect(
+        universityScore('Dhaka University of Engineering and Technology',
+            'dhaka eng'),
+        4,
+      );
+      expect(universityScore('University of Dhaka', 'dhaka eng'), -1);
+    });
+
+    test('no match is -1, and an empty query matches nothing', () {
+      expect(universityScore('University of Dhaka', 'harvard'), -1);
+      expect(universityScore('University of Dhaka', ''), -1);
+    });
+
+    test('the obvious answer comes first', () {
+      final found = searchUniversities(all, 'city', preferCountry: 'BD');
+      expect(found.first.name, 'City University');
+      // Same score, so the student's own country breaks the tie.
+      expect(found[1].name, 'City University of New York');
+      // "Oxford City College" matches on its second word, which ranks below
+      // the two that open with it.
+      expect(found.last.name, 'Oxford City College');
+    });
+
+    test('a better match beats home country, which only breaks ties', () {
+      final found = searchUniversities(all, 'university', preferCountry: 'US');
+      // "University of Dhaka" opens with the query, so it wins outright even
+      // though the student's country is somewhere else. Country is a
+      // tie-break, not a filter.
+      expect(found.first.name, 'University of Dhaka');
+      // Among the equally-matching rest, the US one does come first.
+      expect(found.skip(1).first.countryCode, 'US');
+      expect(found.any((u) => u.countryCode == 'BD'), isTrue);
+    });
+
+    test('an empty query offers the home country rather than the alphabet', () {
+      final found = searchUniversities(all, '', preferCountry: 'BD');
+      expect(found.every((u) => u.countryCode == 'BD'), isTrue);
+      expect(found.length, 5);
+    });
+
+    test('the limit is honoured', () {
+      expect(searchUniversities(all, 'university', limit: 2).length, 2);
+    });
+
+    test('initials skip the little words', () {
+      expect(initialsOf('Daffodil International University'), 'DIU');
+      // "of" is not an initial anyone writes on a seal.
+      expect(initialsOf('University of Dhaka'), 'UD');
+      expect(initialsOf('Brac University'), 'BU');
+      expect(initialsOf(''), '');
+      expect(initialsOf('   '), '');
+    });
+  });
+
+  group('document text', () {
+    test('the ampersand is escaped first, or the escapes get escaped', () {
+      expect(escapeXml('a & b'), 'a &amp; b');
+      expect(escapeXml('<w:t>'), '&lt;w:t&gt;');
+      // The bug this ordering avoids: escaping < first would give &amp;lt;
+      expect(escapeXml('5 < 6 & 7 > 2'), '5 &lt; 6 &amp; 7 &gt; 2');
+    });
+
+    test('blank lines separate paragraphs and wrapped lines are rejoined', () {
+      final blocks = blocksFromPlainText(
+        'This sentence was broken\nacross two lines by the PDF.\n'
+        '\n'
+        'And this is the next paragraph.',
+      );
+      expect(blocks.length, 2);
+      expect(
+        blocks.first.text,
+        'This sentence was broken across two lines by the PDF.',
+      );
+      expect(blocks.first.style, DocStyle.body);
+    });
+
+    test('bullets and numbers are recognised, and the number is kept', () {
+      final blocks = blocksFromPlainText(
+        '- first\n'
+        '• second\n'
+        '1. third\n'
+        '2) fourth',
+      );
+      expect(blocks.map((b) => b.style), [
+        DocStyle.bullet,
+        DocStyle.bullet,
+        DocStyle.numbered,
+        DocStyle.numbered,
+      ]);
+      expect(blocks[0].text, 'first');
+      // A numbered item keeps its number: renumbering it could contradict the
+      // text, which may refer to "step 3".
+      expect(blocks[2].text, '1. third');
+      expect(blocks[3].text, '2. fourth');
+    });
+
+    test('a heading is only guessed when several signs agree', () {
+      expect(blocksFromPlainText('METHODOLOGY').first.style, DocStyle.heading);
+      expect(blocksFromPlainText('3 Results').first.style, DocStyle.heading);
+      expect(
+        blocksFromPlainText('3.2.1 Sample preparation').first.style,
+        DocStyle.subheading,
+      );
+      // Ends in a full stop, so it is a sentence.
+      expect(blocksFromPlainText('Results.').first.style, DocStyle.body);
+      // Too long to be a heading.
+      expect(
+        blocksFromPlainText('A' * 80).first.style,
+        DocStyle.body,
+      );
+    });
+
+    test('the bullet character lives in the drawing, not in the text', () {
+      const block = DocBlock(DocStyle.bullet, 'first');
+      expect(block.text, 'first');
+      expect(docDisplayText(block), '•   first');
+      // So a round trip cannot end up with two bullets.
+      expect(docDisplayText(const DocBlock.body('plain')), 'plain');
+    });
+
+    test('words are counted across every block', () {
+      expect(
+        wordsIn(const [
+          DocBlock(DocStyle.heading, 'Two words'),
+          DocBlock.body('and three more words'),
+        ]),
+        6,
+      );
+      expect(wordsIn(const []), 0);
+    });
+  });
+
+  group('docx writing', () {
+    test('the document is a complete, namespaced part', () {
+      final xml = buildWordDocumentXml(const [DocBlock.body('Hello')]);
+      expect(xml, startsWith('<?xml version="1.0"'));
+      expect(xml, contains('wordprocessingml/2006/main'));
+      expect(xml, contains('<w:body>'));
+      // Without a sectPr Word opens the file but has no page size for it.
+      expect(xml, contains('<w:sectPr>'));
+      expect(xml, contains('Hello'));
+    });
+
+    test('text is escaped on the way in', () {
+      final xml = buildWordDocumentXml(
+        const [DocBlock.body('Tom & Jerry <b>')],
+      );
+      expect(xml, contains('Tom &amp; Jerry &lt;b&gt;'));
+      expect(xml, isNot(contains('Tom & Jerry')));
+    });
+
+    test('a bullet keeps its leading space', () {
+      final xml = buildWordDocumentXml(
+        const [DocBlock(DocStyle.bullet, 'item')],
+      );
+      // Without xml:space="preserve" Word trims "• " down to "•".
+      expect(xml, contains('xml:space="preserve"'));
+      expect(xml, contains('• item'));
+    });
+
+    test('formatting is written onto the run, not left to a missing style', () {
+      final heading = buildWordDocumentXml(
+        const [DocBlock(DocStyle.heading, 'Methods')],
+      );
+      // A w:pStyle of "Heading1" would need a styles.xml this package has not
+      // got, and Word would render the heading as body text.
+      expect(heading, isNot(contains('pStyle')));
+      expect(heading, contains('<w:b/>'));
+      expect(heading, contains('<w:sz w:val="32"/>'));
+
+      final body = buildWordDocumentXml(const [DocBlock.body('Plain')]);
+      expect(body, isNot(contains('<w:b/>')));
+      expect(body, contains('<w:sz w:val="22"/>'));
+    });
+
+    test('an empty document still produces an openable part', () {
+      final xml = buildWordDocumentXml(const []);
+      expect(xml, contains('<w:body>'));
+      expect(xml, contains('<w:p>'));
+    });
+
+    test('the package parts name each other correctly', () {
+      expect(contentTypesXml, contains('/word/document.xml'));
+      expect(rootRelsXml, contains('Target="word/document.xml"'));
+    });
+  });
+
+  group('docx reading', () {
+    String doc(String body) =>
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        'wordprocessingml/2006/main"><w:body>$body</w:body></w:document>';
+
+    test('text is read out of the runs', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>world</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.text, 'Hello world');
+      expect(blocks.single.style, DocStyle.body);
+    });
+
+    test('a different namespace prefix is still read', () {
+      // The "w" prefix is only a convention. A file using another prefix is
+      // equally valid, and matching on the name "w:p" would read it as empty.
+      final blocks = blocksFromWordXml(
+        '<wd:document xmlns:wd="http://schemas.openxmlformats.org/'
+        'wordprocessingml/2006/main"><wd:body>'
+        '<wd:p><wd:r><wd:t>Still here</wd:t></wd:r></wd:p>'
+        '</wd:body></wd:document>',
+      );
+      expect(blocks.single.text, 'Still here');
+    });
+
+    test('a named heading style is honoured', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        '<w:r><w:t>Chapter</w:t></w:r></w:p>'
+        '<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>'
+        '<w:r><w:t>Detail</w:t></w:r></w:p>'
+        '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>'
+        '<w:r><w:t>Front</w:t></w:r></w:p>',
+      ));
+      expect(blocks.map((b) => b.style),
+          [DocStyle.heading, DocStyle.subheading, DocStyle.title]);
+    });
+
+    test('a numbered paragraph becomes a list item', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr>'
+        '<w:r><w:t>point one</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.style, DocStyle.bullet);
+    });
+
+    test('an all-bold line is read as a heading when nothing else says so', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr>'
+        '<w:t>Introduction</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.style, DocStyle.heading);
+    });
+
+    test('a bullet already in the text is not doubled', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:r><w:t>• already bulleted</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.text, 'already bulleted');
+    });
+
+    test('empty paragraphs are dropped', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p/><w:p><w:r><w:t>   </w:t></w:r></w:p>'
+        '<w:p><w:r><w:t>Real</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.text, 'Real');
+    });
+
+    test('words inside a table are kept even though the table is not', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:tbl><w:tr><w:tc>'
+        '<w:p><w:r><w:t>cell text</w:t></w:r></w:p>'
+        '</w:tc></w:tr></w:tbl>',
+      ));
+      // Losing the shape is a stated limitation. Losing the data silently
+      // would be the worse of the two.
+      expect(blocks.single.text, 'cell text');
+    });
+
+    test('a tab becomes a space rather than vanishing', () {
+      final blocks = blocksFromWordXml(doc(
+        '<w:p><w:r><w:t>Name</w:t><w:tab/><w:t>Value</w:t></w:r></w:p>',
+      ));
+      expect(blocks.single.text, 'Name Value');
+    });
+  });
+
+  group('pagination', () {
+    test('a short document is one page', () {
+      final pages = paginateBlocks(const [
+        DocBlock(DocStyle.heading, 'Short'),
+        DocBlock.body('One line is not a book.'),
+      ]);
+      expect(pages.length, 1);
+      expect(pages.single.length, 2);
+    });
+
+    test('an empty document is still one page, not none', () {
+      expect(paginateBlocks(const []).length, 1);
+    });
+
+    test('a long document runs onto more pages', () {
+      final blocks = [
+        for (var i = 0; i < 120; i++)
+          DocBlock.body('Paragraph $i. ${'Filler sentence. ' * 6}'),
+      ];
+      final pages = paginateBlocks(blocks);
+      expect(pages.length, greaterThan(1));
+      // Nothing is dropped on the way: every page has something on it.
+      expect(pages.every((p) => p.isNotEmpty), isTrue);
+    });
+
+    test('a paragraph too tall for one page is split, not lost', () {
+      final pages = paginateBlocks([DocBlock.body('word ' * 4000)]);
+      expect(pages.length, greaterThan(1));
+      final total = pages.fold<int>(0, (n, p) => n + p.length);
+      expect(total, greaterThan(1));
     });
   });
 }

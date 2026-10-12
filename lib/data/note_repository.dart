@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
@@ -10,6 +12,7 @@ import '../models/subject.dart';
 import '../widgets/nest_drawer.dart';
 import 'app_database.dart';
 import 'attachment_store.dart';
+import 'brand_store.dart';
 import 'auth_repository.dart';
 
 /// SQLite treats `%` and `_` inside LIKE as wildcards, so a student searching
@@ -30,6 +33,8 @@ class NoteRepository extends ChangeNotifier {
   static const _kReminder = 'revision_reminder';
   static const _kSetupDone = 'setup_done';
   static const _kRecentSearches = 'recent_searches';
+  static const _kCoverDraft = 'cover_draft';
+  static const _kBrandLogo = 'brand_logo';
 
   final _db = AppDatabase.instance;
   final _auth = AuthRepository.instance;
@@ -39,6 +44,19 @@ class NoteRepository extends ChangeNotifier {
   String? semesterLabel;
   String? reminderChoice;
   bool setupDone = false;
+
+  /// The university logo the student picked once, as PNG bytes.
+  ///
+  /// Null until they choose one. Kept decoded in memory because every cover
+  /// page preview rebuild would otherwise decode the same base64 again.
+  Uint8List? brandLogo;
+
+  /// The last cover page the student filled in, as JSON.
+  ///
+  /// Kept so the institution, department, their name and their ID do not have
+  /// to be retyped for every assignment. [CoverSpec.asNextDraft] decides what
+  /// carries over and what is cleared.
+  String? coverDraft;
 
   List<Subject> _subjects = const [];
 
@@ -82,6 +100,8 @@ class NoteRepository extends ChangeNotifier {
     semesterLabel = map[_kSemester];
     reminderChoice = map[_kReminder];
     setupDone = map[_kSetupDone] == '1';
+    coverDraft = map[_kCoverDraft];
+    brandLogo = BrandStore.decode(map[_kBrandLogo]);
     _recentSearches = _splitSearches(map[_kRecentSearches]);
 
     await _reloadSubjects();
@@ -99,6 +119,8 @@ class NoteRepository extends ChangeNotifier {
     semesterLabel = null;
     reminderChoice = null;
     setupDone = false;
+    coverDraft = null;
+    brandLogo = null;
     notifyListeners();
   }
 
@@ -149,6 +171,26 @@ class NoteRepository extends ChangeNotifier {
     setupDone = true;
     await _setSetting(_kSetupDone, '1');
     notifyListeners();
+  }
+
+  /// Saves, or clears, the logo used on cover pages.
+  ///
+  /// This one does notify: the cover preview has to redraw the moment a logo
+  /// is picked, and that is the whole point of picking it.
+  Future<void> saveBrandLogo(Uint8List? png) async {
+    brandLogo = png;
+    await _setSetting(_kBrandLogo, png == null ? null : BrandStore.encode(png));
+    notifyListeners();
+  }
+
+  /// Remembers the cover page for next time.
+  ///
+  /// Deliberately does not notify: the cover screen already holds the spec it
+  /// just saved, and waking every other listener to tell them a draft changed
+  /// would rebuild the whole app for nothing.
+  Future<void> saveCoverDraft(String json) async {
+    coverDraft = json;
+    await _setSetting(_kCoverDraft, json);
   }
 
   // --------------------------------------------------------------- subjects
@@ -850,6 +892,16 @@ class NoteRepository extends ChangeNotifier {
   // ------------------------------------------------------------ drawer menu
 
   List<NestDrawerLink> drawerLinks() => const [
+        NestDrawerLink(
+          id: 'cover',
+          label: 'Cover page',
+          icon: Icons.description_outlined,
+        ),
+        NestDrawerLink(
+          id: 'convert',
+          label: 'Convert a file',
+          icon: Icons.swap_horiz_rounded,
+        ),
         NestDrawerLink(
           id: 'inbox',
           label: 'Shared inbox',
