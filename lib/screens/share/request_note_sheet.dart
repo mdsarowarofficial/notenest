@@ -212,7 +212,7 @@ class _RequestSheetState extends State<_RequestSheet> {
                 decoration: BoxDecoration(
                   color: NestColor.card,
                   borderRadius: BorderRadius.circular(NestRadius.card),
-                  border: Border.all(color: NestColor.rule),
+                  boxShadow: NestShadow.resting,
                 ),
                 child: Text(
                   _message,

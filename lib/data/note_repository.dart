@@ -922,6 +922,12 @@ class NoteRepository extends ChangeNotifier {
 
   // ------------------------------------------------------------ drawer menu
 
+  /// The drawer is a list of places, not a menu of every feature.
+  ///
+  /// Chats, Groups, Shared inbox and Note requests used to be four links here.
+  /// They are four views of one subject — other people — so they are now four
+  /// things you can reach from the People tab, one tap away on the bar you can
+  /// already see, instead of behind a hamburger you have to know to open.
   List<NestDrawerLink> drawerLinks() => const [
         NestDrawerLink(
           id: 'cloud',
@@ -937,26 +943,6 @@ class NoteRepository extends ChangeNotifier {
           id: 'convert',
           label: 'Convert a file',
           icon: Icons.swap_horiz_rounded,
-        ),
-        NestDrawerLink(
-          id: 'inbox',
-          label: 'Shared inbox',
-          icon: Icons.move_to_inbox_rounded,
-        ),
-        NestDrawerLink(
-          id: 'chats',
-          label: 'Chats',
-          icon: Icons.forum_outlined,
-        ),
-        NestDrawerLink(
-          id: 'groups',
-          label: 'Groups',
-          icon: Icons.groups_2_outlined,
-        ),
-        NestDrawerLink(
-          id: 'requests',
-          label: 'Note requests',
-          icon: Icons.pending_actions_rounded,
         ),
         NestDrawerLink(
           id: 'trash',

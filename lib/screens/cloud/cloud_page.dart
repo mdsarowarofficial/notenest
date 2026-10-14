@@ -185,7 +185,7 @@ class _CloudPageState extends State<CloudPage> {
           decoration: BoxDecoration(
             color: NestColor.card,
             borderRadius: BorderRadius.circular(NestRadius.card),
-            border: Border.all(color: NestColor.rule),
+            boxShadow: NestShadow.resting,
           ),
           child: Row(
             children: [
@@ -598,12 +598,10 @@ class _Chip extends StatelessWidget {
         duration: const Duration(milliseconds: 170),
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? NestColor.o(NestColor.pen, 0.14) : NestColor.paper,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: selected ? NestColor.pen : Colors.transparent,
-            width: 1.5,
-          ),
+          color: selected ? NestColor.tintPen : NestColor.paper,
+          borderRadius: BorderRadius.circular(NestRadius.tile),
+          boxShadow:
+              selected ? NestShadow.glow(NestColor.pen) : const <BoxShadow>[],
         ),
         child: Text(
           label,

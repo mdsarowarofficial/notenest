@@ -301,7 +301,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             decoration: BoxDecoration(
               color: NestColor.card,
               borderRadius: BorderRadius.circular(NestRadius.card),
-              border: Border.all(color: NestColor.rule),
+              boxShadow: NestShadow.resting,
             ),
             child: _body.trim().isEmpty
                 ? Text(

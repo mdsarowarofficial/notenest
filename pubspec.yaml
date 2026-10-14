@@ -1,7 +1,7 @@
 name: notenest
 description: NoteNest — personal academic workspace for students.
 publish_to: "none"
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   # Raised from 3.0.0 for Activity 06: the audio and speech packages below
@@ -79,3 +79,29 @@ flutter:
     # roughly 670 KB. Carried in the app so picking a university works with no
     # connection. Logos are deliberately not here; see data/brand_store.dart.
     - assets/universities.json
+
+  # Bundled rather than fetched from Google Fonts.
+  #
+  # Not only for speed: the app has already failed in the field because it
+  # could not reach fonts.gstatic.com, and a notebook that promises to work
+  # offline cannot depend on a font server to be readable. Both families are
+  # SIL Open Font License, so shipping them is free and allowed.
+  #
+  # Only the weights actually used are carried — 664 KB in total.
+  fonts:
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Outfit-Bold.ttf
+          weight: 700
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700

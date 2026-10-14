@@ -3,26 +3,32 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../models/exam.dart';
 import '../../theme/nest_theme.dart';
-import '../../widgets/note_tile.dart';
+import '../../widgets/nest_mark_tile.dart';
+import '../../widgets/note_row.dart';
+import '../convert/convert_page.dart';
+import '../cover/cover_page.dart';
 import '../notes/note_detail.dart';
-import '../notes/note_editor.dart';
 import '../subjects/subject_form.dart';
 
-/// The landing screen. Requirement 3.
+/// The landing screen.
 ///
-/// It names the single next thing worth doing, then gets out of the way.
+/// Built around one number: how much is left to master before the next exam.
+/// Everything else here is subordinate to it, because that is the question a
+/// student opens a notes app to answer at eleven at night.
+///
+/// Cover page and Convert sit here as two cards rather than in the drawer.
+/// They are the two things NoteNest does that a notes app does not, and they
+/// spent the whole project behind a hamburger menu where nobody found them.
 class TodayPage extends StatelessWidget {
   const TodayPage({
     super.key,
     required this.onOpenNotes,
     required this.onCapture,
-    required this.onSearch,
     required this.onOpenExams,
   });
 
   final VoidCallback onOpenNotes;
   final VoidCallback onCapture;
-  final VoidCallback onSearch;
   final VoidCallback onOpenExams;
 
   @override
@@ -32,76 +38,77 @@ class TodayPage extends StatelessWidget {
     return ListenableBuilder(
       listenable: repo,
       builder: (context, _) {
-        final t = Theme.of(context).textTheme;
-        final days = repo.daysToNextExam;
-        final recent = repo.recentNotes(limit: 5);
+        final recent = repo.recentNotes(limit: 4);
         final reminders = repo.dueReminders();
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(22, 8, 22, 120),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
           children: [
-            Text(todayLabel(), style: nestEyebrow),
-            const SizedBox(height: 8),
-            Text(_headline(repo, days), style: t.displaySmall),
-            const SizedBox(height: 10),
-            Text(_subline(repo), style: t.bodyMedium),
+            _Greeting(name: repo.userName),
             const SizedBox(height: 20),
 
-            // The reminders the student set themselves, shown on the screen
-            // they land on rather than buried in Exam Mode.
             for (final exam in reminders) ...[
               _ReminderStrip(exam: exam, onTap: onOpenExams),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
             ],
-            if (reminders.isNotEmpty) const SizedBox(height: 10),
-
-            // A notebook is only useful if you can find things in it, so the
-            // way in sits on the landing screen rather than only in the bar.
-            if (repo.hasNotes) ...[
-              _SearchRow(onTap: onSearch, count: repo.notes().length),
-              const SizedBox(height: 22),
-            ] else
-              const SizedBox(height: 4),
 
             if (!repo.hasSubjects)
               _StartCard(
                 eyebrow: 'FIRST STEP',
                 title: 'Add a subject',
                 body: 'Subjects give every note a colour and a place to live. '
-                    'You can add more later from the drawer.',
+                    'You can add more later.',
                 actionLabel: 'Add a subject',
                 onAction: () => showSubjectForm(context),
               )
-            else if (!repo.hasNotes)
+            else if (!repo.hasNotes) ...[
               _StartCard(
                 eyebrow: 'NEXT STEP',
                 title: 'Write your first note',
                 body: 'Give it a title, pick the subject and topic, and start '
                     'writing. It saves as you type.',
                 actionLabel: 'Write a note',
-                onAction: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NoteEditorPage()),
-                ),
-              )
-            else ...[
+                onAction: onCapture,
+              ),
+              const SizedBox(height: 14),
+              const _Tools(),
+            ] else ...[
               _RevisionCard(
                 total: repo.unrevisedCount,
                 important: repo.importantUnrevisedCount,
+                allNotes: repo.notes().length,
+                days: repo.daysToNextExam,
+                subject: repo.nextExamSubject,
                 onOpen: onOpenNotes,
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 14),
+              const _Tools(),
+              const SizedBox(height: 24),
               Row(
                 children: [
-                  const Text('RECENT', style: nestEyebrow),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Container(height: 1, color: NestColor.rule),
+                    child: Text(
+                      'Keep going',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onOpenNotes,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('See all'),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              for (final note in recent)
-                NoteTile(
+              const SizedBox(height: 10),
+              // The short row, not the full card. Today is a list of things
+              // to pick up again, and four full cards with body text and tags
+              // fill the screen with reading instead of choices.
+              for (final note in recent) ...[
+                NoteRow(
                   note: note,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -109,38 +116,334 @@ class TodayPage extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 11),
+              ],
             ],
           ],
         );
       },
     );
   }
+}
 
-  String _headline(NoteRepository repo, int? days) {
-    if (days == null) {
-      if (!repo.hasSubjects) return 'Nothing filed yet.';
-      if (!repo.hasNotes) return 'Your notebook is ready.';
-      return '${repo.notes().length} '
-          '${repo.notes().length == 1 ? 'note' : 'notes'} in your notebook.';
+// ------------------------------------------------------------------- header
+
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.name});
+
+  final String name;
+
+  /// First name only. "Good evening, Md. Sarowar Hossain" wraps onto two lines
+  /// and reads like a letter from a bank.
+  String get _first {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return '';
+    for (final p in parts) {
+      // Skip honorifics and initials — "Md." is not what anybody is called.
+      if (p.length > 2 && !p.endsWith('.')) return p;
     }
-    if (days <= 0) return 'Your ${repo.nextExamSubject} exam is today.';
-    return '$days ${days == 1 ? 'day' : 'days'} to your\n'
-        '${repo.nextExamSubject} exam.';
+    return parts.first;
   }
 
-  String _subline(NoteRepository repo) {
-    if (!repo.hasSubjects) {
-      return 'Add a subject to begin.';
-    }
-    if (!repo.hasNotes) return 'No notes yet in any subject.';
-    final exam = repo.nextExam;
-    if (exam == null) {
-      return 'Set an exam date in Exam Mode to see a countdown here.';
-    }
-    return '${exam.title} · ${countdownLabel(exam.daysAway)}. '
-        'Exam Mode has the revision order.';
+  String get _timeOfDay {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(todayLabel(), style: nestEyebrow),
+              const SizedBox(height: 4),
+              Text(
+                _first.isEmpty ? _timeOfDay : '$_timeOfDay, $_first',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: t.headlineSmall,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        InitialsTile(name: name, size: 46),
+      ],
+    );
   }
 }
+
+// -------------------------------------------------------------- the number
+
+class _RevisionCard extends StatelessWidget {
+  const _RevisionCard({
+    required this.total,
+    required this.important,
+    required this.allNotes,
+    required this.days,
+    required this.subject,
+    required this.onOpen,
+  });
+
+  final int total;
+  final int important;
+  final int allNotes;
+  final int? days;
+  final String? subject;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = total == 0;
+    final mastered = allNotes - total;
+    // Guarded rather than assumed: an empty notebook would divide by zero, and
+    // a count that drifted could push this past one and overflow the bar.
+    final share = allNotes == 0 ? 0.0 : (mastered / allNotes).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(NestRadius.card + 2),
+        boxShadow: NestShadow.glow(done ? NestColor.mint : NestColor.pen),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: done ? NestColor.mint : NestColor.pen,
+        child: InkWell(
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        done ? 'All caught up' : 'Needs revision',
+                        style: TextStyle(
+                          fontFamily: NestFont.body,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: NestColor.o(Colors.white, 0.78),
+                        ),
+                      ),
+                    ),
+                    if (days != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: NestColor.o(Colors.white, 0.18),
+                          borderRadius: BorderRadius.circular(NestRadius.pill),
+                        ),
+                        child: Text(
+                          countdownLabel(days!),
+                          style: const TextStyle(
+                            fontFamily: NestFont.body,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      done ? '$allNotes' : '$total',
+                      style: const TextStyle(
+                        fontFamily: NestFont.display,
+                        fontSize: 46,
+                        height: 0.95,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1.6,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Text(
+                          done
+                              ? 'notes mastered.\nNothing waiting.'
+                              : subject == null
+                                  ? 'notes not yet\nmastered'
+                                  : 'notes left\nfor $subject',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: NestFont.body,
+                            fontSize: 13,
+                            height: 1.3,
+                            color: NestColor.o(Colors.white, 0.8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: LinearProgressIndicator(
+                    value: share,
+                    minHeight: 8,
+                    backgroundColor: NestColor.o(Colors.white, 0.22),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      done ? Colors.white : NestColor.highlight,
+                    ),
+                  ),
+                ),
+                if (important > 0 && !done) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 15,
+                        color: NestColor.highlight,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$important marked important',
+                        style: TextStyle(
+                          fontFamily: NestFont.body,
+                          fontSize: 12,
+                          color: NestColor.o(Colors.white, 0.82),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------- tools
+
+class _Tools extends StatelessWidget {
+  const _Tools();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ToolCard(
+            icon: Icons.description_outlined,
+            tint: NestColor.tintPen,
+            colour: NestColor.pen,
+            title: 'Cover page',
+            body: 'Assignment, lab report',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CoverPageScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ToolCard(
+            icon: Icons.swap_horiz_rounded,
+            tint: NestColor.tintMint,
+            colour: NestColor.mint,
+            title: 'Convert',
+            body: 'Word and PDF',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ConvertPage()),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ToolCard extends StatelessWidget {
+  const _ToolCard({
+    required this.icon,
+    required this.tint,
+    required this.colour,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final Color colour;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: NestColor.card,
+        borderRadius: BorderRadius.circular(NestRadius.tile + 2),
+        boxShadow: NestShadow.resting,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(NestRadius.chip),
+                  ),
+                  child: Icon(icon, size: 21, color: colour),
+                ),
+                const SizedBox(height: 12),
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  body,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: NestFont.body,
+                    fontSize: 11.5,
+                    color: NestColor.inkFaint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- reminders
 
 /// A reminder the student asked for, on the screen they open first.
 class _ReminderStrip extends StatelessWidget {
@@ -151,94 +454,63 @@ class _ReminderStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final soon = exam.daysAway <= 1;
-    final accent = soon ? NestColor.redPen : NestColor.pen;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(NestRadius.tile),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: NestColor.o(accent, 0.07),
-          borderRadius: BorderRadius.circular(NestRadius.tile),
-          border: Border.all(color: NestColor.o(accent, 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.notifications_active_rounded, size: 18, color: accent),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${exam.kind.label} · ${countdownLabel(exam.daysAway)}',
-                    style: nestEyebrow.copyWith(color: accent),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    exam.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                size: 18, color: NestColor.inkFaint),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: NestColor.card,
+        borderRadius: BorderRadius.circular(NestRadius.tile),
+        boxShadow: NestShadow.resting,
       ),
-    );
-  }
-}
-
-/// The way into search, drawn as an empty line waiting to be written on.
-class _SearchRow extends StatelessWidget {
-  const _SearchRow({required this.onTap, required this.count});
-
-  final VoidCallback onTap;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(NestRadius.tile),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: NestColor.card,
-          borderRadius: BorderRadius.circular(NestRadius.tile),
-          border: Border.all(color: NestColor.rule),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.search_rounded,
-                size: 19, color: NestColor.inkFaint),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                count == 1
-                    ? 'Search your 1 note'
-                    : 'Search your $count notes',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: NestColor.inkSoft,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
+              children: [
+                // A warm mark rather than the 5px coloured stripe down the
+                // left edge this card used to carry: the stripe is not in the
+                // design, and a bare icon beside white is no colour at all.
+                MarkTile.tool(
+                  Icons.notifications_active_rounded,
+                  tint: NestColor.tintWarm,
+                  ink: NestColor.warmDeep,
+                  size: 40,
                 ),
-              ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        exam.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        countdownLabel(exam.daysAway),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: NestColor.inkFaint,
+                ),
+              ],
             ),
-            Text('FIND', style: nestEyebrow.copyWith(color: NestColor.pen)),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// A card that names the single next thing worth doing.
+// -------------------------------------------------------------- empty state
+
 class _StartCard extends StatelessWidget {
   const _StartCard({
     required this.eyebrow,
@@ -257,28 +529,23 @@ class _StartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: NestColor.card,
         borderRadius: BorderRadius.circular(NestRadius.card),
-        border: Border.all(color: NestColor.rule),
+        boxShadow: NestShadow.lifted,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(width: 4, height: 16, color: NestColor.pen),
-              const SizedBox(width: 8),
-              Text(eyebrow, style: nestEyebrow.copyWith(color: NestColor.pen)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(title, style: t.titleMedium),
-          const SizedBox(height: 6),
+          Text(eyebrow, style: nestEyebrow.copyWith(color: NestColor.pen)),
+          const SizedBox(height: 8),
+          Text(title, style: t.headlineSmall),
+          const SizedBox(height: 8),
           Text(body, style: t.bodySmall),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -286,83 +553,6 @@ class _StartCard extends StatelessWidget {
               child: Text(actionLabel),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RevisionCard extends StatelessWidget {
-  const _RevisionCard({
-    required this.total,
-    required this.important,
-    required this.onOpen,
-  });
-
-  final int total;
-  final int important;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    final done = total == 0;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.card),
-        border: Border.all(color: NestColor.rule),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 16,
-                color: done ? NestColor.mint : NestColor.redPen,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                done ? 'ALL MASTERED' : 'NEEDS REVISION',
-                style: nestEyebrow.copyWith(
-                  color: done ? NestColor.mint : NestColor.redPen,
-                ),
-              ),
-              const Spacer(),
-              if (!done) Text('$total NOTES', style: nestEyebrow),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            done
-                ? 'Every note is marked Mastered'
-                : important > 0
-                    ? 'Start with the $important you marked important'
-                    : 'Work through what you have not mastered yet',
-            style: t.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            done
-                ? 'Nothing is waiting for revision right now.'
-                : 'Notes move from New to Read to Review to Mastered as you '
-                    'work through them.',
-            style: t.bodySmall,
-          ),
-          if (!done) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onOpen,
-                child: const Text('Open my notes'),
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -320,14 +320,10 @@ class _PolicyTile extends StatelessWidget {
         duration: const Duration(milliseconds: 170),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected
-              ? NestColor.o(NestColor.pen, 0.10)
-              : NestColor.paper,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: selected ? NestColor.pen : Colors.transparent,
-            width: 1.5,
-          ),
+          color: selected ? NestColor.tintPen : NestColor.paper,
+          borderRadius: BorderRadius.circular(NestRadius.tile),
+          boxShadow:
+              selected ? NestShadow.glow(NestColor.pen) : const <BoxShadow>[],
         ),
         child: Row(
           children: [

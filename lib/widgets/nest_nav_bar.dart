@@ -15,16 +15,23 @@ class NestNavItem {
   final IconData activeIcon;
   final String label;
 
-  /// The index-tab colour that marks this destination.
+  /// Kept because every caller passes it and the drawer reads the same
+  /// palette, but the bar no longer draws it: the selected pill is plain
+  /// indigo, as in the design.
   final Color accent;
 }
 
-/// Bottom navigation drawn as index tabs on the edge of a page.
+/// The bottom bar, floating clear of the page.
 ///
-/// The selected destination lifts out of the sheet and shows its coloured tab
-/// edge, so the bar behaves like the divider tabs of a notebook instead of a
-/// row of icons. The capture button in the middle is offset-printed against a
-/// highlighter block — the same mark used elsewhere in the app.
+/// A rounded bar resting *above* the content on its own shadow rather than a
+/// strip welded to the bottom edge. That one change does most of the work of
+/// making the app feel current: the page runs underneath it, and the bar is
+/// obviously a control rather than part of the page.
+///
+/// The selected destination grows a filled pill with its label; the others are
+/// icons alone. The capture button is unchanged from the original design — the
+/// offset highlighter block behind a blue key — because it was the one piece
+/// of the old bar that was already doing something nobody else does.
 class NestNavBar extends StatelessWidget {
   const NestNavBar({
     super.key,
@@ -42,8 +49,15 @@ class NestNavBar extends StatelessWidget {
   final VoidCallback onCapture;
   final String captureLabel;
 
-  static const double _barHeight = 68;
-  static const double _tabRise = 12;
+  static const double _pillHeight = 66;
+  static const double _sideMargin = 16;
+  static const double _bottomMargin = 14;
+
+  /// How far the capture button stands proud of the bar.
+  static const double _rise = 12;
+
+  /// The gap in the row that the capture button sits in.
+  static const double _wellWidth = 78;
 
   @override
   Widget build(BuildContext context) {
@@ -51,54 +65,36 @@ class NestNavBar extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return SizedBox(
-      height: _barHeight + _tabRise + bottomInset,
+      height: _pillHeight + _rise + _bottomMargin + bottomInset,
       child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          // The page edge.
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: _barHeight + bottomInset,
+            left: _sideMargin,
+            right: _sideMargin,
+            bottom: _bottomMargin + bottomInset,
+            height: _pillHeight,
             child: Container(
               decoration: BoxDecoration(
                 color: NestColor.card,
-                border: const Border(
-                  top: BorderSide(color: NestColor.rule, width: 1),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: NestColor.o(NestColor.ink, 0.06),
-                    blurRadius: 20,
-                    offset: const Offset(0, -6),
-                  ),
+                borderRadius: BorderRadius.circular(NestRadius.card),
+                boxShadow: NestShadow.floating,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Expanded(child: _tab(0)),
+                  Expanded(child: _tab(1)),
+                  const SizedBox(width: _wellWidth),
+                  Expanded(child: _tab(2)),
+                  Expanded(child: _tab(3)),
                 ],
               ),
             ),
           ),
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: bottomInset,
-            top: 0,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(child: _tab(0)),
-                Expanded(child: _tab(1)),
-                const SizedBox(width: 86),
-                Expanded(child: _tab(2)),
-                Expanded(child: _tab(3)),
-              ],
-            ),
-          ),
-          // Capture button, printed slightly off-register.
-          Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: EdgeInsets.only(top: 0, bottom: bottomInset),
-              child: _captureButton(context),
-            ),
+            bottom: _bottomMargin + bottomInset + _pillHeight - 58,
+            child: _captureButton(context),
           ),
         ],
       ),
@@ -119,69 +115,52 @@ class NestNavBar extends StatelessWidget {
           if (!selected) HapticFeedback.selectionClick();
           onTap(index);
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutBack,
-          height: selected ? _barHeight + _tabRise : _barHeight - 4,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? NestColor.card : Colors.transparent,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
+            height: 42,
+            padding: EdgeInsets.symmetric(horizontal: selected ? 12 : 8),
+            decoration: BoxDecoration(
+              // A plain filled pill, no outline. The outline was mine, not the
+              // design's: a 2px ring in a third colour around a filled shape
+              // makes the one control you look at most read as a sticker.
+              color: selected ? NestColor.pen : Colors.transparent,
+              borderRadius: BorderRadius.circular(NestRadius.pill),
             ),
-            // The shadow is always present and only its colour changes.
-            // easeOutBack overshoots past both ends of the range, so a shadow
-            // that appears and disappears would be interpolated to a negative
-            // blur radius, which Flutter rejects.
-            boxShadow: [
-              BoxShadow(
-                color: NestColor.o(
-                  NestColor.ink,
-                  selected ? 0.10 : 0.0,
-                ),
-                blurRadius: 14,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // The coloured edge of the tab.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 260),
-                margin: const EdgeInsets.only(bottom: 10),
-                height: 4,
-                width: selected ? 30 : 0,
-                decoration: BoxDecoration(
-                  color: item.accent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
                   selected ? item.activeIcon : item.icon,
-                  key: ValueKey(selected),
-                  size: 22,
-                  color: selected ? NestColor.pen : NestColor.inkFaint,
+                  size: 21,
+                  color: selected ? Colors.white : NestColor.inkFaint,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: NestFont.mono,
-                  fontSize: 10.5,
-                  letterSpacing: 0.4,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? NestColor.ink : NestColor.inkFaint,
-                ),
-              ),
-            ],
+                if (selected) ...[
+                  const SizedBox(width: 7),
+                  // Flexible and scaled down rather than clipped. Four labels
+                  // plus a capture well on a narrow phone is exactly where a
+                  // fixed row overflows, and an overflow stripe across the
+                  // navigation bar is the worst place to find one.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontFamily: NestFont.display,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -213,22 +192,29 @@ class NestNavBar extends StatelessWidget {
             Positioned(
               left: 4,
               top: 2,
-              child: Material(
-                color: NestColor.pen,
-                borderRadius: BorderRadius.circular(20),
-                elevation: 6,
-                shadowColor: NestColor.o(NestColor.penDeep, 0.4),
-                child: InkWell(
+              child: Container(
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    onCapture();
-                  },
-                  child: const SizedBox(
-                    width: 58,
-                    height: 58,
-                    child: Icon(Icons.edit_rounded,
-                        color: Colors.white, size: 24),
+                  boxShadow: NestShadow.glow(NestColor.pen),
+                ),
+                child: Material(
+                  color: NestColor.pen,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      onCapture();
+                    },
+                    child: const SizedBox(
+                      width: 58,
+                      height: 58,
+                      child: Icon(
+                        Icons.edit_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
                   ),
                 ),
               ),

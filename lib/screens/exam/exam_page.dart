@@ -247,7 +247,8 @@ class _ExamPageState extends State<ExamPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: NestColor.paper,
+                  color: NestColor.card,
+                  boxShadow: NestShadow.resting,
                   borderRadius: BorderRadius.circular(NestRadius.tile),
                 ),
                 child: Text(
@@ -331,9 +332,12 @@ class _CountdownCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: NestColor.card,
         borderRadius: BorderRadius.circular(NestRadius.card),
-        border: Border.all(
-          color: urgent ? NestColor.o(NestColor.redPen, 0.35) : NestColor.rule,
-        ),
+        // The one card on this screen you are meant to feel, so when the exam
+        // is close it is lit from under in red rather than ringed in it. A
+        // border says "boundary"; a glow says "this is the thing".
+        boxShadow: urgent
+            ? NestShadow.glow(NestColor.redPen)
+            : NestShadow.resting,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,9 +361,9 @@ class _CountdownCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: NestColor.o(accent, 0.14),
+                            color: NestColor.o(accent, 0.2),
                             borderRadius:
-                                BorderRadius.circular(NestRadius.chip),
+                                BorderRadius.circular(NestRadius.pill),
                           ),
                           child: Text(
                             exam.kind.label.toUpperCase(),
@@ -406,9 +410,7 @@ class _CountdownCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: urgent
-                  ? NestColor.o(NestColor.redPen, 0.07)
-                  : NestColor.paper,
+              color: urgent ? NestColor.tintRed : NestColor.tintPen,
               borderRadius: BorderRadius.circular(NestRadius.tile),
             ),
             child: Row(
@@ -417,8 +419,8 @@ class _CountdownCard extends StatelessWidget {
                   urgent
                       ? Icons.priority_high_rounded
                       : Icons.insights_rounded,
-                  size: 16,
-                  color: urgent ? NestColor.redPen : NestColor.pen,
+                  size: 17,
+                  color: urgent ? NestColor.redDeep : NestColor.penDeep,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -504,7 +506,7 @@ class _ProgressBlock extends StatelessWidget {
             child: LinearProgressIndicator(
               value: value,
               minHeight: 10,
-              backgroundColor: NestColor.rule,
+              backgroundColor: NestColor.paperDeep,
               valueColor: AlwaysStoppedAnimation<Color>(accent),
             ),
           ),
@@ -554,12 +556,15 @@ class _ExamChip extends StatelessWidget {
         duration: const Duration(milliseconds: 170),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? NestColor.o(color, 0.14) : NestColor.paper,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: selected ? color : Colors.transparent,
-            width: 1.5,
-          ),
+          color: selected ? NestColor.o(color, 0.32) : NestColor.card,
+          borderRadius: BorderRadius.circular(NestRadius.pill),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F1B1E2B),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

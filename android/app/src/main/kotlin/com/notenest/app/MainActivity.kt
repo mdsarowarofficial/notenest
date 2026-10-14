@@ -1,4 +1,4 @@
-package com.example.notenest
+package com.notenest.app
 
 import io.flutter.embedding.android.FlutterActivity
 

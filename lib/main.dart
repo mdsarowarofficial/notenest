@@ -8,6 +8,7 @@ import 'screens/auth/login_page.dart';
 import 'screens/setup/setup_flow.dart';
 import 'screens/shell/home_shell.dart';
 import 'theme/nest_theme.dart';
+import 'widgets/nest_app_frame.dart';
 
 Future<void> main() async {
   // The database must be open and the session restored before the first frame,
@@ -35,6 +36,10 @@ class NoteNestApp extends StatelessWidget {
       title: 'NoteNest',
       debugShowCheckedModeBanner: false,
       theme: nestTheme(),
+      // Wraps the Navigator, so every route, dialog and sheet is held to a
+      // phone's width on a desktop browser rather than only the first screen.
+      builder: (context, child) =>
+          NestAppFrame(child: child ?? const SizedBox.shrink()),
       home: _firstScreen(),
     );
   }

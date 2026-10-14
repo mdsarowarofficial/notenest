@@ -322,6 +322,16 @@ class _Bubble extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: mine ? NestColor.pen : NestColor.card,
                       borderRadius: BorderRadius.circular(NestRadius.tile),
+                      // Lighter than a card's shadow on purpose: a thread puts
+                      // twenty of these on one screen, and twenty card
+                      // shadows stack into a grey fog.
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x121B1E2B),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

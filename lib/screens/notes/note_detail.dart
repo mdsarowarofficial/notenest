@@ -4,8 +4,8 @@ import '../../data/note_repository.dart';
 import '../../models/note.dart';
 import '../../models/note_query.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/nest_tags.dart';
-import '../../widgets/note_tile.dart';
 import '../search/search_page.dart';
 import '../share/share_note_sheet.dart';
 import 'attachment_strip.dart';
@@ -136,76 +136,118 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
             ],
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(22, 4, 22, 40),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 44),
             children: [
-              if (subject != null)
-                Row(
+              // The head of the note on one card: what it is, what it is
+              // about, and how far through it you are. Before, these three
+              // sat loose on the page separated by a hairline rule, which
+              // made the screen look like a form rather than a thing you had
+              // written.
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: BoxDecoration(
+                  color: NestColor.card,
+                  borderRadius: BorderRadius.circular(NestRadius.card),
+                  boxShadow: NestShadow.resting,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: NestColor.o(subject.color, 0.35),
-                        borderRadius: BorderRadius.circular(NestRadius.chip),
-                      ),
-                      child: Text(
-                        subject.code,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: NestColor.ink,
+                    Row(
+                      children: [
+                        MarkTile.status(note.status, size: 44),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (subject != null)
+                                Text(
+                                  subject.code.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: nestEyebrow.copyWith(
+                                    color: Color.lerp(
+                                        subject.color, NestColor.ink, 0.45),
+                                  ),
+                                ),
+                              Text(
+                                note.topic != null && note.topic!.isNotEmpty
+                                    ? note.topic!
+                                    : 'No topic',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: NestFont.body,
+                                  fontSize: 12.5,
+                                  color: NestColor.inkMeta,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        if (note.important)
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 20,
+                            color: NestColor.redPen,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      note.title.trim().isEmpty ? 'Untitled note' : note.title,
+                      style: t.displaySmall,
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      'Written ${relativeDay(note.createdAt)} · '
+                      'Updated ${relativeDay(note.updatedAt)}',
+                      style: const TextStyle(
+                        fontFamily: NestFont.body,
+                        fontSize: 12,
+                        color: NestColor.inkFaint,
                       ),
                     ),
-                    if (note.topic != null && note.topic!.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          note.topic!,
-                          overflow: TextOverflow.ellipsis,
-                          style: nestEyebrow.copyWith(letterSpacing: 0.4),
-                        ),
-                      ),
+                    if (note.tags.isNotEmpty) ...[
+                      const SizedBox(height: 15),
+                      NestTagChips(tags: note.tags, onTap: _openTag),
                     ],
                   ],
                 ),
-              const SizedBox(height: 14),
-              Text(note.title, style: t.displaySmall),
-              const SizedBox(height: 10),
-              Text(
-                'Written ${relativeDay(note.createdAt)} · '
-                'Updated ${relativeDay(note.updatedAt)}',
-                style: nestEyebrow.copyWith(
-                  letterSpacing: 0.3,
-                  fontWeight: FontWeight.w500,
-                ),
               ),
               if (note.isShared) ...[
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 _SharedBanner(note: note),
               ],
-              if (note.tags.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                NestTagChips(tags: note.tags, onTap: _openTag),
-              ],
-              const SizedBox(height: 22),
+              const SizedBox(height: 12),
               _StatusPicker(note: note),
-              const SizedBox(height: 22),
-              Container(height: 1, color: NestColor.rule),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               AttachmentStrip(note: note),
-              const SizedBox(height: 18),
-              if (note.body.trim().isEmpty)
-                Text('This note has no body yet.', style: t.bodySmall)
-              else
-                SelectableText(
-                  note.body,
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    height: 1.6,
-                    color: NestColor.ink,
-                  ),
+              const SizedBox(height: 12),
+              // The note itself, on its own sheet. A body of text floating on
+              // the page edge to edge reads as a description of the note; on
+              // a card it reads as the note.
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                decoration: BoxDecoration(
+                  color: NestColor.card,
+                  borderRadius: BorderRadius.circular(NestRadius.card),
+                  boxShadow: NestShadow.resting,
                 ),
+                child: note.body.trim().isEmpty
+                    ? Text('This note has no body yet.', style: t.bodySmall)
+                    : SelectableText(
+                        note.body,
+                        style: const TextStyle(
+                          fontFamily: NestFont.body,
+                          fontSize: 15.5,
+                          height: 1.62,
+                          color: NestColor.ink,
+                        ),
+                      ),
+              ),
             ],
           ),
         );
@@ -229,17 +271,21 @@ class _SharedBanner extends StatelessWidget {
     final reference = note.sharePolicy == SharePolicy.reference;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: NestColor.o(NestColor.highlight, 0.20),
-        borderRadius: BorderRadius.circular(NestRadius.tile),
+        color: NestColor.tintWarm,
+        borderRadius: BorderRadius.circular(NestRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.people_outline_rounded,
-              size: 16, color: NestColor.inkSoft),
-          const SizedBox(width: 10),
+          MarkTile.tool(
+            Icons.people_outline_rounded,
+            tint: NestColor.o(NestColor.warmDeep, 0.16),
+            ink: NestColor.warmDeep,
+            size: 38,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,6 +315,12 @@ class _SharedBanner extends StatelessWidget {
 }
 
 /// Moves a note between New, Read, Review and Mastered.
+///
+/// The one control on this screen that changes the note rather than describing
+/// it, so it sits on its own card. Selection is a solid fill in the status's
+/// own colour: the old version marked it with a 1.5px border and a 16% wash,
+/// a difference you had to hunt for on the very control whose whole job is to
+/// tell you where this note stands.
 class _StatusPicker extends StatelessWidget {
   const _StatusPicker({required this.note});
 
@@ -276,57 +328,65 @@ class _StatusPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('STUDY STATUS', style: nestEyebrow),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final status in StudyStatus.values)
-              GestureDetector(
-                onTap: () =>
-                    NoteRepository.instance.setStatus(note, status),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: status == note.status
-                        ? NestColor.o(StatusDot.colorFor(status), 0.16)
-                        : NestColor.paper,
-                    borderRadius: BorderRadius.circular(NestRadius.chip),
-                    border: Border.all(
-                      color: status == note.status
-                          ? StatusDot.colorFor(status)
-                          : Colors.transparent,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      StatusDot(status: status),
-                      const SizedBox(width: 8),
-                      Text(
-                        status.label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: status == note.status
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: NestColor.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        color: NestColor.card,
+        borderRadius: BorderRadius.circular(NestRadius.card),
+        boxShadow: NestShadow.resting,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('STUDY STATUS', style: nestEyebrow),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final status in StudyStatus.values)
+                _StatusChoice(status: status, note: note),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChoice extends StatelessWidget {
+  const _StatusChoice({required this.status, required this.note});
+
+  final StudyStatus status;
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final chosen = status == note.status;
+    final fill = MarkTile.inkForStatus(status);
+
+    return GestureDetector(
+      onTap: () => NoteRepository.instance.setStatus(note, status),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: chosen ? fill : MarkTile.tintForStatus(status),
+          borderRadius: BorderRadius.circular(NestRadius.pill),
+          boxShadow: chosen ? NestShadow.glow(fill) : const <BoxShadow>[],
         ),
-      ],
+        child: Text(
+          status.label,
+          style: TextStyle(
+            fontFamily: NestFont.body,
+            fontSize: 13,
+            fontWeight: chosen ? FontWeight.w700 : FontWeight.w600,
+            color: chosen ? Colors.white : fill,
+          ),
+        ),
+      ),
     );
   }
 }

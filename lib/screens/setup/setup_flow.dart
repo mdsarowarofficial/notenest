@@ -379,7 +379,7 @@ class _Sheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: NestColor.card,
             borderRadius: BorderRadius.circular(NestRadius.card),
-            border: Border.all(color: NestColor.rule),
+            boxShadow: NestShadow.resting,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

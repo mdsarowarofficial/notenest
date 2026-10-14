@@ -46,3 +46,20 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# ---------------------------------------------------------------------------
+# Release signing.
+#
+# android/.gitignore already covers these, but only for files under android/.
+# A keystore saved to the project root, or to a build/ or docs/ folder, would
+# otherwise be committed — and this repository is public. These patterns match
+# anywhere in the tree, so the keystore cannot leak by being in the wrong
+# folder. A published upload key cannot be revoked: anyone holding it can sign
+# an update of the app.
+# ---------------------------------------------------------------------------
+**/key.properties
+!**/key.properties.example
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pepk

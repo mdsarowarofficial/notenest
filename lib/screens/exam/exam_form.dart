@@ -432,14 +432,10 @@ class _PlainChip extends StatelessWidget {
         duration: const Duration(milliseconds: 170),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: selected
-              ? NestColor.o(NestColor.pen, 0.14)
-              : NestColor.paper,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: selected ? NestColor.pen : Colors.transparent,
-            width: 1.5,
-          ),
+          color: selected ? NestColor.tintPen : NestColor.paper,
+          borderRadius: BorderRadius.circular(NestRadius.pill),
+          boxShadow:
+              selected ? NestShadow.glow(NestColor.pen) : const <BoxShadow>[],
         ),
         child: Text(
           label,

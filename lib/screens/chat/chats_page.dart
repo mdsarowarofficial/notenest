@@ -18,11 +18,19 @@ import 'chat_page.dart';
 /// group's document before the screen could draw anything. Two sections draw
 /// immediately and read just as well.
 class ChatsPage extends StatelessWidget {
-  const ChatsPage({super.key});
+  const ChatsPage({super.key, this.embedded = false});
+
+  /// Drawn inside the People tab rather than pushed as a screen of its own.
+  /// Embedded it gives up its Scaffold — the tab already has one — and its
+  /// floating button, because a FAB and the floating nav bar want the same
+  /// corner and the FAB wins by sitting on top of a destination.
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final cloud = CloudService.instance;
+    final body = _body(context, cloud);
+    if (embedded) return body;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chats')),
@@ -36,7 +44,12 @@ class ChatsPage extends StatelessWidget {
               )
             : const SizedBox.shrink(),
       ),
-      body: ListenableBuilder(
+      body: body,
+    );
+  }
+
+  Widget _body(BuildContext context, CloudService cloud) {
+    return ListenableBuilder(
         listenable: cloud,
         builder: (context, _) {
           if (!cloud.isSignedIn) {
@@ -57,7 +70,6 @@ class ChatsPage extends StatelessWidget {
           }
           return const _Threads();
         },
-      ),
     );
   }
 }
@@ -248,6 +260,14 @@ class _Row extends StatelessWidget {
       child: Material(
         color: NestColor.card,
         borderRadius: BorderRadius.circular(NestRadius.tile),
+        // A row has to sit above the page, not be a white patch on it. Drawn
+        // through Material rather than a Container so the ink splash still
+        // clips to the rounded corners; surfaceTintColor off because Material
+        // 3 otherwise tints an elevated surface toward the primary colour and
+        // the card stops being white.
+        elevation: 3,
+        shadowColor: NestColor.o(NestColor.ink, 0.42),
+        surfaceTintColor: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(NestRadius.tile),
           onTap: onTap,
@@ -260,7 +280,7 @@ class _Row extends StatelessWidget {
                   height: 42,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: NestColor.o(colour, 0.12),
+                    color: NestColor.o(colour, 0.26),
                     borderRadius: BorderRadius.circular(NestRadius.chip),
                   ),
                   child: Text(

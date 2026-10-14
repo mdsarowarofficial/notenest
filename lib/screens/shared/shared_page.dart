@@ -6,6 +6,7 @@ import '../../models/note.dart';
 import '../../models/note_bundle.dart';
 import '../../models/note_share.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/nest_empty_state.dart';
 import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
@@ -124,7 +125,7 @@ class SharedPage extends StatelessWidget {
               height: 26,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: NestColor.o(NestColor.pen, 0.12),
+                color: NestColor.o(NestColor.pen, 0.26),
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -162,9 +163,11 @@ class SharedPage extends StatelessWidget {
     ];
   }
 
+  /// Delegates to the one rune-safe implementation. `name[0]` cuts a Bengali
+  /// letter in half, and on an empty name it throws.
   static String _initial(String name) {
     final t = name.trim();
-    return t.isEmpty ? '?' : t[0].toUpperCase();
+    return t.isEmpty ? '?' : firstLetterOf(t);
   }
 
   static void _import(BuildContext context) {
@@ -340,7 +343,7 @@ class _PendingTileState extends State<_PendingTile> {
         decoration: BoxDecoration(
           color: NestColor.card,
           borderRadius: BorderRadius.circular(NestRadius.tile),
-          border: Border.all(color: NestColor.o(NestColor.pen, 0.3)),
+          boxShadow: NestShadow.resting,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,11 +356,11 @@ class _PendingTileState extends State<_PendingTile> {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: NestColor.o(NestColor.pen, 0.1),
+                    color: NestColor.o(NestColor.pen, 0.26),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
-                    share.fromLabel[0].toUpperCase(),
+                    firstLetterOf(share.fromLabel),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

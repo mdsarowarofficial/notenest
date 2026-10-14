@@ -15,7 +15,12 @@ import 'group_detail.dart';
 /// groups you are in, who else is in them, and the code that lets one more
 /// person in.
 class GroupsPage extends StatefulWidget {
-  const GroupsPage({super.key});
+  const GroupsPage({super.key, this.embedded = false});
+
+  /// Drawn inside the People tab instead of pushed as its own screen. The two
+  /// join/make buttons move up into the tab's action row when embedded, out
+  /// of the floating nav bar's corner.
+  final bool embedded;
 
   @override
   State<GroupsPage> createState() => _GroupsPageState();
@@ -43,9 +48,7 @@ class _GroupsPageState extends State<GroupsPage> {
   Widget build(BuildContext context) {
     final cloud = CloudService.instance;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Groups')),
-      body: ListenableBuilder(
+    final body = ListenableBuilder(
         listenable: cloud,
         builder: (context, _) {
           if (!cloud.isSignedIn) return const _NeedsAccount();
@@ -85,7 +88,13 @@ class _GroupsPageState extends State<GroupsPage> {
             },
           );
         },
-      ),
+    );
+
+    if (widget.embedded) return body;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Groups')),
+      body: body,
       floatingActionButton: ListenableBuilder(
         listenable: cloud,
         builder: (context, _) {
@@ -131,6 +140,14 @@ class _GroupTile extends StatelessWidget {
       child: Material(
         color: NestColor.card,
         borderRadius: BorderRadius.circular(NestRadius.tile),
+        // A row has to sit above the page, not be a white patch on it. Drawn
+        // through Material rather than a Container so the ink splash still
+        // clips to the rounded corners; surfaceTintColor off because Material
+        // 3 otherwise tints an elevated surface toward the primary colour and
+        // the card stops being white.
+        elevation: 3,
+        shadowColor: NestColor.o(NestColor.ink, 0.42),
+        surfaceTintColor: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(NestRadius.tile),
           onTap: () => Navigator.of(context).push(
@@ -147,7 +164,7 @@ class _GroupTile extends StatelessWidget {
                   height: 42,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: NestColor.o(colour, 0.12),
+                    color: NestColor.o(colour, 0.26),
                     borderRadius: BorderRadius.circular(NestRadius.chip),
                   ),
                   child: Text(

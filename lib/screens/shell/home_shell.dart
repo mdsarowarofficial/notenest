@@ -8,18 +8,15 @@ import '../../widgets/nest_nav_bar.dart';
 import '../capture/capture_sheet.dart';
 import '../capture/dictation_page.dart';
 import '../capture/record_page.dart';
-import '../chat/chats_page.dart';
 import '../cloud/cloud_page.dart';
-import '../groups/groups_page.dart';
 import '../convert/convert_page.dart';
 import '../cover/cover_page.dart';
 import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
+import '../people/people_page.dart';
 import '../notes/transcript_editor.dart';
 import '../search/search_page.dart';
-import '../share/request_note_sheet.dart';
-import '../shared/shared_page.dart';
 import '../capture/media_capture.dart';
 import '../notes/note_editor.dart';
 import '../profile/profile_page.dart';
@@ -59,7 +56,7 @@ class _HomeShellState extends State<HomeShell> {
     NestNavItem(
       icon: Icons.people_outline_rounded,
       activeIcon: Icons.people_rounded,
-      label: 'Shared',
+      label: 'People',
       accent: Color(0xFFFF9BB3),
     ),
     NestNavItem(
@@ -205,14 +202,6 @@ class _HomeShellState extends State<HomeShell> {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CloudPage()),
                 );
-              case 'chats':
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ChatsPage()),
-                );
-              case 'groups':
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const GroupsPage()),
-                );
               case 'cover':
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CoverPageScreen()),
@@ -225,10 +214,6 @@ class _HomeShellState extends State<HomeShell> {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const TrashPage()),
                 );
-              case 'inbox':
-                setState(() => _tab = 2);
-              case 'requests':
-                showRequestNoteSheet(context);
               default:
                 _toast('${l.label} is not built yet');
             }
@@ -274,11 +259,17 @@ class _HomeShellState extends State<HomeShell> {
             TodayPage(
               onOpenNotes: () => setState(() => _tab = 1),
               onCapture: _openCapture,
-              onSearch: _openSearch,
               onOpenExams: () => setState(() => _tab = 3),
             ),
-            NotesPage(subjectCode: _drawerSelection, onCapture: _openCapture),
-            const SharedPage(),
+            NotesPage(
+              subjectCode: _drawerSelection,
+              onCapture: _openCapture,
+              // The subject chips on the page and the subject list in the
+              // drawer set the same one value, so the two can never disagree
+              // about which subject you are looking at.
+              onPickSubject: (code) => setState(() => _drawerSelection = code),
+            ),
+            const PeoplePage(),
             const ExamPage(),
           ],
         ),

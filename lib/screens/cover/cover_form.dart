@@ -669,12 +669,10 @@ class _Chip extends StatelessWidget {
         duration: const Duration(milliseconds: 170),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? NestColor.o(NestColor.pen, 0.14) : NestColor.paper,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: selected ? NestColor.pen : Colors.transparent,
-            width: 1.5,
-          ),
+          color: selected ? NestColor.tintPen : NestColor.paper,
+          borderRadius: BorderRadius.circular(NestRadius.tile),
+          boxShadow:
+              selected ? NestShadow.glow(NestColor.pen) : const <BoxShadow>[],
         ),
         child: Text(
           label,
@@ -756,7 +754,7 @@ class _LogoTile extends StatelessWidget {
             decoration: BoxDecoration(
               color: NestColor.card,
               borderRadius: BorderRadius.circular(NestRadius.chip),
-              border: Border.all(color: NestColor.rule),
+              boxShadow: NestShadow.resting,
             ),
             child: mark == null
                 ? const Icon(Icons.school_outlined,

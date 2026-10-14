@@ -8,9 +8,14 @@ import 'note_tile.dart';
 /// The filter and sort strip above a list of notes. Requirement 6.2.
 ///
 /// One row of chips that scrolls sideways, with the sort menu pinned on the
-/// right so it never scrolls out of reach. The chips are the index tabs of a
-/// subject divider: flat, coloured by what they stand for, and pressed in when
-/// switched on.
+/// right so it never scrolls out of reach.
+///
+/// A chip at rest is a white pill lying on the page on its own soft shadow;
+/// switched on it fills with its own colour and the label reverses out. The
+/// earlier version marked the on state with a 1.5px border and an 18%-opacity
+/// wash, which is a difference you have to look for. A solid fill is one you
+/// cannot miss at arm's length — and that matters most here, because the whole
+/// point of the strip is to tell you at a glance why the list below is short.
 class NestQueryBar extends StatelessWidget {
   const NestQueryBar({
     super.key,
@@ -64,7 +69,9 @@ class NestQueryBar extends StatelessWidget {
           _QueryChip(
             label: status.label,
             dot: StatusDot.colorFor(status),
-            accent: StatusDot.colorFor(status),
+            // The dot keeps the light status colour; the fill uses the deeper
+            // one, because white type on a pale dot colour is unreadable.
+            accent: StatusPill.inkFor(status),
             active: query.status == status,
             onTap: () => onChanged(query.toggleStatus(status)),
           ),
@@ -87,7 +94,9 @@ class NestQueryBar extends StatelessWidget {
     ];
 
     return SizedBox(
-      height: 40,
+      // Taller than the chips themselves: a horizontal ListView clips, and at
+      // exactly chip height it would shave the soft shadow off top and bottom.
+      height: 50,
       child: Row(
         children: [
           Expanded(
@@ -138,21 +147,26 @@ class _QueryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color fill = active
+        ? accent
+        : (outlined ? NestColor.paperDeep : NestColor.card);
+    final Color labelInk = active ? Colors.white : NestColor.inkSoft;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 170),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: active
-              ? NestColor.o(accent, 0.18)
-              : (outlined ? Colors.transparent : NestColor.card),
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(
-            color: active ? accent : NestColor.rule,
-            width: active ? 1.5 : 1,
-          ),
+          color: fill,
+          borderRadius: BorderRadius.circular(NestRadius.pill),
+          // A chip on is lit from under by its own colour; a chip off just
+          // rests on the page. Nothing carries a hairline border, which is
+          // what made the old strip read as a table of buttons.
+          boxShadow: active
+              ? NestShadow.glow(accent)
+              : (outlined ? const <BoxShadow>[] : _chipRest),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -161,23 +175,27 @@ class _QueryChip extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: active ? Colors.white : dot,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 7),
             ] else if (icon != null) ...[
               Icon(
                 icon,
                 size: 14,
-                color: active ? accent : NestColor.inkSoft,
+                color: active ? Colors.white : NestColor.inkSoft,
               ),
               const SizedBox(width: 6),
             ],
             Text(
               label,
               style: TextStyle(
+                fontFamily: NestFont.body,
                 fontSize: 12.5,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active ? NestColor.ink : NestColor.inkSoft,
+                color: labelInk,
               ),
             ),
           ],
@@ -186,6 +204,16 @@ class _QueryChip extends StatelessWidget {
     );
   }
 }
+
+/// Lighter than [NestShadow.resting]: a chip is a small object and the card
+/// shadow under one looks like a smudge.
+const _chipRest = <BoxShadow>[
+  BoxShadow(
+    color: Color(0x0F1B1E2B),
+    blurRadius: 10,
+    offset: Offset(0, 4),
+  ),
+];
 
 class _SortButton extends StatelessWidget {
   const _SortButton({required this.sort, required this.onPick});
@@ -233,11 +261,11 @@ class _SortButton extends StatelessWidget {
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
         decoration: BoxDecoration(
           color: NestColor.card,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          border: Border.all(color: NestColor.rule),
+          borderRadius: BorderRadius.circular(NestRadius.pill),
+          boxShadow: _chipRest,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -248,6 +276,7 @@ class _SortButton extends StatelessWidget {
             Text(
               sort.shortLabel,
               style: const TextStyle(
+                fontFamily: NestFont.body,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: NestColor.inkSoft,

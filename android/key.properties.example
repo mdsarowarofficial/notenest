@@ -1,0 +1,19 @@
+# Template for android/key.properties.
+#
+# Copy this file to android/key.properties, fill in the four values, and never
+# commit the copy — it is in .gitignore for a reason. These four lines plus the
+# .jks file are the only proof that an update to NoteNest on the Play Store
+# came from you. Lose them and you cannot update the app, ever; you would have
+# to publish a new listing under a new application ID and ask every user to
+# install it again.
+#
+# Keep a copy of upload-keystore.jks and these passwords somewhere that is not
+# only this laptop: a password manager, or an encrypted archive in your own
+# cloud drive.
+
+storePassword=the password you typed for the keystore
+keyPassword=the password you typed for the key
+keyAlias=upload
+# Absolute path, with forward slashes even on Windows.
+# Example: C:/project/notenest/android/upload-keystore.jks
+storeFile=C:/project/notenest/android/upload-keystore.jks
