@@ -14,12 +14,15 @@ plugins {
 // .gitignore and must never be committed: it holds the passwords to the one
 // key that can ever publish updates of this app.
 //
-// When the file is absent — a fresh clone of the repository, or a marker
-// checking out the project — the release build falls back to Flutter's debug
-// key so that `flutter build apk --release` still produces something that
-// runs. Such a build will not upload to Google Play, which is the correct
-// outcome: an unsigned-by-you release should fail loudly at the store rather
-// than quietly ship under a throwaway key.
+// When the file is absent the release build FAILS. It used to fall back to
+// Flutter's debug key so that a fresh clone could still build, and the comment
+// here claimed that was safe because the store would reject it. That is the
+// wrong place to find out. A debug-signed APK installs, runs, and looks
+// finished; it is only at upload, or worse on somebody's phone, that it turns
+// out to be signed with a key shared by every Flutter project on earth.
+//
+// A marker or a CI job that genuinely wants an unsigned-by-you build asks for
+// it out loud:  -PallowDebugSigning=true
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKey = keystorePropertiesFile.exists()
@@ -78,8 +81,24 @@ android {
         release {
             signingConfig = if (hasReleaseKey) {
                 signingConfigs.getByName("release")
-            } else {
+            } else if (project.findProperty("allowDebugSigning") == "true") {
+                logger.warn(
+                    "NoteNest: android/key.properties is missing, so this " +
+                    "release build is signed with the DEBUG key because " +
+                    "-PallowDebugSigning=true was passed. It cannot be " +
+                    "published and must not be given to anyone as a release."
+                )
                 signingConfigs.getByName("debug")
+            } else {
+                throw GradleException(
+                    "NoteNest release build has no signing key.\n\n" +
+                    "android/key.properties was not found, so this build " +
+                    "cannot be signed with the upload key.\n" +
+                    "  * To build a real release: create android/key.properties " +
+                    "from android/key.properties.example.\n" +
+                    "  * To build an UNPUBLISHABLE debug-signed release on " +
+                    "purpose: add -PallowDebugSigning=true"
+                )
             }
 
             // Code shrinking is deliberately left off.

@@ -15,6 +15,8 @@ import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
 import '../people/people_page.dart';
+import '../semester/semester_page.dart';
+import '../settings/settings_page.dart';
 import '../notes/transcript_editor.dart';
 import '../search/search_page.dart';
 import '../capture/media_capture.dart';
@@ -209,6 +211,14 @@ class _HomeShellState extends State<HomeShell> {
               case 'convert':
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ConvertPage()),
+                );
+              case 'settings':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              case 'semesters':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SemesterPage()),
                 );
               case 'trash':
                 Navigator.of(context).push(

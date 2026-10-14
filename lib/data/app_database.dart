@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 6;
+  static const _version = 7;
 
   Database? _db;
 
@@ -90,6 +90,11 @@ class AppDatabase {
         color_index INTEGER NOT NULL,
         archived    INTEGER NOT NULL DEFAULT 0,
         created_at  INTEGER NOT NULL,
+        -- Which semester this course belongs to. Nullable on purpose: a
+        -- student who has not told the app when their degree started has no
+        -- semester to file it under, and guessing one would be worse than
+        -- leaving the question open.
+        semester_no INTEGER,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )
     ''');
@@ -224,6 +229,21 @@ class AppDatabase {
       // A whole new table, so no guard is needed — nothing below version 6
       // has it, and version 6 installs go through _create instead.
       await _createExams(db);
+    }
+    if (from < 7) {
+      // Courses gain the semester they were taught in.
+      //
+      // Added as a nullable column with no backfill here. Every existing
+      // course keeps its notes and keeps working; it simply has no semester
+      // until the student sets their degree dates, at which point the app
+      // offers to file the lot under the semester they are in now. Writing a
+      // guess into every row during a migration would be the kind of silent
+      // change that is impossible to undo and impossible to notice.
+      await db.execute('ALTER TABLE subjects ADD COLUMN semester_no INTEGER');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_subjects_semester '
+        'ON subjects (user_id, semester_no)',
+      );
     }
   }
 

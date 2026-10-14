@@ -83,8 +83,79 @@ class AuthRepository extends ChangeNotifier {
     return base64Url.encode(bytes);
   }
 
+  /// How many times the password is run through HMAC-SHA256.
+  ///
+  /// The point of a password hash is to be slow. The first version of this
+  /// file used a single round of SHA-256, which is the opposite: SHA-256 is
+  /// built to be fast, and a graphics card tries billions of candidates a
+  /// second against it. Anyone who walked off with the phone's database had
+  /// the passwords shortly afterwards — and people reuse passwords, so that is
+  /// their email account too, not just their notes.
+  ///
+  /// PBKDF2-HMAC-SHA256 is the standard answer that needs no new package: the
+  /// `crypto` package already here provides HMAC, and NIST SP 800-132 defines
+  /// the construction. A hundred and twenty thousand rounds turns one guess
+  /// from free into something measurable, which is the whole game.
+  static const int _pbkdf2Rounds = 120000;
+
+  /// PBKDF2 with a 32-byte output — exactly one block, so no loop over blocks.
+  static String _pbkdf2(String password, String salt, int rounds) {
+    final hmac = Hmac(sha256, utf8.encode(password));
+    // U1 = HMAC(password, salt || INT_32_BE(1))
+    var block = hmac.convert([...utf8.encode(salt), 0, 0, 0, 1]).bytes;
+    final out = List<int>.from(block);
+    for (var i = 1; i < rounds; i++) {
+      block = hmac.convert(block).bytes;
+      for (var j = 0; j < out.length; j++) {
+        out[j] ^= block[j];
+      }
+    }
+    return base64Url.encode(out);
+  }
+
+  /// The stored form, which names its own algorithm and cost.
+  ///
+  /// Writing the round count into the value is what makes it possible to raise
+  /// it later without locking anybody out: an old row still says how it was
+  /// made, so it can still be checked.
   static String _hash(String password, String salt) =>
+      'pbkdf2\$$_pbkdf2Rounds\$${_pbkdf2(password, salt, _pbkdf2Rounds)}';
+
+  /// The single round of SHA-256 this app shipped with, kept only so that
+  /// accounts created before the change can still sign in — once.
+  static String _legacyHash(String password, String salt) =>
       sha256.convert(utf8.encode('$salt::$password')).toString();
+
+  /// True when [password] is the one behind [stored].
+  ///
+  /// Returns `legacy: true` through [wasLegacy] so the caller can quietly
+  /// rewrite the row in the new form. Nobody is asked to reset anything.
+  static bool _verify(String password, String salt, String stored) {
+    if (!stored.startsWith('pbkdf2\$')) {
+      return _constantTimeEquals(_legacyHash(password, salt), stored);
+    }
+    final parts = stored.split('\$');
+    if (parts.length != 3) return false;
+    final rounds = int.tryParse(parts[1]);
+    if (rounds == null || rounds < 1) return false;
+    return _constantTimeEquals(_pbkdf2(password, salt, rounds), parts[2]);
+  }
+
+  static bool _isLegacy(String stored) => !stored.startsWith('pbkdf2\$');
+
+  /// Compares without returning early on the first wrong character.
+  ///
+  /// A plain `==` leaks how much of a guess was right through how long the
+  /// comparison took. That is a thin channel on a phone and a real one on a
+  /// server; it costs nothing to close either way.
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
 
   // --------------------------------------------------------------- session
 
@@ -229,8 +300,24 @@ class AuthRepository extends ChangeNotifier {
 
     final row = rows.first;
     final salt = row['password_salt'] as String;
-    if (_hash(password, salt) != row['password_hash']) {
+    final stored = row['password_hash'] as String;
+    if (!_verify(password, salt, stored)) {
       return AuthError.wrongPassword;
+    }
+
+    // The one moment the plain password is in hand and already proven: rewrite
+    // an old single-round row in the new form. Silent, and it happens once.
+    if (_isLegacy(stored)) {
+      final freshSalt = _newSalt();
+      await _db.db.update(
+        'users',
+        {
+          'password_hash': _hash(password, freshSalt),
+          'password_salt': freshSalt,
+        },
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
     }
 
     _current = UserAccount.fromMap(row);
@@ -277,9 +364,84 @@ class AuthRepository extends ChangeNotifier {
     return null;
   }
 
+  /// Run after a sign out, so whatever is holding account-scoped state can
+  /// drop it.
+  ///
+  /// Sign out used to clear only the session here, and the previous account's
+  /// notes, subjects and exams were emptied by the profile screen calling
+  /// NoteRepository.clear() straight afterwards. That worked for exactly as
+  /// long as every sign out went through that one screen: the invariant lived
+  /// in a caller rather than in the thing being signed out of. A hook puts it
+  /// back where it belongs — a new sign-out path cannot forget.
+  final List<void Function()> _signOutHooks = [];
+
+  void addSignOutHook(void Function() hook) => _signOutHooks.add(hook);
+
+  /// Removes this account and everything it owns from the device.
+  ///
+  /// Google Play requires an app that lets a person create an account to let
+  /// them delete it from inside the app. This is that, for the device half.
+  /// The cloud half is [CloudService.deleteCloudAccount], and the screen does
+  /// the cloud first: if the cloud refuses, nothing here has happened yet.
+  ///
+  /// The password is asked for again on purpose. It is the last check before
+  /// an action with no undo, and it is the only thing standing between a
+  /// borrowed unlocked phone and somebody's whole term of notes.
+  ///
+  /// Everything the account owns — subjects, notes, exams, settings and
+  /// attachment rows — goes with the row through ON DELETE CASCADE, which the
+  /// database has on because `PRAGMA foreign_keys = ON` is set when it opens.
+  /// Files on disk are not rows and do not cascade: the caller clears those
+  /// first.
+  Future<AuthError?> deleteAccount({required String password}) async {
+    final user = _current;
+    if (user?.id == null) return AuthError.emailNotFound;
+
+    final rows = await _db.db
+        .query('users', where: 'id = ?', whereArgs: [user!.id], limit: 1);
+    if (rows.isEmpty) return AuthError.emailNotFound;
+
+    final row = rows.first;
+    if (!_verify(password, row['password_salt'] as String,
+        row['password_hash'] as String)) {
+      return AuthError.wrongPassword;
+    }
+
+    await _db.db.delete('users', where: 'id = ?', whereArgs: [user.id]);
+
+    await _clearSession();
+    _current = null;
+    for (final hook in _signOutHooks) {
+      hook();
+    }
+    notifyListeners();
+    return null;
+  }
+
+  /// The stored file names of everything this account has attached.
+  ///
+  /// Read before the account row goes, because afterwards the rows that name
+  /// the files are gone and the files would sit on disk for ever.
+  Future<List<String>> attachmentFileNamesForCurrentUser() async {
+    final id = _current?.id;
+    if (id == null) return const [];
+    final rows = await _db.db.rawQuery(
+      'SELECT stored_name FROM attachments '
+      'WHERE note_id IN (SELECT id FROM notes WHERE user_id = ?)',
+      [id],
+    );
+    return [
+      for (final r in rows)
+        if (r['stored_name'] is String) r['stored_name'] as String,
+    ];
+  }
+
   Future<void> signOut() async {
     await _clearSession();
     _current = null;
+    for (final hook in _signOutHooks) {
+      hook();
+    }
     notifyListeners();
   }
 
@@ -313,8 +475,10 @@ class AuthRepository extends ChangeNotifier {
     final rows = await _db.db
         .query('users', where: 'id = ?', whereArgs: [user!.id], limit: 1);
     final row = rows.first;
-    if (_hash(currentPassword, row['password_salt'] as String) !=
-        row['password_hash']) {
+    // Through _verify, so somebody whose row is still in the old single-round
+    // form can change their password rather than being told it is wrong.
+    if (!_verify(currentPassword, row['password_salt'] as String,
+        row['password_hash'] as String)) {
       return AuthError.wrongPassword;
     }
 

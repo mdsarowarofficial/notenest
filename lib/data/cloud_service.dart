@@ -66,6 +66,23 @@ class CloudService extends ChangeNotifier {
   CollectionReference<Map<String, dynamic>> get _chats =>
       _store.collection('chats');
 
+  /// address → uid, one tiny document per account.
+  ///
+  /// This exists so that finding a classmate is a `get` of one document whose
+  /// name you already know, instead of a query across every account. The rules
+  /// used to allow listing `users` with a limit of twenty, on the reasoning
+  /// that the caller only ever learns a name against an address they already
+  /// had. That reasoning was wrong: a query is not obliged to be the query the
+  /// app makes. Anyone could ask for twenty accounts ordered by anything, page
+  /// through with a cursor, and walk out with every name, address and
+  /// institution in the project.
+  ///
+  /// Reading this index still tells a caller whether one address they typed is
+  /// registered, which is an honest cost: it answers one guess at a time and
+  /// hands back no name. Listing is closed.
+  CollectionReference<Map<String, dynamic>> get _emailIndex =>
+      _store.collection('emailIndex');
+
   /// Profiles already fetched, so opening a group of thirty does not read
   /// thirty documents every time the screen rebuilds.
   final Map<String, CloudProfile> _profileCache = {};
@@ -175,6 +192,7 @@ class CloudService extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
       await _users.doc(user.uid).set(profile.toMap());
+      _writeEmailIndex(user.uid, profile.email);
       _profile = profile;
     });
   }
@@ -217,6 +235,63 @@ class CloudService extends ChangeNotifier {
     });
   }
 
+  /// Deletes the cloud account: the profile, the address index, and the
+  /// Firebase sign-in itself.
+  ///
+  /// Required by Google Play for any app that lets a person create an account.
+  ///
+  /// What this removes, exactly:
+  ///   * users/{uid} — the name, address, role and institution classmates see.
+  ///   * emailIndex/{address} — so nobody can find the account again.
+  ///   * the Firebase Authentication user, so the address can be registered
+  ///     afresh by whoever owns it.
+  ///
+  /// What it does NOT remove, and why the screen says so before asking:
+  /// messages already sent, and notes already shared and accepted, stay where
+  /// they landed. They are in other people's conversations and other people's
+  /// notebooks — deleting them would be reaching into someone else's data, and
+  /// on this plan there is no server-side job that could do it safely anyway.
+  /// Those copies carry the name that was on them when they were sent.
+  ///
+  /// The password is required because Firebase refuses to delete an account on
+  /// a stale sign-in, which is the right rule: deletion is exactly the action
+  /// a borrowed phone should not be able to take.
+  Future<void> deleteCloudAccount({required String password}) async {
+    _requireReady();
+    await _run(() async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw const CloudException('Not signed in to the cloud.');
+      }
+      final address = normaliseEmail(user.email ?? '');
+
+      // Proves the person at the phone is the account holder, right now.
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(
+          email: address,
+          password: password,
+        ),
+      );
+
+      // The index first: while it is gone the profile is merely unfindable,
+      // whereas a profile deleted first would leave the index pointing at
+      // nothing and a classmate's search returning an empty card.
+      if (looksLikeEmail(address)) {
+        await _emailIndex.doc(address).delete();
+      }
+      await _users.doc(user.uid).delete();
+
+      // Last, because once this succeeds there is no signed-in account left
+      // with permission to do the two writes above.
+      await user.delete();
+
+      _profile = null;
+      _profileCache.clear();
+      _lastTypingWrite.clear();
+      notifyListeners();
+    });
+  }
+
   /// Signs out of the cloud only. The local account, and every note in it,
   /// is untouched.
   Future<void> signOutOfCloud() async {
@@ -256,12 +331,44 @@ class CloudService extends ChangeNotifier {
   }
 
   /// Reads the profile document, creating one if the account predates it.
+  /// Points this account's address at its uid.
+  ///
+  /// Never fatal, and this time the code says so too. The first version caught
+  /// only FirebaseException while the comment above it promised that nothing
+  /// here could stop a sign in — so anything else this write threw travelled
+  /// up through `_loadProfile`, became a CloudException, and came out on the
+  /// login screen as "No account found for this email". A lookup table that
+  /// can lock a student out of their own account is worse than no lookup
+  /// table.
+  ///
+  /// It is also no longer awaited by the caller. The index is a convenience
+  /// for other people's searches; a student signing in should not wait on a
+  /// round trip that has nothing to do with their own sign in, and on a slow
+  /// connection they were.
+  void _writeEmailIndex(String uid, String email) {
+    final key = normaliseEmail(email);
+    if (!looksLikeEmail(key)) return;
+    _emailIndex.doc(key).set({
+      'uid': uid,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    }).catchError((Object _) {
+      // Every failure, not merely the Firebase-shaped ones. Rules not yet
+      // published, offline, anything: the sign in carries on and the write is
+      // tried again next time.
+    });
+  }
+
   Future<void> _loadProfile(String id) async {
     try {
       final snapshot = await _users.doc(id).get();
       final data = snapshot.data();
       if (data != null) {
-        _profile = CloudProfile.fromMap(id, data);
+        final profile = CloudProfile.fromMap(id, data);
+        _profile = profile;
+        // Written on every sign in, not only at registration, so the accounts
+        // that existed before this index did become findable again the first
+        // time they open the app. It is one small idempotent write.
+        _writeEmailIndex(id, profile.email);
         return;
       }
 
@@ -277,6 +384,7 @@ class CloudService extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
       await _users.doc(id).set(rebuilt.toMap());
+      _writeEmailIndex(id, rebuilt.email);
       _profile = rebuilt;
     } on FirebaseException catch (e) {
       throw CloudException(describeStoreError(e.code));
@@ -296,11 +404,14 @@ class CloudService extends ChangeNotifier {
     if (!looksLikeEmail(wanted)) return null;
 
     try {
-      final found =
-          await _users.where('email', isEqualTo: wanted).limit(1).get();
-      if (found.docs.isEmpty) return null;
-      final doc = found.docs.first;
-      return CloudProfile.fromMap(doc.id, doc.data());
+      final entry = await _emailIndex.doc(wanted).get();
+      final uid = entry.data()?['uid'];
+      if (uid is! String || uid.isEmpty) return null;
+      // Awaited, not just returned. An un-awaited return hands the future back
+      // before it completes, so it leaves the try block and this catch never
+      // sees anything it throws — the handler reads as protection it does not
+      // give. `flutter analyze` caught this one.
+      return await profileFor(uid);
     } on FirebaseException catch (e) {
       throw CloudException(describeStoreError(e.code));
     }

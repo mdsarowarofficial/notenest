@@ -26,12 +26,21 @@ const _likeEscape = "ESCAPE '\\'";
 /// Everything is scoped to the signed-in account, so two students sharing a
 /// phone never see each other's subjects or notes.
 class NoteRepository extends ChangeNotifier {
-  NoteRepository._();
+  NoteRepository._() {
+    // Registered here rather than left to whichever screen happens to sign
+    // out: the account's rows leave memory because the account left, not
+    // because a particular button remembered to ask.
+    AuthRepository.instance.addSignOutHook(clear);
+  }
 
   static final NoteRepository instance = NoteRepository._();
 
   static const _kSemester = 'semester_label';
   static const _kSemesterSystem = 'semester_system';
+  static const _kUniversity = 'university';
+  static const _kProgrammeStart = 'programme_start';
+  static const _kProgrammeEnd = 'programme_end';
+  static const _kManualSemester = 'manual_semester';
   static const _kRole = 'account_role';
   static const _kReminder = 'revision_reminder';
   static const _kSetupDone = 'setup_done';
@@ -49,6 +58,17 @@ class NoteRepository extends ChangeNotifier {
   /// How this student's university counts semesters, so the picker reopens
   /// where they left it rather than at the top of the list.
   SemesterSystem semesterSystem = SemesterSystem.bi;
+
+  /// Where the degree is being taken, when it started, when it is expected to
+  /// end. Together with the system these are what let the app work out which
+  /// semester today falls in instead of asking every time.
+  String? university;
+  DateTime? programmeStart;
+  DateTime? programmeEnd;
+
+  /// Set only when the student has moved off the computed semester. Terms
+  /// slip; an app that argues with somebody about their own degree is wrong.
+  int? manualSemester;
 
   /// Student or teacher, kept on the device as well as in the cloud profile.
   ///
@@ -114,6 +134,10 @@ class NoteRepository extends ChangeNotifier {
     };
     semesterLabel = map[_kSemester];
     semesterSystem = SemesterSystemData.fromKey(map[_kSemesterSystem]);
+    university = map[_kUniversity];
+    programmeStart = _readDate(map[_kProgrammeStart]);
+    programmeEnd = _readDate(map[_kProgrammeEnd]);
+    manualSemester = int.tryParse(map[_kManualSemester] ?? '');
     roleKey = map[_kRole] == 'teacher' ? 'teacher' : 'student';
     reminderChoice = map[_kReminder];
     setupDone = map[_kSetupDone] == '1';
@@ -130,11 +154,16 @@ class NoteRepository extends ChangeNotifier {
   /// Clears in-memory state on sign out.
   void clear() {
     _subjects = const [];
+    _allSubjects = const [];
     _notes = const [];
     _exams = const [];
     _recentSearches = const [];
     semesterLabel = null;
     semesterSystem = SemesterSystem.bi;
+    university = null;
+    programmeStart = null;
+    programmeEnd = null;
+    manualSemester = null;
     roleKey = 'student';
     reminderChoice = null;
     setupDone = false;
@@ -143,25 +172,34 @@ class NoteRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Every course this account has ever had, archived ones included.
+  ///
+  /// The semester record is a history, so it has to contain courses that are
+  /// no longer current — a student looking back at semester 3 wants the five
+  /// courses that were there, not the two they have not archived yet.
+  List<Subject> _allSubjects = const [];
+
   Future<void> _reloadSubjects() async {
     final rows = await _db.db.query(
       'subjects',
-      where: 'user_id = ? AND archived = 0',
+      where: 'user_id = ?',
       whereArgs: [_auth.requireUserId],
       orderBy: 'created_at ASC',
     );
-    _subjects = rows.map(Subject.fromMap).toList();
+    _allSubjects = rows.map(Subject.fromMap).toList();
+    // The working list stays what it always was: what is current.
+    _subjects = _allSubjects.where((s) => !s.archived).toList();
     _applyCounts();
   }
 
   /// Fills each subject's note count and mastery from the loaded notes.
   void _applyCounts() {
-    _subjects = _subjects
-        .map((s) => s.copyWith(
-              noteCount: noteCountForSubject(s.id),
-              mastery: masteryForSubject(s.id),
-            ))
-        .toList();
+    Subject counted(Subject s) => s.copyWith(
+          noteCount: noteCountForSubject(s.id),
+          mastery: masteryForSubject(s.id),
+        );
+    _allSubjects = _allSubjects.map(counted).toList();
+    _subjects = _subjects.map(counted).toList();
   }
 
   Future<void> _setSetting(String key, String? value) async {
@@ -173,6 +211,158 @@ class NoteRepository extends ChangeNotifier {
   }
 
   // --------------------------------------------------------------- semester
+
+  /// Milliseconds in a settings row, or null when it is absent or nonsense.
+  static DateTime? _readDate(String? raw) {
+    final ms = int.tryParse(raw ?? '');
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  /// The degree as a span of time. Built fresh each read so it can never
+  /// disagree with the settings it comes from.
+  SemesterPlan get semesterPlan => SemesterPlan(
+        system: semesterSystem,
+        university: university,
+        start: programmeStart,
+        end: programmeEnd,
+        manualSemester: manualSemester,
+      );
+
+  /// Which semester today falls in, or null when the degree has no start date.
+  int? get currentSemester => semesterPlan.semesterFor(DateTime.now());
+
+  /// The semester the student last agreed to, which is what courses are filed
+  /// under until they accept a new one.
+  int? get settledSemester =>
+      manualSemester ?? semesterNumberIn(semesterLabel);
+
+  /// A semester has begun that the student has not acknowledged yet.
+  ///
+  /// The screen asks rather than moving them, because university dates slip by
+  /// weeks and being told you are in semester 5 while you are still sitting
+  /// semester 4's exams is worse than being asked.
+  int? get semesterAwaitingAcceptance {
+    final now = currentSemester;
+    if (now == null) return null;
+    final settled = settledSemester;
+    if (settled == null) return now;
+    return now > settled ? now : null;
+  }
+
+  /// Records the degree itself. Courses are not touched.
+  Future<void> saveProgramme({
+    String? university,
+    DateTime? start,
+    DateTime? end,
+    SemesterSystem? system,
+    bool clearEnd = false,
+  }) async {
+    if (university != null) {
+      this.university = university.trim();
+      await _setSetting(_kUniversity, this.university);
+    }
+    if (start != null) {
+      programmeStart = start;
+      await _setSetting(
+          _kProgrammeStart, start.millisecondsSinceEpoch.toString());
+    }
+    if (clearEnd) {
+      programmeEnd = null;
+      await _setSetting(_kProgrammeEnd, null);
+    } else if (end != null) {
+      programmeEnd = end;
+      await _setSetting(_kProgrammeEnd, end.millisecondsSinceEpoch.toString());
+    }
+    if (system != null) {
+      semesterSystem = system;
+      await _setSetting(_kSemesterSystem, system.key);
+    }
+    notifyListeners();
+  }
+
+  /// Moves to [number] and remembers that the student agreed to it.
+  ///
+  /// Courses already filed under earlier semesters stay where they are. That
+  /// is the whole point of the record: semester 3 keeps its five courses and
+  /// their notes for good, and semester 4 starts empty.
+  Future<void> enterSemester(int number) async {
+    manualSemester = number;
+    await _setSetting(_kManualSemester, number.toString());
+    semesterLabel = semesterLabelFor(number);
+    await _setSetting(_kSemester, semesterLabel);
+    notifyListeners();
+  }
+
+  /// Gives up the manual choice and goes back to whatever the dates say.
+  Future<void> followTheCalendar() async {
+    manualSemester = null;
+    await _setSetting(_kManualSemester, null);
+    final now = currentSemester;
+    if (now != null) {
+      semesterLabel = semesterLabelFor(now);
+      await _setSetting(_kSemester, semesterLabel);
+    }
+    notifyListeners();
+  }
+
+  /// Every semester that has a course filed under it, newest first, plus the
+  /// one the student is in even when it is still empty.
+  List<int> get semestersWithCourses {
+    final seen = <int>{
+      for (final s in _allSubjects)
+        if (s.semesterNo != null) s.semesterNo!,
+    };
+    final now = settledSemester ?? currentSemester;
+    if (now != null) seen.add(now);
+    final list = seen.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  /// The courses taught in one semester. Archived ones are included, because
+  /// this is a record of what happened rather than a list of what is current.
+  List<Subject> subjectsInSemester(int number) => List.unmodifiable(
+        _allSubjects.where((s) => s.semesterNo == number),
+      );
+
+  /// Courses with no semester at all — everything created before the degree
+  /// was dated.
+  List<Subject> get subjectsWithoutSemester => List.unmodifiable(
+        _allSubjects.where((s) => s.semesterNo == null),
+      );
+
+  /// Files every undated course under [number].
+  ///
+  /// Offered once, after the degree dates are first set, and never run on its
+  /// own: a migration that silently decides which term a year of notes
+  /// belonged to is not something anybody can check afterwards.
+  Future<int> fileLooseCoursesInto(int number) async {
+    final loose = subjectsWithoutSemester;
+    if (loose.isEmpty) return 0;
+    for (final subject in loose) {
+      await _db.db.update(
+        'subjects',
+        {'semester_no': number},
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [subject.id, _auth.requireUserId],
+      );
+    }
+    await _reloadSubjects();
+    notifyListeners();
+    return loose.length;
+  }
+
+  /// Moves one course to another semester, for when it was filed wrong.
+  Future<void> moveSubjectToSemester(Subject subject, int? number) async {
+    if (subject.id == null) return;
+    await _db.db.update(
+      'subjects',
+      {'semester_no': number},
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [subject.id, _auth.requireUserId],
+    );
+    await _reloadSubjects();
+    notifyListeners();
+  }
 
   Future<void> saveSemester(String semester, {SemesterSystem? system}) async {
     semesterLabel = semester.trim();
@@ -231,12 +421,17 @@ class NoteRepository extends ChangeNotifier {
     required String name,
     required String code,
     required int colorIndex,
+    int? semesterNo,
   }) async {
     final subject = Subject(
       userId: _auth.requireUserId,
       name: name.trim(),
       code: code.trim(),
       colorIndex: colorIndex,
+      // Stamped with the semester the student is in unless the caller names
+      // one. A course added today belongs to today's term; working that out
+      // later from a creation date would be guesswork.
+      semesterNo: semesterNo ?? settledSemester ?? currentSemester,
       createdAt: DateTime.now(),
     );
     final id = await _db.db.insert('subjects', subject.toMap());
@@ -250,8 +445,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'subjects',
       subject.toMap(),
-      where: 'id = ?',
-      whereArgs: [subject.id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [subject.id, _auth.requireUserId],
     );
     await _reloadSubjects();
     notifyListeners();
@@ -262,8 +457,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'subjects',
       {'archived': 1},
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [id, _auth.requireUserId],
     );
     await _reloadSubjects();
     notifyListeners();
@@ -370,8 +565,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'notes',
       note.copyWith(updatedAt: DateTime.now()).toMap(),
-      where: 'id = ?',
-      whereArgs: [note.id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [note.id, _auth.requireUserId],
     );
     await _reloadNotes();
     notifyListeners();
@@ -390,8 +585,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'notes',
       {'opened_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'id = ?',
-      whereArgs: [note.id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [note.id, _auth.requireUserId],
     );
     await _reloadNotes();
   }
@@ -745,8 +940,11 @@ class NoteRepository extends ChangeNotifier {
 
   /// Removes the row and the file together, so nothing is left orphaned.
   Future<void> removeAttachment(Attachment attachment) async {
-    await _db.db
-        .delete('attachments', where: 'id = ?', whereArgs: [attachment.id]);
+    await _db.db.delete(
+      'attachments',
+      where: 'id = ? AND note_id IN (SELECT id FROM notes WHERE user_id = ?)',
+      whereArgs: [attachment.id, _auth.requireUserId],
+    );
     if (AttachmentStore.isSupported) {
       await AttachmentStore.delete(attachment.storedName);
     }
@@ -761,8 +959,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'notes',
       {'deleted_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'id = ?',
-      whereArgs: [note.id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [note.id, _auth.requireUserId],
     );
     await _reloadNotes();
     notifyListeners();
@@ -783,8 +981,8 @@ class NoteRepository extends ChangeNotifier {
     await _db.db.update(
       'notes',
       {'deleted_at': null},
-      where: 'id = ?',
-      whereArgs: [note.id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [note.id, _auth.requireUserId],
     );
     await _reloadNotes();
     notifyListeners();
@@ -799,7 +997,11 @@ class NoteRepository extends ChangeNotifier {
       }
     }
     // The attachment rows go with the note through ON DELETE CASCADE.
-    await _db.db.delete('notes', where: 'id = ?', whereArgs: [note.id]);
+    await _db.db.delete(
+      'notes',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [note.id, _auth.requireUserId],
+    );
     notifyListeners();
   }
 
@@ -890,15 +1092,23 @@ class NoteRepository extends ChangeNotifier {
 
   Future<void> updateExam(Exam exam) async {
     if (exam.id == null) return;
-    await _db.db
-        .update('exams', exam.toMap(), where: 'id = ?', whereArgs: [exam.id]);
+    await _db.db.update(
+      'exams',
+      exam.toMap(),
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [exam.id, _auth.requireUserId],
+    );
     await _reloadExams();
     notifyListeners();
   }
 
   Future<void> deleteExam(Exam exam) async {
     if (exam.id == null) return;
-    await _db.db.delete('exams', where: 'id = ?', whereArgs: [exam.id]);
+    await _db.db.delete(
+      'exams',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [exam.id, _auth.requireUserId],
+    );
     await _reloadExams();
     notifyListeners();
   }
@@ -943,6 +1153,11 @@ class NoteRepository extends ChangeNotifier {
           id: 'convert',
           label: 'Convert a file',
           icon: Icons.swap_horiz_rounded,
+        ),
+        NestDrawerLink(
+          id: 'semesters',
+          label: 'Semesters',
+          icon: Icons.school_outlined,
         ),
         NestDrawerLink(
           id: 'trash',

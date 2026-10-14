@@ -58,16 +58,20 @@ service cloud.firestore {
       // a group, and who set an assignment.
       allow get: if signedIn();
 
-      // Searching. The app only ever looks an account up by its exact
-      // address, which is a query of one. The limit is here so that this rule
-      // cannot also be used to page through every account in the project:
-      // a directory anyone can enumerate is the user table leaked.
+      // Closed. This used to read `signedIn() && request.query.limit <= 20`,
+      // on the reasoning that the app only ever queries one exact address.
       //
-      // It is worth being straight about what this does not do — a determined
-      // caller can still make many small queries. It raises the cost of a bulk
-      // dump rather than making one impossible, and the only thing exposed is
-      // a name against an address the caller already knew.
-      allow list: if signedIn() && request.query.limit <= 20;
+      // That reasoning was wrong, and it was my own. A rule cannot see WHICH
+      // field a query filters on — only how many rows it asks for. Anyone
+      // signed in could ask for twenty accounts ordered by any field, walk a
+      // cursor through the collection, and leave with every name, address and
+      // institution in the project. Twenty at a time is not a defence; it is
+      // a page size.
+      //
+      // Finding a classmate now goes through /emailIndex, where the address is
+      // the document name, so a lookup is a `get` of something you can already
+      // spell rather than a query over everyone.
+      allow list: if false;
 
       allow create: if isSelf(userId)
         && incoming().uid == userId
@@ -88,9 +92,48 @@ service cloud.firestore {
         && textWithin(incoming().institution, 160)
         && incoming().role in ['student', 'teacher'];
 
-      // Deleting a profile would leave shared notes and group memberships
-      // pointing at nothing. Removing an account is a job for the console.
-      allow delete: if false;
+      // Your own profile, and only your own.
+      //
+      // This used to be closed, with the reasoning that a deleted profile
+      // leaves shared notes and group memberships pointing at nothing. That
+      // reasoning loses to a rule outside this file: Google Play requires an
+      // app that lets a person create an account to let them delete it from
+      // inside the app. "Ask us by email" does not satisfy it, and neither
+      // does the console.
+      //
+      // What dangles afterwards dangles honestly. A group keeps the uid in its
+      // member list and the app shows it as a former member; a message keeps
+      // the name it was sent under. Deleting those would mean editing other
+      // people's conversations, which is worse than a gap.
+      allow delete: if isSelf(userId);
+    }
+
+    // -------------------------------------------------------- emailIndex
+    //
+    // address → uid. The document NAME is the folded address, so looking a
+    // classmate up is a `get` of a document you can name, and listing is shut.
+    //
+    // What this still allows, said plainly: somebody can test one address at a
+    // time and learn whether it is registered. They get back a uid and no
+    // name. That is a real cost and it is the one being paid on purpose —
+    // the alternative, a queryable user table, hands over the whole directory.
+
+    match /emailIndex/{address} {
+
+      allow get: if signedIn();
+      allow list: if false;
+
+      // You may only ever claim your own address, because the document name
+      // must equal the address on your own token. Nobody can point somebody
+      // else's address at their uid and collect the notes meant for them.
+      allow create, update: if signedIn()
+        && address == request.auth.token.email.lower()
+        && incoming().uid == request.auth.uid;
+
+      // Removed when the account is deleted, by its owner, so the address can
+      // be registered again by whoever actually holds it.
+      allow delete: if signedIn()
+        && address == request.auth.token.email.lower();
     }
 
     // ------------------------------------------------------------ groups
@@ -139,7 +182,16 @@ service cloud.firestore {
       allow update: if signedIn()
         && changedKeys().hasOnly(['memberUids', 'updatedAt'])
         && request.resource.data.memberUids
-             == resource.data.memberUids.concat([request.auth.uid]);
+             == resource.data.memberUids.concat([request.auth.uid])
+        // Already in? Then there is nothing to join. Without this a member
+        // could send the same join over and over, appending their own uid each
+        // time: the member list grows without limit, every other member
+        // downloads it on every read, and at a megabyte the document stops
+        // being writable at all. A member list is not a log.
+        && !(request.auth.uid in resource.data.memberUids)
+        // A ceiling on the same growth from the other direction. Sixty is far
+        // above any real class and far below anything that hurts.
+        && request.resource.data.memberUids.size() <= 60;
 
       // Leaving. The mirror image, and equally pinned.
       allow update: if isMember()
@@ -234,7 +286,19 @@ service cloud.firestore {
         && changedKeys().hasOnly(['state', 'respondedAt'])
         && incoming().state in ['accepted', 'declined'];
 
-      allow delete: if false;
+      // Either end may remove a share once it has been answered.
+      //
+      // It used to be `false`, which meant every note anyone ever sent stayed
+      // in the project for good, at up to 700 KB each. On the free plan the
+      // whole project has one gigabyte: fifteen hundred shares fill it, and
+      // when it is full nobody can send anything. Letting the two people who
+      // can already read a share delete it is what keeps ordinary use from
+      // accumulating. A deliberate flood is still possible and is not solved
+      // here — see SECURITY_REVIEW.md.
+      allow delete: if signedIn()
+        && resource.data.state != 'pending'
+        && (resource.data.toUid == request.auth.uid
+            || resource.data.fromUid == request.auth.uid);
     }
 
     // ------------------------------------------------------------- chats
@@ -314,8 +378,13 @@ service cloud.firestore {
       // writes a read receipt; typing writes a flag. All three land here, and
       // each is held to its own fields.
       allow update: if canUseThread(chatId)
+        // `kind` and `groupId` are deliberately absent: a write that leaves
+        // them as they are does not appear in changedKeys at all, so the app's
+        // merge still works, while a write that CHANGES them is refused. They
+        // say which group a thread belongs to, and a thread that can be
+        // re-pointed at another group is a thread whose history moves house.
         && changedKeys().hasOnly([
-             'kind', 'groupId', 'title', 'memberUids',
+             'title', 'memberUids',
              'lastText', 'lastFromUid', 'lastFromName', 'lastAt',
              'readAt', 'typingAt',
            ])

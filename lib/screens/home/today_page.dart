@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
 import '../../models/exam.dart';
+import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/note_row.dart';
@@ -46,6 +47,15 @@ class TodayPage extends StatelessWidget {
           children: [
             _Greeting(name: repo.userName),
             const SizedBox(height: 20),
+
+            // A term has begun that the student has not acknowledged. Asked
+            // rather than done: university dates slip by weeks, and being
+            // moved into semester 5 while you are still sitting semester 4's
+            // exams is worse than being asked.
+            if (repo.semesterAwaitingAcceptance != null) ...[
+              _SemesterStrip(number: repo.semesterAwaitingAcceptance!),
+              const SizedBox(height: 12),
+            ],
 
             for (final exam in reminders) ...[
               _ReminderStrip(exam: exam, onTap: onOpenExams),
@@ -552,6 +562,62 @@ class _StartCard extends StatelessWidget {
               onPressed: onAction,
               child: Text(actionLabel),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Semester 5 has started" — the one moment the app volunteers to move the
+/// student through their degree.
+class _SemesterStrip extends StatelessWidget {
+  const _SemesterStrip({required this.number});
+
+  final int number;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 15, 14, 15),
+      decoration: BoxDecoration(
+        color: NestColor.card,
+        borderRadius: BorderRadius.circular(NestRadius.card),
+        boxShadow: NestShadow.resting,
+      ),
+      child: Row(
+        children: [
+          MarkTile.tool(
+            Icons.school_rounded,
+            tint: NestColor.tintMint,
+            ink: NestColor.mintDeep,
+            size: 40,
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${semesterLabelFor(number)} has started',
+                    style: t.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  'Your courses so far stay where they are.',
+                  style: t.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => NoteRepository.instance.enterSemester(number),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: const Size(0, 38),
+            ),
+            child: const Text('Move'),
           ),
         ],
       ),

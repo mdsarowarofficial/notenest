@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../data/auth_repository.dart';
+import '../../data/attachment_store.dart';
+import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
@@ -20,6 +22,10 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  /// True while the account is being removed, so the screen cannot be asked
+  /// to do it twice.
+  bool _deleting = false;
+
   final _auth = AuthRepository.instance;
   final _repo = NoteRepository.instance;
 
@@ -124,6 +130,66 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (saved == true && semesterProblem(label) == null) {
       await _repo.saveSemester(label, system: system);
+    }
+  }
+
+  /// Deletes the account: the cloud half first, then everything on the phone.
+  ///
+  /// Two gates, not one. The password proves the person holding the phone is
+  /// the account holder — the single thing between a borrowed unlocked phone
+  /// and somebody's whole term of notes. Typing DELETE proves they meant this
+  /// button rather than the one above it.
+  ///
+  /// The cloud goes first because it is the half that can refuse. If Firebase
+  /// says no — wrong password, no connection — nothing on the phone has been
+  /// touched yet and the student still has every note.
+  Future<void> _deleteAccount() async {
+    final cloud = CloudService.instance;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    final password = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _DeleteAccountDialog(
+        signedInToCloud: cloud.isSignedIn,
+      ),
+    );
+    if (password == null || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      if (cloud.isSignedIn) {
+        await cloud.deleteCloudAccount(password: password);
+      }
+
+      // Read the file names while the rows that name them still exist.
+      final files = await _auth.attachmentFileNamesForCurrentUser();
+      final error = await _auth.deleteAccount(password: password);
+      if (error != null) {
+        if (!mounted) return;
+        setState(() => _deleting = false);
+        messenger.showSnackBar(SnackBar(content: Text(error.message)));
+        return;
+      }
+
+      // After the rows, so a crash in the middle leaves files without rows
+      // rather than rows pointing at files that are gone.
+      if (AttachmentStore.isSupported) {
+        for (final name in files) {
+          await AttachmentStore.delete(name);
+        }
+      }
+
+      _repo.clear();
+      if (!mounted) return;
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    } on CloudException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -324,12 +390,23 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 36),
               TextButton.icon(
-                onPressed: _signOut,
+                onPressed: _deleting ? null : _signOut,
                 icon: const Icon(Icons.logout_rounded,
                     size: 18, color: NestColor.redPen),
                 label: const Text(
                   'Sign out',
                   style: TextStyle(color: NestColor.redPen),
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: _deleting ? null : _deleteAccount,
+                child: const Text(
+                  'Delete account',
+                  style: TextStyle(
+                    color: NestColor.inkFaint,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
             ],
@@ -359,6 +436,107 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Asks for the password, and for the word, before an action with no undo.
+///
+/// It says plainly what survives. An account-deletion screen that implies
+/// everything disappears, when messages already sent plainly cannot, is a
+/// promise the app is not in a position to keep — and Google Play asks for
+/// the disclosure as much as for the button.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog({required this.signedInToCloud});
+
+  final bool signedInToCloud;
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _ready = false;
+
+  void _recheck() {
+    final ok = _password.text.isNotEmpty &&
+        _confirm.text.trim().toUpperCase() == 'DELETE';
+    if (ok != _ready) setState(() => _ready = ok);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _password.addListener(_recheck);
+    _confirm.addListener(_recheck);
+  }
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      title: const Text('Delete this account?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('This removes, for good:', style: t.titleSmall),
+            const SizedBox(height: 6),
+            Text(
+              'Every note, subject, exam and attachment on this phone, and '
+              '${widget.signedInToCloud ? 'your cloud profile, so classmates can no longer find you.' : 'this device account.'}',
+              style: t.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            Text('This does not remove:', style: t.titleSmall),
+            const SizedBox(height: 6),
+            Text(
+              'Messages you have already sent, and notes classmates have '
+              'already accepted. Those are in their copies now, under the '
+              'name they were sent with — the same as an email you cannot '
+              'unsend.',
+              style: t.bodySmall,
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              autofillHints: const [AutofillHints.password],
+              decoration: const InputDecoration(labelText: 'Your password'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirm,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Type DELETE to confirm',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Keep my account'),
+        ),
+        FilledButton(
+          onPressed: _ready ? () => Navigator.pop(context, _password.text) : null,
+          style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
+          child: const Text('Delete for ever'),
+        ),
+      ],
     );
   }
 }

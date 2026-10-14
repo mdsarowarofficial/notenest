@@ -12,7 +12,12 @@
           "package_name": "com.example.notenest"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1040887500479-87qhg06tjjl7btud9s1ptl5jq70qjkmm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC9YxVmu1WU60nIvMYiUxWj51XKeLAZpDA"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040887500479-87qhg06tjjl7btud9s1ptl5jq70qjkmm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -31,7 +41,28 @@
           "package_name": "com.notenest.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1040887500479-2m2tnc6f8a2ehah44ehlr2kq3ro779g3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.notenest.app",
+            "certificate_hash": "e4dcbfe5ca7719e7c64a0a0dd79ea541a91b7e69"
+          }
+        },
+        {
+          "client_id": "1040887500479-9ahtorpofddltu5ooavp74fcn4vesunp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.notenest.app",
+            "certificate_hash": "e0cd22e6f900a71e552b6ca06d637e21b9568996"
+          }
+        },
+        {
+          "client_id": "1040887500479-87qhg06tjjl7btud9s1ptl5jq70qjkmm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC9YxVmu1WU60nIvMYiUxWj51XKeLAZpDA"
@@ -39,7 +70,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040887500479-87qhg06tjjl7btud9s1ptl5jq70qjkmm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
