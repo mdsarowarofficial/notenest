@@ -62,6 +62,20 @@ dependencies:
   firebase_auth: ^6.7.0
   firebase_core: ^4.15.0
 
+  # Activity 11 — signing in with a Google account.
+  #
+  # Version 7 and not 6: the API changed shape (GoogleSignIn.instance,
+  # authenticate(), a separate authorization client for access tokens), and 6 is
+  # the version every older tutorial shows. Pinning the major here is what stops
+  # a later `pub upgrade` from quietly swapping one API for the other.
+  #
+  # On Android this needs the signing fingerprint of *each* build — debug and
+  # release both — registered against com.notenest.app in the Firebase project,
+  # and google-services.json re-downloaded afterwards so it carries the web
+  # OAuth client entry. Without that, sign-in fails as a *cancellation*, which
+  # is the single most misleading error in this whole dependency.
+  google_sign_in: ^7.2.0
+
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.
   # google_fonts: ^6.2.1

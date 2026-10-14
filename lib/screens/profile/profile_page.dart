@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/auth_repository.dart';
 import '../../data/attachment_store.dart';
 import '../../data/cloud_service.dart';
+import '../../data/google_identity.dart';
 import '../../data/note_repository.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
@@ -148,10 +149,24 @@ class _ProfilePageState extends State<ProfilePage> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
+    // The two halves can want different proof, and they really can disagree.
+    //
+    // Firebase links a Google sign-in to an existing password account on the
+    // same address, so a student who registered with a password on one phone
+    // and used the Google button on a second one ends up with a cloud account
+    // that has both and a device row on the second phone that has neither a
+    // password nor any way to get one. Asking each half what it wants, rather
+    // than deciding once from the device, is what makes all four combinations
+    // work instead of three.
+    final cloudWantsGoogle = cloud.isSignedIn && cloud.signsInWithGoogle;
+    final cloudWantsPassword = cloud.isSignedIn && !cloud.signsInWithGoogle;
+    final deviceWantsPassword = !_auth.currentUserUsesGoogle;
+
     final password = await showDialog<String>(
       context: context,
       builder: (dialogContext) => _DeleteAccountDialog(
         signedInToCloud: cloud.isSignedIn,
+        askForPassword: deviceWantsPassword || cloudWantsPassword,
       ),
     );
     if (password == null || !mounted) return;
@@ -159,12 +174,16 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _deleting = true);
     try {
       if (cloud.isSignedIn) {
-        await cloud.deleteCloudAccount(password: password);
+        await cloud.deleteCloudAccount(
+          password: cloudWantsGoogle ? null : password,
+        );
       }
 
       // Read the file names while the rows that name them still exist.
       final files = await _auth.attachmentFileNamesForCurrentUser();
-      final error = await _auth.deleteAccount(password: password);
+      final error = deviceWantsPassword
+          ? await _auth.deleteAccount(password: password)
+          : await _auth.deleteAccountVerified();
       if (error != null) {
         if (!mounted) return;
         setState(() => _deleting = false);
@@ -185,6 +204,17 @@ class _ProfilePageState extends State<ProfilePage> {
       navigator.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginPage()),
         (route) => false,
+      );
+    } on GoogleSignInCancelled {
+      // The Google sheet closed without a choice, so the second gate was never
+      // passed. Nothing has been deleted — the cloud half refuses before it
+      // touches anything, and the device half runs after it.
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Nothing was deleted — your account is still here.'),
+        ),
       );
     } on CloudException catch (e) {
       if (!mounted) return;
@@ -447,9 +477,17 @@ class _ProfilePageState extends State<ProfilePage> {
 /// promise the app is not in a position to keep — and Google Play asks for
 /// the disclosure as much as for the button.
 class _DeleteAccountDialog extends StatefulWidget {
-  const _DeleteAccountDialog({required this.signedInToCloud});
+  const _DeleteAccountDialog({
+    required this.signedInToCloud,
+    required this.askForPassword,
+  });
 
   final bool signedInToCloud;
+
+  /// False for an account that proves itself with Google, which has no
+  /// password to ask for. Then the second gate is Google's own sheet, shown
+  /// after this dialog closes.
+  final bool askForPassword;
 
   @override
   State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
@@ -461,7 +499,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   bool _ready = false;
 
   void _recheck() {
-    final ok = _password.text.isNotEmpty &&
+    final ok = (!widget.askForPassword || _password.text.isNotEmpty) &&
         _confirm.text.trim().toUpperCase() == 'DELETE';
     if (ok != _ready) setState(() => _ready = ok);
   }
@@ -509,12 +547,20 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               style: t.bodySmall,
             ),
             const SizedBox(height: 18),
-            TextField(
-              controller: _password,
-              obscureText: true,
-              autofillHints: const [AutofillHints.password],
-              decoration: const InputDecoration(labelText: 'Your password'),
-            ),
+            if (widget.askForPassword)
+              TextField(
+                controller: _password,
+                obscureText: true,
+                autofillHints: const [AutofillHints.password],
+                decoration: const InputDecoration(labelText: 'Your password'),
+              )
+            else
+              Text(
+                'This account signs in with Google, so there is no password to '
+                'ask for. Google will ask you to pick the account again once '
+                'you confirm — that is the same check, in its own words.',
+                style: t.bodySmall,
+              ),
             const SizedBox(height: 12),
             TextField(
               controller: _confirm,

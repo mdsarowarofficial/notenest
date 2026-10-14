@@ -8,6 +8,8 @@ import '../../theme/nest_theme.dart';
 import '../../widgets/nest_paper.dart';
 import '../../widgets/pen_wordmark.dart';
 import '../setup/setup_flow.dart';
+import '../shell/home_shell.dart';
+import 'google_sign_in_button.dart';
 import 'login_page.dart';
 
 /// Create an account on this device. Requirement 2.
@@ -56,6 +58,55 @@ class _RegisterPageState extends State<RegisterPage> {
     _email.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  /// Creating an account with Google, which is the same call as signing in
+  /// with one — see [continueWithGoogle].
+  ///
+  /// Nothing on this form is read. Name and address come from the Google
+  /// account, the password does not exist, and the role starts as student and
+  /// is changed in the cloud screen. Reading the half-filled fields instead
+  /// would mean a student who typed a different address here ends up with an
+  /// account under one address and a profile under another.
+  Future<void> _continueWithGoogle() async {
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
+
+    final result = await continueWithGoogle();
+    if (!mounted) return;
+
+    switch (result.outcome) {
+      case GoogleOutcome.cancelled:
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(googleCancelledNotice),
+            duration: Duration(seconds: 7),
+          ),
+        );
+        return;
+      case GoogleOutcome.failed:
+        setState(() {
+          _error = result.message;
+          _busy = false;
+        });
+        return;
+      case GoogleOutcome.signedIn:
+        // Not always SetupFlow, unlike the form below. A student signing in
+        // with Google on a phone they have used before has already done setup,
+        // and sending them back through it would ask for a semester they
+        // already chose.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => NoteRepository.instance.setupDone
+                ? const HomeShell()
+                : const SetupFlow(),
+          ),
+        );
+        return;
+    }
   }
 
   Future<void> _submit() async {
@@ -263,6 +314,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                 _busy ? 'Creating...' : 'Create account',
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 20),
+                          GoogleSignInButton(
+                            busy: _busy,
+                            onPressed: _busy ? null : _continueWithGoogle,
                           ),
                         ],
                       ),

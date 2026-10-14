@@ -194,3 +194,95 @@ ships broken.
 * **The opening animation has never run.** It was written, and its geometry was
   checked by porting the painter's arithmetic to Python and rendering a
   filmstrip — which proves the shapes, not that Flutter draws them.
+* **Nothing in §10 has been run**, and the Google sheet cannot be reached from a
+  test at all. See below.
+
+## 10 · Signing in with Google — NOT RUN, needs a device and the console
+
+Added after the audit. **None of this has been run**, and some of it cannot be:
+the account sheet is drawn by Android's Credential Manager, which does not exist
+in a widget test and does not exist on the machine this was written on. What
+*was* checked here is the arithmetic underneath it — the password rules for an
+account that has no password, and which proof each half of a deletion asks for —
+by porting both to Python and running 23 cases. That proves the decisions, not
+that Google answers the phone.
+
+§10.0 is not a test. It is the precondition, and until it is ticked off, every
+failure below is this list and not the code.
+
+**10.0 · Console**
+
+| # | Done? | Thing |
+|---|---|---|
+| a | | Google provider switched **on** in Firebase → Authentication → Sign-in method |
+| b | | **Debug** keystore SHA-1 added to the `com.notenest.app` app |
+| c | | **Upload** keystore SHA-1 added to the same app — `E0:CD:22:…:89:96` |
+| d | | `google-services.json` re-downloaded **after** b and c |
+| e | | That file contains an entry with `"client_type": 3` — the web OAuth client |
+
+Check (d) and (e) together. Two or more `certificate_hash` lines means the
+fingerprints landed; a `client_type` of 3 means the web client is there:
+
+```powershell
+Select-String -Path C:\project\notenest\android\app\google-services.json -Pattern "certificate_hash","client_type"
+```
+
+If `client_type: 3` is missing, sign-in fails with `serverClientId must be
+provided on Android`. The fix is to re-download the file. The escape hatch, if
+that cannot be done, is `GoogleAccounts.serverClientId` in
+`lib/data/google_identity.dart`.
+
+**10.1 · The happy paths**
+
+| # | Test | Expected |
+|---|---|---|
+| 10.1 | Fresh install, Login → Continue with Google, pick an account | setup, then the notebook |
+| 10.2 | Sign out, Continue with Google again | the account sheet **appears again** — it must not silently re-enter the account just left |
+| 10.3 | Register screen → Continue with Google, same account | straight to the notebook, **not** back through setup |
+| 10.4 | Force-close and reopen | still signed in, no sheet |
+| 10.5 | Firestore → `users` | one document, with the Google account's name and address |
+| 10.6 | Firestore → `emailIndex` | one document, named with the lowercased address |
+| 10.7 | From a second account, search that address in "Message someone" | found |
+
+**10.2 · The paths that had no right answer before this change**
+
+These are the ones worth the time. Each of them used to end in a message about
+a wrong password, on an account that has none.
+
+| # | Test | Expected |
+|---|---|---|
+| 10.8 | Google account → Settings → ACCOUNT | **no** "Change password" row; a "Sign-in method · Google" row instead, with no chevron |
+| 10.9 | Google account → Profile → Delete account | asks for **DELETE only**, no password field, and says Google will ask again |
+| 10.10 | Confirm it, then close the Google sheet without choosing | "Nothing was deleted" — and the account still signs in afterwards |
+| 10.11 | Confirm it and pick the account | Firebase user gone, `users` and `emailIndex` documents gone |
+| 10.12 | Register with email+password **and** cloud; sign out; Continue with Google with the *same* address | signs in, the notes are still there, and Settings **still shows** "Change password" — the password was not taken away |
+| 10.13 | After 10.12, Delete account | asks for the password **and** shows the Google sheet, because the two halves want different proof |
+| 10.14 | Type a Google account's address into the **password** form and sign in | "This account signs in with Google…", not "that password does not match" |
+
+10.12 and 10.13 are the pair most likely to be wrong, because they only happen
+when Firebase links a Google sign-in onto an address that already had a
+password — which it does by default, and which means the cloud half and the
+device half genuinely disagree about what proof to ask for.
+
+**10.3 · The failure that lies about itself**
+
+| # | Test | Expected |
+|---|---|---|
+| 10.15 | Build a release APK **before** adding the upload SHA-1, then tap the button | it reports a *cancellation*, together with the notice about this build maybe not being registered |
+
+10.15 is here deliberately. Credential Manager returns the same cancellation for
+"the person tapped away" and "this build's signing fingerprint is not
+registered" — the plugin's maintainer confirms this in flutter/flutter#171761.
+Without that notice, a wrong fingerprint looks exactly like a button that does
+nothing, for ever. **Do not delete the wording in `googleCancelledNotice`.**
+
+## 11 · What Stage 1 deliberately does not do
+
+Two things anyone would reasonably assume are now working, and are not:
+
+* **Notes still do not sync between phones.** Signing in with Google on a second
+  device brings the account across and nothing else — the same as the existing
+  cloud sign-in, and the snackbar on that path says so out loud.
+* **Nothing is in Drive.** `GoogleAccounts.authorizeDrive` is written and the
+  scope is chosen (`drive.file`, which is non-sensitive), but **no code calls
+  it**. Enabling the Drive API changes nothing until Stage 3.

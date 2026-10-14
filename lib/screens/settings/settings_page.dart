@@ -96,14 +96,27 @@ class SettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const CloudPage()),
                     ),
                   ),
-                  _Row(
-                    icon: Icons.password_rounded,
-                    tint: NestColor.tintRed,
-                    ink: NestColor.redDeep,
-                    title: 'Change password',
-                    value: 'The one you use on this device',
-                    onTap: () => _changePassword(context),
-                  ),
+                  // Offered only to an account that has a password. For a
+                  // Google account the row used to be here too, and tapping it
+                  // asked for a current password that had never been set — a
+                  // dead end dressed up as a setting.
+                  if (!AuthRepository.instance.currentUserUsesGoogle)
+                    _Row(
+                      icon: Icons.password_rounded,
+                      tint: NestColor.tintRed,
+                      ink: NestColor.redDeep,
+                      title: 'Change password',
+                      value: 'The one you use on this device',
+                      onTap: () => _changePassword(context),
+                    )
+                  else
+                    const _Row(
+                      icon: Icons.verified_user_outlined,
+                      tint: NestColor.tintPen,
+                      ink: NestColor.penDeep,
+                      title: 'Sign-in method',
+                      value: 'Google — there is no password to change',
+                    ),
                 ],
               ),
 
@@ -258,7 +271,7 @@ class _Row extends StatelessWidget {
     required this.ink,
     required this.title,
     required this.value,
-    required this.onTap,
+    this.onTap,
   });
 
   final IconData icon;
@@ -266,7 +279,11 @@ class _Row extends StatelessWidget {
   final Color ink;
   final String title;
   final String value;
-  final VoidCallback onTap;
+
+  /// Null for a row that states something rather than leading somewhere. The
+  /// chevron goes with it, because an arrow that points nowhere is a lie about
+  /// what a tap will do.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -300,8 +317,9 @@ class _Row extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: NestColor.inkFaint),
+              if (onTap != null)
+                const Icon(Icons.chevron_right_rounded,
+                    color: NestColor.inkFaint),
             ],
           ),
         ),

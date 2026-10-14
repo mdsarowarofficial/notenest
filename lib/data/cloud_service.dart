@@ -11,6 +11,7 @@ import '../models/chat.dart';
 import '../models/cloud_profile.dart';
 import '../models/note_share.dart';
 import '../models/study_group.dart';
+import 'google_identity.dart';
 
 /// Everything that talks to Firebase.
 ///
@@ -215,6 +216,68 @@ class CloudService extends ChangeNotifier {
     });
   }
 
+  /// True when the signed-in Firebase account proves itself with Google and
+  /// has no password of its own.
+  ///
+  /// Asked before anything that would demand a password. `providerData` is the
+  /// list of ways this one account can sign in, so an account that has both —
+  /// Google *and* a password, which Firebase allows — is not treated as
+  /// password-less, because for that one a password check is still the right
+  /// question and the stricter one.
+  bool get signsInWithGoogle {
+    if (!_ready) return false;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final providers = user.providerData.map((p) => p.providerId).toSet();
+    return providers.contains('google.com') && !providers.contains('password');
+  }
+
+  /// Signs in to Firebase with a Google account, creating the profile document
+  /// on the first time.
+  ///
+  /// There is no separate "register with Google". Google already knows whether
+  /// this person has an account with it; whether *NoteNest* has seen them
+  /// before is answered by whether `users/{uid}` exists, and [_loadProfile]
+  /// writes one when it does not. So the same method sits behind the button on
+  /// the login screen and the button on the register screen, and a student who
+  /// taps the wrong one still ends up in the right place.
+  ///
+  /// Lets [GoogleSignInCancelled] through untouched. A closed sheet is not a
+  /// failure and must not come out of here as a [CloudException], because the
+  /// screen would then draw a red line for somebody who simply changed their
+  /// mind.
+  Future<void> signInWithGoogle() async {
+    _requireReady();
+    await _run(() async {
+      final GoogleCredential google;
+      try {
+        google = await GoogleAccounts.instance.signIn();
+      } on GoogleIdentityError catch (e) {
+        throw CloudException(e.message);
+      }
+
+      final credential = await FirebaseAuth.instance.signInWithCredential(
+        GoogleAuthProvider.credential(idToken: google.idToken),
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw const CloudException(
+          'Google accepted the sign-in but no account came back. Try again.',
+        );
+      }
+      if ((user.email ?? '').isEmpty) {
+        // Every path after this one is keyed on the address: the device row,
+        // the index classmates are found through, the profile document. An
+        // account with none would sign in and then be unreachable.
+        throw const CloudException(
+          'That Google account has no email address on it, so there is nothing '
+          'to connect a NoteNest account to.',
+        );
+      }
+      await _loadProfile(user.uid);
+    });
+  }
+
   /// Asks Firebase to email a password-reset link.
   ///
   /// This is the only route a forgotten password has, and it is worth being
@@ -256,7 +319,11 @@ class CloudService extends ChangeNotifier {
   /// The password is required because Firebase refuses to delete an account on
   /// a stale sign-in, which is the right rule: deletion is exactly the action
   /// a borrowed phone should not be able to take.
-  Future<void> deleteCloudAccount({required String password}) async {
+  /// [password] is null for an account that signs in with Google. Then the
+  /// proof is a fresh Google sign-in instead: the student picks their account
+  /// again, which is the same demand made in a different currency, and the one
+  /// Firebase will accept for an account that has no password to check.
+  Future<void> deleteCloudAccount({String? password}) async {
     _requireReady();
     await _run(() async {
       final user = FirebaseAuth.instance.currentUser;
@@ -266,12 +333,24 @@ class CloudService extends ChangeNotifier {
       final address = normaliseEmail(user.email ?? '');
 
       // Proves the person at the phone is the account holder, right now.
-      await user.reauthenticateWithCredential(
-        EmailAuthProvider.credential(
-          email: address,
-          password: password,
-        ),
-      );
+      if (password == null) {
+        final GoogleCredential google;
+        try {
+          google = await GoogleAccounts.instance.signIn();
+        } on GoogleIdentityError catch (e) {
+          throw CloudException(e.message);
+        }
+        await user.reauthenticateWithCredential(
+          GoogleAuthProvider.credential(idToken: google.idToken),
+        );
+      } else {
+        await user.reauthenticateWithCredential(
+          EmailAuthProvider.credential(
+            email: address,
+            password: password,
+          ),
+        );
+      }
 
       // The index first: while it is gone the profile is merely unfindable,
       // whereas a profile deleted first would leave the index pointing at
@@ -297,6 +376,11 @@ class CloudService extends ChangeNotifier {
   Future<void> signOutOfCloud() async {
     if (!_ready) return;
     await FirebaseAuth.instance.signOut();
+    // Google keeps its own idea of which account was chosen, and it outlives
+    // Firebase's session. Without this, signing out and tapping the Google
+    // button again drops straight back into the account just left — no sheet,
+    // no choice. On a shared phone that is not a convenience.
+    await GoogleAccounts.instance.signOut();
     _profile = null;
     // Another account must not inherit the last one's view of who people are.
     _profileCache.clear();

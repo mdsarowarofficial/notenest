@@ -9,6 +9,7 @@ import '../../widgets/nest_paper.dart';
 import '../../widgets/pen_wordmark.dart';
 import '../setup/setup_flow.dart';
 import '../shell/home_shell.dart';
+import 'google_sign_in_button.dart';
 import 'register_page.dart';
 
 /// Sign in to an account stored on this device. Requirement 2.
@@ -167,6 +168,50 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  /// The Google button. Everything it does is in [continueWithGoogle]; this is
+  /// the screen's half — the busy flag, the message, and where to go next.
+  Future<void> _continueWithGoogle() async {
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
+
+    final result = await continueWithGoogle();
+    if (!mounted) return;
+
+    switch (result.outcome) {
+      case GoogleOutcome.cancelled:
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(googleCancelledNotice),
+            duration: Duration(seconds: 7),
+          ),
+        );
+        return;
+      case GoogleOutcome.failed:
+        setState(() {
+          _error = result.message;
+          _busy = false;
+        });
+        return;
+      case GoogleOutcome.signedIn:
+        _openNotebook();
+        return;
+    }
+  }
+
+  /// Where both ways in end up.
+  void _openNotebook() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => NoteRepository.instance.setupDone
+            ? const HomeShell()
+            : const SetupFlow(),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     setState(() {
       _error = null;
@@ -231,13 +276,7 @@ class _LoginPageState extends State<LoginPage> {
       );
     }
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => NoteRepository.instance.setupDone
-            ? const HomeShell()
-            : const SetupFlow(),
-      ),
-    );
+    _openNotebook();
   }
 
   @override
@@ -316,6 +355,11 @@ class _LoginPageState extends State<LoginPage> {
                                 _busy ? 'Opening your notebook...' : 'Sign in',
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 20),
+                          GoogleSignInButton(
+                            busy: _busy,
+                            onPressed: _busy ? null : _continueWithGoogle,
                           ),
                         ],
                       ),
