@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The colour Android paints the window with between the tap on the icon
+         and Flutter's first frame.
+
+         It is the icon's own yellow so that the opening animation appears to
+         grow out of the icon the student just touched. White here is what
+         produces the flash every cheap app has: tap, white rectangle, then the
+         app. The window keeps this colour behind the Flutter UI as well, which
+         is harmless — the app paints over all of it. -->
+    <color name="nest_launch">#FFD84D</color>
+</resources>

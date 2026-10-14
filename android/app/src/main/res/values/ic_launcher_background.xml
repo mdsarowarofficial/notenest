@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The ground the adaptive icon's page sits on. Android fills the whole
+         108dp background layer with it, so it must be the icon's own yellow
+         and not white, or the page floats on a white card on every launcher
+         that crops to a circle. -->
+    <color name="ic_launcher_background">#FFD84D</color>
+</resources>

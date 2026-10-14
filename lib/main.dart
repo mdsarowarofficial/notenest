@@ -9,6 +9,7 @@ import 'screens/setup/setup_flow.dart';
 import 'screens/shell/home_shell.dart';
 import 'theme/nest_theme.dart';
 import 'widgets/nest_app_frame.dart';
+import 'widgets/nest_opening.dart';
 
 Future<void> main() async {
   // The database must be open and the session restored before the first frame,
@@ -40,7 +41,10 @@ class NoteNestApp extends StatelessWidget {
       // phone's width on a desktop browser rather than only the first screen.
       builder: (context, child) =>
           NestAppFrame(child: child ?? const SizedBox.shrink()),
-      home: _firstScreen(),
+      // The opening plays over the first screen, which is built underneath it
+      // from the very first frame. By the time the fold lifts, the app is
+      // already laid out — the animation costs no waiting.
+      home: NestOpening(child: _firstScreen()),
     );
   }
 
