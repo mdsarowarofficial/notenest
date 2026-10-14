@@ -272,7 +272,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const PaperRule(),
                 _row(
-                  'REVISION REMINDER',
+                  'REVISION PLAN',
                   _repo.reminderChoice ?? 'Not set',
                 ),
                 const PaperRule(),

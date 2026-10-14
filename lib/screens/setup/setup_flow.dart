@@ -44,7 +44,17 @@ class _SetupFlowState extends State<SetupFlow> {
     NestStep(
       title: 'Study routine',
       icon: Icons.alarm_rounded,
-      hint: 'Pick when NoteNest should remind you to revise.',
+      // Deliberately a plan, not a promise.
+      //
+      // This used to read "Pick when NoteNest should remind you to revise",
+      // and nothing in the app ever read the answer — there is no notification
+      // machinery here at all. A setting that quietly does nothing is worse
+      // than no setting: the student waits for a reminder that was never
+      // coming. So the question now asks what it can honestly ask, the answer
+      // is shown back on the profile as their own stated routine, and when
+      // scheduled reminders are built this is the setting that will drive them.
+      hint: 'When do you plan to revise? Noted for you — NoteNest does not '
+          'send alerts yet.',
     ),
   ];
 
@@ -306,7 +316,7 @@ class _SetupFlowState extends State<SetupFlow> {
       default:
         return _Sheet(
           children: [
-            const Text('REVISION REMINDER', style: nestEyebrow),
+            const Text('YOUR REVISION PLAN', style: nestEyebrow),
             const SizedBox(height: 12),
             for (final r in _reminders)
               Padding(
