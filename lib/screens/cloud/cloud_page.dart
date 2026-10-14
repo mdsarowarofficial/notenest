@@ -240,6 +240,33 @@ class _CloudPageState extends State<CloudPage> {
           ),
         ),
 
+        if (!_cloud.emailVerified) ...[
+          const SizedBox(height: 16),
+          _Banner(
+            icon: Icons.mark_email_unread_rounded,
+            colour: NestColor.redPen,
+            title: 'Confirm your email',
+            body: 'We sent a link to ${profile?.email ?? 'your address'}. '
+                'Until you open it, classmates cannot find you by email. '
+                'Check spam as well.',
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: _cloud.isBusy ? null : _checkVerified,
+                child: const Text('I have confirmed it'),
+              ),
+              OutlinedButton(
+                onPressed: _cloud.isBusy ? null : _resendVerification,
+                child: const Text('Send the link again'),
+              ),
+            ],
+          ),
+        ],
+
         const SizedBox(height: 20),
         const Text('YOU ARE HERE AS', style: nestEyebrow),
         const SizedBox(height: 8),
@@ -306,6 +333,33 @@ class _CloudPageState extends State<CloudPage> {
     );
   }
 
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _checkVerified() async {
+    try {
+      final verified = await _cloud.refreshVerification();
+      _say(verified
+          ? 'Email confirmed. Classmates can find you now.'
+          : 'Not confirmed yet. Open the link in the email, then try again.');
+    } on CloudException catch (e) {
+      _say(e.message);
+    }
+  }
+
+  Future<void> _resendVerification() async {
+    try {
+      await _cloud.sendVerificationEmail();
+      _say('Sent. It can take a minute to arrive.');
+    } on CloudException catch (e) {
+      _say(e.message);
+    }
+  }
+
   Future<void> _setRole(CloudRole role) async {
     try {
       await _cloud.updateProfile(role: role);
@@ -363,6 +417,10 @@ class _CloudPageState extends State<CloudPage> {
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           capitalize: TextCapitalization.none,
+          // Fixed to the device account's address. The cloud account is the
+          // same person, and letting it be a different address is how one
+          // student's phone ended up connected to another student's cloud.
+          readOnly: AuthRepository.instance.currentUser != null,
         ),
         const SizedBox(height: 14),
 
@@ -532,6 +590,7 @@ class _Field extends StatelessWidget {
     this.suffix,
     this.keyboardType,
     this.capitalize = TextCapitalization.none,
+    this.readOnly = false,
   });
 
   final String label;
@@ -540,6 +599,7 @@ class _Field extends StatelessWidget {
   final Widget? suffix;
   final TextInputType? keyboardType;
   final TextCapitalization capitalize;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -557,6 +617,7 @@ class _Field extends StatelessWidget {
         const SizedBox(height: 5),
         TextField(
           controller: controller,
+          readOnly: readOnly,
           obscureText: obscure,
           keyboardType: keyboardType,
           textCapitalization: capitalize,

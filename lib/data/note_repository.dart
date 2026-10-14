@@ -47,6 +47,7 @@ class NoteRepository extends ChangeNotifier {
   static const _kRecentSearches = 'recent_searches';
   static const _kCoverDraft = 'cover_draft';
   static const _kBrandLogo = 'brand_logo';
+  static const _kImportedShares = 'imported_shares';
 
   final _db = AppDatabase.instance;
   final _auth = AuthRepository.instance;
@@ -101,9 +102,14 @@ class NoteRepository extends ChangeNotifier {
 
   bool get hasSubjects => _subjects.isNotEmpty;
 
+  /// Case-insensitive, because the database is: the unique index on subjects
+  /// is on `LOWER(code)`. An exact comparison here meant an imported note for
+  /// "cse112" found no "CSE112", tried to create a second one, and the insert
+  /// failed on that index — taking the whole import down with it.
   Subject? subjectByCode(String code) {
+    final wanted = code.trim().toLowerCase();
     for (final s in _subjects) {
-      if (s.code == code) return s;
+      if (s.code.trim().toLowerCase() == wanted) return s;
     }
     return null;
   }
@@ -144,6 +150,7 @@ class NoteRepository extends ChangeNotifier {
     coverDraft = map[_kCoverDraft];
     brandLogo = BrandStore.decode(map[_kBrandLogo]);
     _recentSearches = _splitSearches(map[_kRecentSearches]);
+    _importedShares = _splitSearches(map[_kImportedShares]).toSet();
 
     await _reloadSubjects();
     await _reloadNotes();
@@ -158,6 +165,7 @@ class NoteRepository extends ChangeNotifier {
     _notes = const [];
     _exams = const [];
     _recentSearches = const [];
+    _importedShares = {};
     semesterLabel = null;
     semesterSystem = SemesterSystem.bi;
     university = null;
@@ -780,7 +788,19 @@ class NoteRepository extends ChangeNotifier {
   /// own CSE112 instead of making a second one.
   Future<Note> importBundle(NoteBundle bundle) async {
     final code = bundle.subjectCode?.trim() ?? '';
+    // Archived courses too. The unique index on the code covers every row, so
+    // a match that is only archived would otherwise be "missing" here and
+    // then refused by the database when a second one was created.
     var subject = code.isEmpty ? null : subjectByCode(code);
+    if (subject == null && code.isNotEmpty) {
+      final wanted = code.toLowerCase();
+      for (final s in _allSubjects) {
+        if (s.code.trim().toLowerCase() == wanted) {
+          subject = s;
+          break;
+        }
+      }
+    }
 
     if (subject == null && code.isNotEmpty) {
       subject = await addSubject(
@@ -838,6 +858,31 @@ class NoteRepository extends ChangeNotifier {
     return note.copyWith(id: id);
   }
 
+  // -------------------------------------------------------- imported shares
+
+  /// Cloud shares already added to this notebook, by share id.
+  ///
+  /// Accepting a share is two steps — add the note here, then tell the cloud —
+  /// and they cannot be one transaction, because one is SQLite and the other
+  /// is Firestore. When the second failed, the share stayed in the inbox as
+  /// waiting, and accepting it again added a second copy. Remembering the id
+  /// lets the retry skip straight to the step that failed.
+  Set<String> _importedShares = {};
+
+  bool hasImportedShare(String shareId) => _importedShares.contains(shareId);
+
+  Future<void> markShareImported(String shareId) async {
+    if (!_auth.isSignedIn) return;
+    _importedShares = {..._importedShares, shareId};
+    // Bounded: an answered share leaves the inbox, so only recent ids can
+    // ever be retried. Sets keep insertion order, so the oldest go first.
+    if (_importedShares.length > 300) {
+      _importedShares =
+          _importedShares.skip(_importedShares.length - 300).toSet();
+    }
+    await _setSetting(_kImportedShares, _importedShares.join('\n'));
+  }
+
   // -------------------------------------------------------- recent searches
 
   List<String> _recentSearches = const [];
@@ -876,10 +921,12 @@ class NoteRepository extends ChangeNotifier {
 
   /// Files belonging to one note, in capture order.
   Future<List<Attachment>> attachmentsFor(int noteId) async {
+    // Scoped to the account like every other read here, rather than trusting
+    // that a note id could only ever have come from this account's lists.
     final rows = await _db.db.query(
       'attachments',
-      where: 'note_id = ?',
-      whereArgs: [noteId],
+      where: 'note_id = ? AND note_id IN (SELECT id FROM notes WHERE user_id = ?)',
+      whereArgs: [noteId, _auth.requireUserId],
       orderBy: 'position ASC, id ASC',
     );
     return rows.map(Attachment.fromMap).toList();
@@ -887,8 +934,9 @@ class NoteRepository extends ChangeNotifier {
 
   Future<int> attachmentCount(int noteId) async {
     final rows = await _db.db.rawQuery(
-      'SELECT COUNT(*) AS c FROM attachments WHERE note_id = ?',
-      [noteId],
+      'SELECT COUNT(*) AS c FROM attachments WHERE note_id = ? '
+      'AND note_id IN (SELECT id FROM notes WHERE user_id = ?)',
+      [noteId, _auth.requireUserId],
     );
     return (rows.first['c'] as int?) ?? 0;
   }

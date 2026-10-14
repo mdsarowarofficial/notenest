@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
@@ -23,10 +24,17 @@ class AttachmentStore {
     return dir;
   }
 
+  static final _random = Random.secure();
+
+  /// The clock alone is not a unique name: an imported note writes its files
+  /// in a tight loop, and two saves in one clock tick would share a name — the
+  /// second overwriting the first. The random tail makes that impossible in
+  /// practice.
   static String _newName(String extension) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
+    final tail = _random.nextInt(1 << 32).toRadixString(36);
     final ext = extension.startsWith('.') ? extension : '.$extension';
-    return 'a_$stamp$ext';
+    return 'a_${stamp}_$tail$ext';
   }
 
   /// The name part of a path, used to turn the recorder's output path back

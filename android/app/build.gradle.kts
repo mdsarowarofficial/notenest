@@ -39,9 +39,12 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
 
-        // Required by flutter_local_notifications, which uses java.time to
-        // work out when a reminder is due. Desugaring rewrites those calls so
-        // they also run on Android versions that never shipped java.time.
+        // Added for flutter_local_notifications, which is no longer a
+        // dependency — exam reminders are shown in the app, not as system
+        // notifications. Left on because it is harmless and because removing
+        // it is a release-build change that should be tested on its own, not
+        // slipped in with something else: some current plugins may also rely
+        // on java.* APIs that only desugaring provides on older Android.
         isCoreLibraryDesugaringEnabled = true
     }
 

@@ -425,6 +425,15 @@ class _NoteCardState extends State<_NoteCard> {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('That note could not be saved on this phone. '
+              'Check there is free space and try again.'),
+        ),
+      );
     }
   }
 

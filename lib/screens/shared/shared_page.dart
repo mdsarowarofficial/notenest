@@ -272,7 +272,12 @@ class _PendingTileState extends State<_PendingTile> {
       // one more machine than one arriving as a file, so if anything deserves
       // the strict reader it is this.
       final bundle = NoteBundle.decode(widget.share.payload);
-      await NoteRepository.instance.importBundle(bundle);
+      final repo = NoteRepository.instance;
+      // A retry after the cloud half failed: the note is already here.
+      if (!repo.hasImportedShare(widget.share.id)) {
+        await repo.importBundle(bundle);
+        await repo.markShareImported(widget.share.id);
+      }
       await CloudService.instance
           .respondToShare(widget.share, accept: true);
       if (!mounted) return;
@@ -294,6 +299,17 @@ class _PendingTileState extends State<_PendingTile> {
         SnackBar(
           content: Text('Added, but it is still showing as waiting: '
               '${e.message}'),
+        ),
+      );
+    } catch (_) {
+      // The database or the disk refused the note. Nothing was answered, so
+      // the share is still waiting and can be tried again.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('That note could not be saved on this phone. '
+              'Check there is free space and try again.'),
         ),
       );
     }

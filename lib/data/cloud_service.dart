@@ -11,6 +11,7 @@ import '../models/chat.dart';
 import '../models/cloud_profile.dart';
 import '../models/note_share.dart';
 import '../models/study_group.dart';
+import 'auth_repository.dart';
 import 'google_identity.dart';
 
 /// Everything that talks to Firebase.
@@ -26,7 +27,14 @@ import 'google_identity.dart';
 /// `Firebase.initializeApp` has succeeded, and one such read on a startup path
 /// would take the whole app down for a student who only wanted to write a note.
 class CloudService extends ChangeNotifier {
-  CloudService._();
+  CloudService._() {
+    // The device account and the cloud account are one person, and must stop
+    // being one together. Firebase remembers its own sign-in independently of
+    // this app's session, so without this a student who signed out on a shared
+    // phone left their Firebase session behind for whoever signed in next —
+    // who then saw their groups and inbox and could post under their name.
+    AuthRepository.instance.addSignOutHook(signOutOfCloud);
+  }
 
   static final CloudService instance = CloudService._();
 
@@ -147,11 +155,93 @@ class CloudService extends ChangeNotifier {
     _startupError = null;
 
     // Firebase remembers a signed-in account across restarts, so a returning
-    // student should already be connected.
+    // student should already be connected — but only if it is *their* cloud
+    // account. A session left over from somebody else, or one with no device
+    // account signed in at all, is dropped rather than inherited.
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      if (AuthRepository.instance.currentUser == null ||
+          !_belongsToDevice(user.email)) {
+        await _dropSession();
+        return;
+      }
       await _loadProfile(user.uid);
     }
+  }
+
+  // ------------------------------------------------------------- binding
+
+  /// What the screen says when a cloud account is not the device account's.
+  static const accountMismatchMessage =
+      'That cloud account uses a different email from the account signed in '
+      'on this device. Connect the cloud account for this email, or sign out '
+      'and sign in as the other person.';
+
+  /// True when a cloud account on [cloudEmail] may run alongside the device
+  /// account signed in now.
+  ///
+  /// With no device account signed in — the login and register screens — any
+  /// cloud account may, because the device account is about to be built from
+  /// it. Otherwise the two addresses must be the same address.
+  bool _belongsToDevice(String? cloudEmail) {
+    final local = AuthRepository.instance.currentUser?.email;
+    if (local == null) return true;
+    return normaliseEmail(local) == normaliseEmail(cloudEmail ?? '');
+  }
+
+  /// Signs out of Firebase and Google without touching the device account.
+  Future<void> _dropSession() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await GoogleAccounts.instance.signOut();
+    } catch (_) {
+      // Signing out cannot meaningfully fail from the student's point of view;
+      // the worst case is a session that is dropped again next start.
+    }
+    _profile = null;
+    _profileCache.clear();
+    _lastTypingWrite.clear();
+  }
+
+  // -------------------------------------------------------- verification
+
+  /// True when Firebase has confirmed this account owns its email address.
+  ///
+  /// Always true for Google, which only issues verified addresses. False for a
+  /// new password account until the link in the confirmation email is opened.
+  bool get emailVerified =>
+      _ready && (FirebaseAuth.instance.currentUser?.emailVerified ?? false);
+
+  /// Sends the confirmation email again.
+  Future<void> sendVerificationEmail() async {
+    _requireReady();
+    await _run(() async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw const CloudException('Not signed in to the cloud.');
+      }
+      await user.sendEmailVerification();
+    });
+  }
+
+  /// Asks Firebase whether the address has been confirmed since sign in, and
+  /// if it has, makes the account findable. Returns the answer.
+  Future<bool> refreshVerification() async {
+    _requireReady();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    try {
+      await user.reload();
+    } on FirebaseException catch (e) {
+      throw CloudException(describeStoreError(e.code));
+    }
+    final fresh = FirebaseAuth.instance.currentUser;
+    final verified = fresh?.emailVerified ?? false;
+    if (verified && fresh != null) {
+      await _writeEmailIndexNow(fresh.uid, fresh.email ?? '');
+    }
+    notifyListeners();
+    return verified;
   }
 
   // ------------------------------------------------------------- account
@@ -167,6 +257,11 @@ class CloudService extends ChangeNotifier {
     String institution = '',
   }) async {
     _requireReady();
+    // Before anything is created: an account made on the wrong address would
+    // exist in Firebase whether or not it is then refused here.
+    if (!_belongsToDevice(email)) {
+      throw const CloudException(accountMismatchMessage);
+    }
     await _run(() async {
       final credential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -182,6 +277,16 @@ class CloudService extends ChangeNotifier {
       // Shown by Firebase itself in the console user list, which makes the
       // project far easier to read while testing.
       await user.updateDisplayName(name.trim());
+
+      // Proof of the address. Until the link is opened the account works but
+      // cannot be found by classmates: the rules refuse to point an address
+      // at an account that has not shown it owns that address, so nobody can
+      // register a classmate's email and collect the notes sent to it.
+      try {
+        await user.sendEmailVerification();
+      } catch (_) {
+        // Not fatal. The cloud screen offers to send it again.
+      }
 
       final profile = CloudProfile(
         uid: user.uid,
@@ -203,6 +308,9 @@ class CloudService extends ChangeNotifier {
     required String password,
   }) async {
     _requireReady();
+    if (!_belongsToDevice(email)) {
+      throw const CloudException(accountMismatchMessage);
+    }
     await _run(() async {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: normaliseEmail(email),
@@ -273,6 +381,12 @@ class CloudService extends ChangeNotifier {
           'That Google account has no email address on it, so there is nothing '
           'to connect a NoteNest account to.',
         );
+      }
+      // The address is only known once Google has answered, so this check
+      // comes after the sign in and undoes it when it fails.
+      if (!_belongsToDevice(user.email)) {
+        await _dropSession();
+        throw const CloudException(accountMismatchMessage);
       }
       await _loadProfile(user.uid);
     });
@@ -352,6 +466,13 @@ class CloudService extends ChangeNotifier {
         );
       }
 
+      // What this account left in shared places: groups it owns (which would
+      // otherwise be ownerless for ever — nobody else may rename or delete
+      // them), memberships elsewhere, and shares at either end. Best effort:
+      // a failure here must not stand between someone and deleting their
+      // account, which Google Play requires to work.
+      await _removeFootprint(user.uid);
+
       // The index first: while it is gone the profile is merely unfindable,
       // whereas a profile deleted first would leave the index pointing at
       // nothing and a classmate's search returning an empty card.
@@ -371,20 +492,70 @@ class CloudService extends ChangeNotifier {
     });
   }
 
+  /// Deletes or leaves every group, and deletes every share, belonging to
+  /// [me]. Each step is attempted whatever happened to the one before.
+  ///
+  /// Messages are not touched. They sit in other people's conversations and
+  /// the rules let nobody delete them; that is said on the delete screen.
+  Future<void> _removeFootprint(String me) async {
+    try {
+      final groups = await _groups.where('memberUids', arrayContains: me).get();
+      for (final d in groups.docs) {
+        final group = StudyGroup.fromMap(d.id, d.data());
+        try {
+          if (group.isOwner(me)) {
+            final batch = _store.batch();
+            batch.delete(_groups.doc(group.id));
+            batch.delete(_joinCodes.doc(normaliseJoinCode(group.joinCode)));
+            await batch.commit();
+          } else {
+            await _groups.doc(group.id).update({
+              'memberUids': FieldValue.arrayRemove([me]),
+              'updatedAt': DateTime.now().millisecondsSinceEpoch,
+            });
+          }
+        } catch (_) {
+          // Next group.
+        }
+      }
+    } catch (_) {
+      // Could not list groups; carry on with shares.
+    }
+
+    for (final field in const ['fromUid', 'toUid']) {
+      try {
+        final shares = await _shares.where(field, isEqualTo: me).get();
+        await _deleteAll(shares.docs.map((d) => d.reference));
+      } catch (_) {
+        // Next query.
+      }
+    }
+  }
+
+  /// Deletes documents in batches below Firestore's 500-write ceiling.
+  Future<void> _deleteAll(
+      Iterable<DocumentReference<Map<String, dynamic>>> refs) async {
+    final all = refs.toList();
+    for (var i = 0; i < all.length; i += 400) {
+      final batch = _store.batch();
+      for (final ref in all.skip(i).take(400)) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    }
+  }
+
   /// Signs out of the cloud only. The local account, and every note in it,
   /// is untouched.
   Future<void> signOutOfCloud() async {
     if (!_ready) return;
-    await FirebaseAuth.instance.signOut();
     // Google keeps its own idea of which account was chosen, and it outlives
-    // Firebase's session. Without this, signing out and tapping the Google
-    // button again drops straight back into the account just left — no sheet,
-    // no choice. On a shared phone that is not a convenience.
-    await GoogleAccounts.instance.signOut();
-    _profile = null;
-    // Another account must not inherit the last one's view of who people are.
-    _profileCache.clear();
-    _lastTypingWrite.clear();
+    // Firebase's session, so [_dropSession] signs out of both. Without that,
+    // signing out and tapping the Google button again drops straight back into
+    // the account just left — no sheet, no choice. It also clears the profile
+    // cache: another account must not inherit the last one's view of who
+    // people are.
+    await _dropSession();
     notifyListeners();
   }
 
@@ -429,17 +600,39 @@ class CloudService extends ChangeNotifier {
   /// for other people's searches; a student signing in should not wait on a
   /// round trip that has nothing to do with their own sign in, and on a slow
   /// connection they were.
+  ///
+  /// Only for an address Firebase has verified. The rules refuse the write
+  /// otherwise, and they are right to: an unverified address is one somebody
+  /// typed, not one they have shown they own. An account that was unverified
+  /// at sign in is reloaded once here, so a student who opened the link since
+  /// becomes findable without signing out and back in.
   void _writeEmailIndex(String uid, String email) {
+    unawaited(_writeEmailIndexNow(uid, email));
+  }
+
+  Future<void> _writeEmailIndexNow(String uid, String email) async {
     final key = normaliseEmail(email);
     if (!looksLikeEmail(key)) return;
-    _emailIndex.doc(key).set({
-      'uid': uid,
-      'updatedAt': DateTime.now().toUtc().toIso8601String(),
-    }).catchError((Object _) {
+    try {
+      var user = FirebaseAuth.instance.currentUser;
+      if (user == null || user.uid != uid) return;
+      if (!user.emailVerified) {
+        await user.reload();
+        user = FirebaseAuth.instance.currentUser;
+        if (user == null || !user.emailVerified) return;
+        // The rules read `email_verified` from the ID token, and the token
+        // already in hand was minted before the link was opened.
+        await user.getIdToken(true);
+      }
+      await _emailIndex.doc(key).set({
+        'uid': uid,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {
       // Every failure, not merely the Firebase-shaped ones. Rules not yet
       // published, offline, anything: the sign in carries on and the write is
       // tried again next time.
-    });
+    }
   }
 
   Future<void> _loadProfile(String id) async {
@@ -837,11 +1030,14 @@ class CloudService extends ChangeNotifier {
     return targets.length;
   }
 
-  /// Records what the recipient decided.
+  /// Records what the recipient decided, then removes the share.
   ///
-  /// The document is kept rather than deleted, so the sender's side can one day
-  /// show that a note was received — and so a declined note does not simply
-  /// reappear the next time the sender presses send.
+  /// It used to be kept for good, so that a sender's screen could one day show
+  /// that a note had been received. That screen does not exist, and every
+  /// answered share is up to 700 KB of the project's one free gigabyte, so an
+  /// answered share is now deleted. The answer is still written first: if the
+  /// delete does not go through, the share is at least no longer pending and
+  /// will not come back to the inbox.
   Future<void> respondToShare(NoteShare share, {required bool accept}) async {
     _requireReady();
     await _run(() async {
@@ -850,6 +1046,11 @@ class CloudService extends ChangeNotifier {
         'respondedAt': DateTime.now().millisecondsSinceEpoch,
       });
     });
+    unawaited(
+      _shares.doc(share.id).delete().catchError((Object _) {
+        // Clean-up only; the answer above is what matters.
+      }),
+    );
   }
 
   // ---------------------------------------------------------------- chat

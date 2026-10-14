@@ -1,0 +1,14 @@
+{
+  "name": "notenest-firestore-tests",
+  "private": true,
+  "description": "Security rules tests for NoteNest, run in the local Firestore emulator.",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-notenest \"node --test --test-reporter=spec rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
+    "firebase": "11.10.0",
+    "firebase-tools": "13.35.1"
+  }
+}

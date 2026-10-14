@@ -73,7 +73,16 @@ service cloud.firestore {
       // spell rather than a query over everyone.
       allow list: if false;
 
+      // The fields a profile has, and no others. Without this the length
+      // limits below are decoration: a client could add a megabyte under a
+      // name nobody checks, and every classmate who opens a group downloads it.
+      function profileKeys() {
+        return ['uid', 'name', 'email', 'role', 'institution',
+                'createdAt', 'updatedAt'];
+      }
+
       allow create: if isSelf(userId)
+        && incoming().keys().hasOnly(profileKeys())
         && incoming().uid == userId
         // The address is taken from the signed-in token, not from whatever the
         // client typed, so nobody can register themselves under someone
@@ -84,6 +93,7 @@ service cloud.firestore {
         && incoming().role in ['student', 'teacher'];
 
       allow update: if isSelf(userId)
+        && incoming().keys().hasOnly(profileKeys())
         // Identity is fixed after creation. The name and the role can change;
         // who the document belongs to cannot.
         && incoming().uid == resource.data.uid
@@ -126,8 +136,19 @@ service cloud.firestore {
       // You may only ever claim your own address, because the document name
       // must equal the address on your own token. Nobody can point somebody
       // else's address at their uid and collect the notes meant for them.
+      //
+      // And the address must be verified. "On your own token" used to be the
+      // whole check, but an email-and-password account can be created on any
+      // address at all — Firebase does not ask whether you own it. Without
+      // email_verified, somebody could register a classmate's university
+      // address before the classmate did, claim this entry, and receive every
+      // note and message sent to that address under a name of their choosing.
+      // Google sign-ins are verified by Google, so they pass at once; a
+      // password account passes once its confirmation link has been opened.
       allow create, update: if signedIn()
+        && request.auth.token.email_verified == true
         && address == request.auth.token.email.lower()
+        && incoming().keys().hasOnly(['uid', 'updatedAt'])
         && incoming().uid == request.auth.uid;
 
       // Removed when the account is deleted, by its owner, so the address can
@@ -161,14 +182,25 @@ service cloud.firestore {
       allow read: if isMember();
 
       allow create: if signedIn()
+        && incoming().keys().hasOnly([
+             'name', 'joinCode', 'ownerUid', 'ownerName', 'kind', 'subject',
+             'memberUids', 'createdAt', 'updatedAt',
+           ])
         && incoming().ownerUid == request.auth.uid
         // A group starts with exactly one member: the person making it. Nobody
         // gets to create a group with other people already in it.
         && incoming().memberUids == [request.auth.uid]
         && textWithin(incoming().name, 60)
         && textWithin(incoming().subject, 60)
+        && textWithin(incoming().ownerName, 80)
         && incoming().kind in ['study', 'class']
-        && textWithin(incoming().joinCode, 6);
+        // Exactly six, and reserved in the same batch. The app always writes
+        // the group and its code together; a group whose code was never
+        // reserved could not be joined, and one with an empty code could
+        // collide with every other one.
+        && incoming().joinCode is string
+        && incoming().joinCode.size() == 6
+        && existsAfter(/databases/$(database)/documents/joinCodes/$(incoming().joinCode));
 
       // Joining with a code. The only change permitted to an outsider, and it
       // is pinned to the bone: the member list afterwards must equal the list
@@ -204,10 +236,19 @@ service cloud.firestore {
       // own code would invalidate every copy of it already written down, and a
       // study group that can quietly become a class is a student who can
       // quietly start setting assignments.
+      //
+      // Remove — not add. The member list may only shrink here, and the owner
+      // must still be on it. This used to accept any list at all, which let an
+      // owner put any uid they had ever seen into a group without its owner's
+      // say: the group then appeared in that person's list and its thread in
+      // their chats. Joining is something a person does for themselves.
       allow update: if isGroupOwner()
         && changedKeys().hasOnly(['name', 'subject', 'memberUids', 'updatedAt'])
         && textWithin(incoming().name, 60)
-        && textWithin(incoming().subject, 60);
+        && textWithin(incoming().subject, 60)
+        && (!changedKeys().hasAny(['memberUids'])
+            || (resource.data.memberUids.hasAll(request.resource.data.memberUids)
+                && request.auth.uid in request.resource.data.memberUids));
 
       allow delete: if isGroupOwner();
     }
@@ -226,10 +267,20 @@ service cloud.firestore {
       allow get: if signedIn();
       allow list: if false;
 
+      // Only for a group you own, carrying this very code. Checked against the
+      // group as it will be once the batch lands — getAfter, not get — because
+      // the app creates the two together and the group does not exist yet
+      // beforehand. Without this anyone could mint codes pointing at any group
+      // id they had come across.
       allow create: if signedIn()
+        && incoming().keys().hasOnly(['groupId', 'name', 'ownerUid', 'createdAt'])
         && incoming().ownerUid == request.auth.uid
         && incoming().groupId is string
-        && textWithin(incoming().name, 60);
+        && textWithin(incoming().name, 60)
+        && getAfter(/databases/$(database)/documents/groups/$(incoming().groupId))
+             .data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/groups/$(incoming().groupId))
+             .data.joinCode == code;
 
       // This single line is what makes a code unique.
       //
@@ -262,10 +313,19 @@ service cloud.firestore {
             || resource.data.fromUid == request.auth.uid);
 
       allow create: if signedIn()
+        // What a share carries, and nothing else — otherwise the 700 KB limit
+        // on the payload below is a limit on one field of a document that can
+        // still be filled to a megabyte through any other.
+        && incoming().keys().hasOnly([
+             'fromUid', 'fromName', 'toUid', 'title', 'payload', 'groupId',
+             'groupName', 'message', 'subjectCode', 'fileCount', 'state',
+             'createdAt',
+           ])
         // You can only send as yourself. Without this, a note could arrive
         // wearing a classmate's name — and the receiving student has no way to
         // tell, because the name is all the inbox has.
         && incoming().fromUid == request.auth.uid
+        && textWithin(incoming().fromName, 80)
         && incoming().toUid is string
         && incoming().toUid != request.auth.uid
         // It starts waiting. A share cannot be created already accepted.
@@ -286,7 +346,7 @@ service cloud.firestore {
         && changedKeys().hasOnly(['state', 'respondedAt'])
         && incoming().state in ['accepted', 'declined'];
 
-      // Either end may remove a share once it has been answered.
+      // Either end may remove a share, answered or not.
       //
       // It used to be `false`, which meant every note anyone ever sent stayed
       // in the project for good, at up to 700 KB each. On the free plan the
@@ -295,8 +355,12 @@ service cloud.firestore {
       // can already read a share delete it is what keeps ordinary use from
       // accumulating. A deliberate flood is still possible and is not solved
       // here — see SECURITY_REVIEW.md.
+      //
+      // It was later limited to answered shares. That left a sender unable to
+      // withdraw a note sent to the wrong person, and an account being deleted
+      // unable to take its unanswered shares with it — so they would wait in
+      // somebody's inbox, from an account that no longer exists, for ever.
       allow delete: if signedIn()
-        && resource.data.state != 'pending'
         && (resource.data.toUid == request.auth.uid
             || resource.data.fromUid == request.auth.uid);
     }
@@ -359,7 +423,25 @@ service cloud.firestore {
 
       // A group thread. Nothing about who is in it is stored here, so there is
       // nothing here to get out of step with the group.
-      allow create: if isGroupThread(chatId) && inGroup(groupOf(chatId));
+      //
+      // Held to the fields the app writes, and to the creator's own receipt,
+      // typing flag and name — the same limits an update has below, which a
+      // first write would otherwise slip past simply by being first.
+      allow create: if isGroupThread(chatId) && inGroup(groupOf(chatId))
+        && incoming().keys().hasOnly([
+             'kind', 'groupId', 'title',
+             'lastText', 'lastFromUid', 'lastFromName', 'lastAt',
+             'readAt', 'typingAt',
+           ])
+        && (!('kind' in incoming()) || incoming().kind == 'group')
+        && (!('groupId' in incoming())
+            || incoming().groupId == groupOf(chatId))
+        && (!('lastFromUid' in incoming())
+            || incoming().lastFromUid == request.auth.uid)
+        && (!('readAt' in incoming())
+            || incoming().readAt.keys().hasOnly([request.auth.uid]))
+        && (!('typingAt' in incoming())
+            || incoming().typingAt.keys().hasOnly([request.auth.uid]));
 
       // A direct thread, and the address must be the one these two people
       // would compute. Checked rather than trusted: without this, a thread
@@ -368,6 +450,8 @@ service cloud.firestore {
       // would find an empty conversation.
       allow create: if signedIn()
         && isDirectThread(chatId)
+        && incoming().keys().hasOnly(['kind', 'memberUids'])
+        && incoming().kind == 'direct'
         && incoming().memberUids.size() == 2
         && request.auth.uid in incoming().memberUids
         && incoming().memberUids[0] < incoming().memberUids[1]
@@ -402,7 +486,11 @@ service cloud.firestore {
         // The member list of a direct thread is fixed once set. A thread that
         // could gain a third person would make its own address a lie.
         && (!changedKeys().hasAny(['memberUids'])
-            || request.resource.data.memberUids == resource.data.memberUids);
+            || request.resource.data.memberUids == resource.data.memberUids)
+        // The list's "last message from" is whoever is writing it. Otherwise
+        // one member could make the preview say another had just spoken.
+        && (!changedKeys().hasAny(['lastFromUid'])
+            || request.resource.data.lastFromUid == request.auth.uid);
 
       // A conversation is not deleted. Removing it would take everyone else's
       // copy with it, and leaving a group is the way out of a group thread.
@@ -415,13 +503,21 @@ service cloud.firestore {
         allow read: if canUseThread(chatId);
 
         allow create: if canUseThread(chatId)
+          && incoming().keys().hasOnly([
+               'fromUid', 'fromName', 'kind', 'text', 'title', 'subjectCode',
+               'fileCount', 'blobId', 'thumb', 'durationMs', 'createdAt',
+             ])
           // You can only speak as yourself. The name beside a message is all
           // the reader has.
           && incoming().fromUid == request.auth.uid
+          && textWithin(incoming().fromName, 80)
           && textWithin(incoming().text, 2000)
           && textWithin(incoming().title, 200)
           && textWithin(incoming().subjectCode, 40)
-          && incoming().kind in ['text', 'note', 'image', 'voice', 'system']
+          // No 'system'. The app never sends one, and a member who could would
+          // be able to post "X removed you from the group" in the app's own
+          // voice. If the app ever needs notices, they need their own rule.
+          && incoming().kind in ['text', 'note', 'image', 'voice']
           // Small enough to scroll past. The weight of a posted note lives in
           // `blobs`, fetched only by whoever asks for it.
           && textWithin(incoming().thumb, 40000);
@@ -442,9 +538,11 @@ service cloud.firestore {
         allow read: if canUseThread(chatId);
 
         allow create: if canUseThread(chatId)
+          && incoming().keys().hasOnly(['payload', 'fromUid', 'createdAt'])
           && incoming().fromUid == request.auth.uid
           // The same 700 KB the app enforces, enforced again where it cannot
-          // be edited out.
+          // be edited out — and, with hasOnly above, the only place the
+          // weight can go.
           && textWithin(incoming().payload, 716800);
 
         allow update, delete: if false;

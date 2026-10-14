@@ -94,8 +94,9 @@ account deletion.
 
 **`/emailIndex/{address}`** — new. The folded address is the document name, so a
 lookup is a `get`. `list` is closed. A write is only permitted when the document
-name equals the address on the caller's own token, so nobody can point someone
-else's address at their uid and collect their shared notes.
+name equals the address on the caller's own token **and that token says the
+address is verified**, so nobody can point someone else's address at their uid
+and collect their shared notes.
 *Still possible:* one guess at a time tells a caller whether an address is
 registered. They get a uid and no name. That is the price of a lookup that is
 not a query, and it is a far smaller surface than the directory it replaced.
@@ -105,8 +106,8 @@ query it cannot prove stays inside the rule, so the app's `array-contains` on
 `memberUids` is what makes the read legal at all, not merely how the right rows
 are found. Joining is pinned to "the list before, plus exactly my uid", now with
 a not-already-a-member check and a 60-member ceiling (NN-06). Leaving is the
-mirror. Only the owner may rename or remove people, and the join code and
-`kind` cannot be changed by anyone.
+mirror. Only the owner may rename or remove people — remove, never add — and the
+join code and `kind` cannot be changed by anyone.
 
 **`/joinCodes/{code}`** — `get` only; `list` is closed, because a listable code
 table is the opposite of a join code. `update` is `false`, and that single line
@@ -118,7 +119,8 @@ read-then-write, no window.
 from the token, so a note cannot arrive wearing a classmate's name. Only the
 recipient may answer, and answering is the only permitted update, so a sender
 cannot swap the payload after it was accepted. Deletion is now allowed for
-either party once answered (NN-08).
+either party, answered or not (NN-08, widened October 2026 so a sender can
+withdraw a note and a deleted account can take its shares with it).
 
 **`/chats/{chatId}`** — the thread kind is read from the id (`grp_…`, `dm_…`)
 rather than from a field. That is not cleverness for its own sake: a batched
@@ -162,9 +164,41 @@ Listed because an audit that reports only what it fixed is an advertisement.
 4. **No encryption at rest, and no end-to-end encryption.** Stated above.
 5. **The project owner can read everything** in the Firebase console. Normal for
    this architecture, and it belongs in the privacy policy rather than in a fix.
-6. **Rules have never been executed against tests.** Every statement in this
-   document about what the rules permit comes from reading them. The emulator
-   would turn that into evidence; see `TEST_PLAN.md` §4 and §5.
+6. **Rules tests cover the main paths, not every path.** Fifteen emulator
+   tests in `firestore-tests/` (October 2026) pair each real app write with the
+   nearest forged one. Against the rules before that hardening, twelve failed.
+   Anything not in those fifteen is still known only by reading.
+7. **Joining needs the group id, not the code.** The join rule cannot see which
+   code a person typed, so anyone who has learned a group's id — a former
+   member, say — can add themselves back. Harmless while the app has no way to
+   remove a member; it must be solved (a join request the owner approves, or a
+   per-join proof document) before one is added.
+8. **Anyone can open a direct conversation with any uid they have seen.**
+   Without blocking (Play blocker B-3) there is no way to refuse one.
+
+## October 2026 hardening
+
+Found in a second audit and fixed in the app and the rules. The rules changes
+are in `firestore.rules` and take effect only when deployed.
+
+- **Device and cloud sessions were not tied together.** Signing out of the app
+  left Firebase signed in, so the next person to sign in on the phone inherited
+  the previous account's groups, inbox and chat. Sign-out now ends both;
+  a cloud session on a different address from the device account is refused
+  or dropped at startup.
+- **Unverified addresses could be claimed.** `/emailIndex` writes now require
+  `email_verified`, and password accounts are sent a confirmation link.
+  Entries claimed before this by unverified accounts remain until removed in
+  the console.
+- **Owners could add people to groups.** The owner may now only remove members.
+- **Join codes could point at any group.** A code's creator must own the group,
+  checked with `getAfter` because the two are written in one batch.
+- **Size limits could be bypassed with extra fields.** Every create now lists
+  the fields it accepts (`keys().hasOnly`).
+- **`system` messages and a forged "last message from"** are refused.
+- **Pending shares could not be withdrawn,** including by an account being
+  deleted. Either end may now delete a share; account deletion removes the
+  account's shares and groups.
 
 ## Recommended next, in order
 
@@ -175,5 +209,7 @@ Listed because an audit that reports only what it fixed is an advertisement.
 4. Build reporting and blocking for chat before any public release — a Play
    requirement, and the only defence a student currently has against harassment
    is leaving the group.
-5. Write the rules tests when Node is available. The manual procedures in
-   `TEST_PLAN.md` are the specification for them.
+5. Run `firestore-tests/` (`npm install && npm test`) before every rules
+   deploy, and add a test with every rules change. It pins firebase-tools 13
+   because that is the last line that runs on Java 17; on Java 21 it can move
+   to the current release.

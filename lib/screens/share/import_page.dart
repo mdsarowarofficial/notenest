@@ -70,7 +70,21 @@ class _ImportNotePageState extends State<ImportNotePage> {
     if (bundle == null || _busy) return;
     setState(() => _busy = true);
 
-    final note = await _repo.importBundle(bundle);
+    final Note note;
+    try {
+      note = await _repo.importBundle(bundle);
+    } catch (_) {
+      // Without this the button stayed on its spinner for good.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That note could not be saved on this phone. Check '
+              'there is free space and try again.'),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
 
     Navigator.pushReplacement(

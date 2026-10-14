@@ -242,6 +242,19 @@ class _LoginPageState extends State<LoginPage> {
         rekeyExisting: failure == AuthError.wrongPassword,
       );
       if (viaCloud == null) failure = null;
+    } else if (failure == null) {
+      // Signing out of the device now signs out of the cloud as well, so a
+      // returning student would otherwise land disconnected every time. Most
+      // use one password for both; try it quietly, and if it is not the cloud
+      // password they can still connect from the Cloud screen.
+      final cloud = CloudService.instance;
+      if (cloud.isReady && !cloud.isSignedIn) {
+        try {
+          await cloud.signIn(email: _email.text, password: _password.text);
+        } on CloudException {
+          // Not connected, which is a state the app already handles.
+        }
+      }
     }
 
     if (!mounted) return;

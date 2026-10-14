@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:notenest/data/auth_repository.dart';
 import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
 import 'package:notenest/models/cloud_profile.dart';
@@ -2008,6 +2009,32 @@ void main() {
       expect(semesterProblem('Semester 5'), isNull);
       expect(semesterProblem('   '), isNotNull);
       expect(semesterProblem('x' * 41), isNotNull);
+    });
+  });
+
+  group('password hash', () {
+    // The hash is built by hand from HMAC, so it is checked against the
+    // published PBKDF2-HMAC-SHA256 vectors rather than against itself. A
+    // construction that was subtly wrong would still round-trip — every
+    // password would verify — and be useless against the attack it exists for.
+    String b64(String hex) => base64Url.encode([
+          for (var i = 0; i < hex.length; i += 2)
+            int.parse(hex.substring(i, i + 2), radix: 16),
+        ]);
+
+    test('matches the published vectors', () {
+      expect(
+        AuthRepository.pbkdf2ForTest('password', 'salt', 1),
+        b64('120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b'),
+      );
+      expect(
+        AuthRepository.pbkdf2ForTest('password', 'salt', 2),
+        b64('ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43'),
+      );
+      expect(
+        AuthRepository.pbkdf2ForTest('password', 'salt', 4096),
+        b64('c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a'),
+      );
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -129,13 +130,32 @@ class AuthRepository extends ChangeNotifier {
     return base64Url.encode(out);
   }
 
+  /// Exposed so the test suite can check the construction against published
+  /// PBKDF2-HMAC-SHA256 vectors. Not for use by the app.
+  @visibleForTesting
+  static String pbkdf2ForTest(String password, String salt, int rounds) =>
+      _pbkdf2(password, salt, rounds);
+
+  /// [_pbkdf2] on a background isolate.
+  ///
+  /// A hundred and twenty thousand HMAC rounds is the point of the hash, and it
+  /// is also long enough on a budget phone to freeze the sign-in screen
+  /// mid-animation — or, on a slow enough one, to trip Android's "app not
+  /// responding" dialog. On the web `compute` runs on the same thread, which is
+  /// no worse than before.
+  static Future<String> _pbkdf2Off(String password, String salt, int rounds) =>
+      compute(_pbkdf2Job, <Object>[password, salt, rounds]);
+
+  static String _pbkdf2Job(List<Object> args) =>
+      _pbkdf2(args[0] as String, args[1] as String, args[2] as int);
+
   /// The stored form, which names its own algorithm and cost.
   ///
   /// Writing the round count into the value is what makes it possible to raise
   /// it later without locking anybody out: an old row still says how it was
   /// made, so it can still be checked.
-  static String _hash(String password, String salt) =>
-      'pbkdf2\$$_pbkdf2Rounds\$${_pbkdf2(password, salt, _pbkdf2Rounds)}';
+  static Future<String> _hash(String password, String salt) async =>
+      'pbkdf2\$$_pbkdf2Rounds\$${await _pbkdf2Off(password, salt, _pbkdf2Rounds)}';
 
   /// The single round of SHA-256 this app shipped with, kept only so that
   /// accounts created before the change can still sign in — once.
@@ -172,7 +192,8 @@ class AuthRepository extends ChangeNotifier {
   ///
   /// Returns `legacy: true` through [wasLegacy] so the caller can quietly
   /// rewrite the row in the new form. Nobody is asked to reset anything.
-  static bool _verify(String password, String salt, String stored) {
+  static Future<bool> _verify(
+      String password, String salt, String stored) async {
     // First, and before any hashing: a Google row has no password, so nothing
     // typed can be the right one. Falling through to the legacy branch would
     // also return false today — the marker is not 64 hex characters — but that
@@ -187,7 +208,8 @@ class AuthRepository extends ChangeNotifier {
     if (parts.length != 3) return false;
     final rounds = int.tryParse(parts[1]);
     if (rounds == null || rounds < 1) return false;
-    return _constantTimeEquals(_pbkdf2(password, salt, rounds), parts[2]);
+    return _constantTimeEquals(
+        await _pbkdf2Off(password, salt, rounds), parts[2]);
   }
 
   static bool _isLegacy(String stored) => !stored.startsWith('pbkdf2\$');
@@ -274,7 +296,7 @@ class AuthRepository extends ChangeNotifier {
       'name': cleanName,
       'email': cleanEmail,
       'institution': institution?.trim(),
-      'password_hash': _hash(password, salt),
+      'password_hash': await _hash(password, salt),
       'password_salt': salt,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
@@ -324,7 +346,7 @@ class AuthRepository extends ChangeNotifier {
       'name': name.trim().isEmpty ? cleanEmail.split('@').first : name.trim(),
       'email': cleanEmail,
       'institution': institution?.trim(),
-      'password_hash': _hash(password, salt),
+      'password_hash': await _hash(password, salt),
       'password_salt': salt,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
@@ -443,7 +465,7 @@ class AuthRepository extends ChangeNotifier {
     // Google account is a round trip that cannot succeed.
     if (_isGoogleOnly(stored)) return AuthError.googleAccount;
 
-    if (!_verify(password, salt, stored)) {
+    if (!await _verify(password, salt, stored)) {
       return AuthError.wrongPassword;
     }
 
@@ -454,7 +476,7 @@ class AuthRepository extends ChangeNotifier {
       await _db.db.update(
         'users',
         {
-          'password_hash': _hash(password, freshSalt),
+          'password_hash': await _hash(password, freshSalt),
           'password_salt': freshSalt,
         },
         where: 'id = ?',
@@ -494,7 +516,7 @@ class AuthRepository extends ChangeNotifier {
     final id = rows.first['id'] as int;
     await _db.db.update(
       'users',
-      {'password_hash': _hash(password, salt), 'password_salt': salt},
+      {'password_hash': await _hash(password, salt), 'password_salt': salt},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -518,9 +540,20 @@ class AuthRepository extends ChangeNotifier {
   /// long as every sign out went through that one screen: the invariant lived
   /// in a caller rather than in the thing being signed out of. A hook puts it
   /// back where it belongs — a new sign-out path cannot forget.
-  final List<void Function()> _signOutHooks = [];
+  ///
+  /// Hooks may be async and are awaited in order. The cloud registers one that
+  /// signs out of Firebase, and it has to have finished before the login screen
+  /// appears — otherwise the next person to sign in on this phone would inherit
+  /// the previous account's groups, conversations and inbox.
+  final List<FutureOr<void> Function()> _signOutHooks = [];
 
-  void addSignOutHook(void Function() hook) => _signOutHooks.add(hook);
+  void addSignOutHook(FutureOr<void> Function() hook) => _signOutHooks.add(hook);
+
+  Future<void> _runSignOutHooks() async {
+    for (final hook in _signOutHooks) {
+      await hook();
+    }
+  }
 
   /// Removes this account and everything it owns from the device.
   ///
@@ -553,7 +586,7 @@ class AuthRepository extends ChangeNotifier {
     if (_isGoogleOnly(row['password_hash'] as String)) {
       return AuthError.googleAccount;
     }
-    if (!_verify(password, row['password_salt'] as String,
+    if (!await _verify(password, row['password_salt'] as String,
         row['password_hash'] as String)) {
       return AuthError.wrongPassword;
     }
@@ -595,9 +628,7 @@ class AuthRepository extends ChangeNotifier {
     await _clearSession();
     _current = null;
     _currentIsGoogle = false;
-    for (final hook in _signOutHooks) {
-      hook();
-    }
+    await _runSignOutHooks();
     notifyListeners();
     return null;
   }
@@ -624,9 +655,7 @@ class AuthRepository extends ChangeNotifier {
     await _clearSession();
     _current = null;
     _currentIsGoogle = false;
-    for (final hook in _signOutHooks) {
-      hook();
-    }
+    await _runSignOutHooks();
     notifyListeners();
   }
 
@@ -667,7 +696,7 @@ class AuthRepository extends ChangeNotifier {
     }
     // Through _verify, so somebody whose row is still in the old single-round
     // form can change their password rather than being told it is wrong.
-    if (!_verify(currentPassword, row['password_salt'] as String,
+    if (!await _verify(currentPassword, row['password_salt'] as String,
         row['password_hash'] as String)) {
       return AuthError.wrongPassword;
     }
@@ -675,7 +704,7 @@ class AuthRepository extends ChangeNotifier {
     final salt = _newSalt();
     await _db.db.update(
       'users',
-      {'password_hash': _hash(newPassword, salt), 'password_salt': salt},
+      {'password_hash': await _hash(newPassword, salt), 'password_salt': salt},
       where: 'id = ?',
       whereArgs: [user.id],
     );

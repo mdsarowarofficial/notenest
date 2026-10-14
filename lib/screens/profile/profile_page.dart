@@ -533,7 +533,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
             const SizedBox(height: 6),
             Text(
               'Every note, subject, exam and attachment on this phone, and '
-              '${widget.signedInToCloud ? 'your cloud profile, so classmates can no longer find you.' : 'this device account.'}',
+              '${widget.signedInToCloud ? 'your cloud profile, so classmates can no longer find you. Groups you created are deleted for everyone in them, you leave the rest, and notes waiting in either inbox are withdrawn.' : 'this device account.'}',
               style: t.bodySmall,
             ),
             const SizedBox(height: 14),
