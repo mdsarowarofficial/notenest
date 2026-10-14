@@ -163,6 +163,55 @@ class AuthRepository extends ChangeNotifier {
     return null;
   }
 
+  /// Builds the device account for somebody who already has a cloud account.
+  ///
+  /// Used when a student signs in on a new device, or after a browser has
+  /// cleared its storage: the cloud knows who they are, but this device has
+  /// never seen them. Rather than telling them their account does not exist —
+  /// which is how this used to fail, and is simply untrue — the device account
+  /// is rebuilt from what the cloud returned.
+  ///
+  /// The strength rule is deliberately not applied. It guards the *choice* of
+  /// a new password; this password already belongs to a real account, and
+  /// refusing it here would lock somebody out of their own notes over a rule
+  /// their password predates.
+  Future<AuthError?> adoptCloudAccount({
+    required String name,
+    required String email,
+    required String password,
+    String? institution,
+  }) async {
+    final cleanEmail = email.trim();
+    if (!isValidEmail(cleanEmail)) return AuthError.invalidEmail;
+
+    final existing = await _db.db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail.toLowerCase()],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) return AuthError.emailTaken;
+
+    final salt = _newSalt();
+    final id = await _db.db.insert('users', {
+      // A cloud profile with no name still has an address, and a blank name
+      // would make every screen say "?" until they fixed it by hand.
+      'name': name.trim().isEmpty ? cleanEmail.split('@').first : name.trim(),
+      'email': cleanEmail,
+      'institution': institution?.trim(),
+      'password_hash': _hash(password, salt),
+      'password_salt': salt,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    });
+
+    final rows =
+        await _db.db.query('users', where: 'id = ?', whereArgs: [id], limit: 1);
+    _current = UserAccount.fromMap(rows.first);
+    await _saveSession(id);
+    notifyListeners();
+    return null;
+  }
+
   Future<AuthError?> signIn({
     required String email,
     required String password,
@@ -186,6 +235,44 @@ class AuthRepository extends ChangeNotifier {
 
     _current = UserAccount.fromMap(row);
     await _saveSession(_current!.id!);
+    notifyListeners();
+    return null;
+  }
+
+  /// Sets the device password for an existing account to [password].
+  ///
+  /// **Only to be called after the cloud has already accepted that password.**
+  /// There is no current-password check here — that is the point: a student who
+  /// has just reset their password by email does not know the old one, and
+  /// cannot be asked for it. What makes this safe is not a check in this
+  /// method but where it is called from: Firebase has already verified the
+  /// person against the one copy of the truth that lives off this device.
+  Future<AuthError?> rekeyPassword({
+    required String email,
+    required String password,
+  }) async {
+    final cleanEmail = email.trim();
+    final rows = await _db.db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail.toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty) return AuthError.emailNotFound;
+
+    final salt = _newSalt();
+    final id = rows.first['id'] as int;
+    await _db.db.update(
+      'users',
+      {'password_hash': _hash(password, salt), 'password_salt': salt},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    final fresh =
+        await _db.db.query('users', where: 'id = ?', whereArgs: [id], limit: 1);
+    _current = UserAccount.fromMap(fresh.first);
+    await _saveSession(id);
     notifyListeners();
     return null;
   }

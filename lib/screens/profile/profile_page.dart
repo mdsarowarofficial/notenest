@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../data/auth_repository.dart';
 import '../../data/note_repository.dart';
+import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/semester_picker.dart';
 import '../../widgets/nest_marks.dart';
 import '../auth/login_page.dart';
 import '../subjects/subject_form.dart';
@@ -56,33 +58,72 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  /// The same picker the first-run setup uses, so a semester is written the
+  /// same way whether it was chosen on day one or changed in March.
   Future<void> _editSemester() async {
-    final controller = TextEditingController(text: _repo.semesterLabel ?? '');
-    final value = await showDialog<String>(
+    var system = _repo.semesterSystem;
+    var label = _repo.semesterLabel ?? '';
+
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: NestColor.card,
-        title: const Text('Semester'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(hintText: 'e.g. Semester 5'),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheet) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+          ),
+          decoration: const BoxDecoration(
+            color: NestColor.paper,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 26),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: NestColor.rule,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Semester',
+                  style: Theme.of(sheetContext).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                SemesterPicker(
+                  system: system,
+                  label: label,
+                  onChanged: (s, l) => setSheet(() {
+                    system = s;
+                    label = l;
+                  }),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                    child: const Text('Save'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
-    if (value != null && value.trim().isNotEmpty) {
-      await _repo.saveSemester(value);
+
+    if (saved == true && semesterProblem(label) == null) {
+      await _repo.saveSemester(label, system: system);
     }
   }
 

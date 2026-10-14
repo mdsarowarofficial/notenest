@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/auth_repository.dart';
+import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
+import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_paper.dart';
 import '../../widgets/pen_wordmark.dart';
@@ -25,6 +27,20 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _error;
   bool _busy = false;
   bool _obscure = true;
+
+  CloudRole _role = CloudRole.student;
+
+  /// Whether to make the cloud account in the same step.
+  ///
+  /// On by default when Firebase started. The two accounts used to be made
+  /// separately, which meant everybody did the same work twice with the same
+  /// details — and anybody who skipped the second one was later told, wrongly,
+  /// that they had no account at all.
+  bool _alsoCloud = true;
+
+  /// Set when the device account was made but the cloud one was not, so the
+  /// student is told plainly instead of finding out later.
+  String? _cloudNote;
 
   @override
   void initState() {
@@ -66,7 +82,42 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     await NoteRepository.instance.load();
+    await NoteRepository.instance.saveRole(_role.key);
+
+    // The cloud account, with the same details and the same password. It runs
+    // after the device account on purpose: the device account is the one that
+    // owns the notes, and it must not depend on a network that may not be
+    // there.
+    if (_alsoCloud && CloudService.instance.isReady) {
+      try {
+        await CloudService.instance.createAccount(
+          name: _name.text,
+          email: _email.text,
+          password: _password.text,
+          role: _role,
+          institution: _institution.text,
+        );
+      } on CloudException catch (e) {
+        // Not fatal, and not hidden. The notebook works either way; what fails
+        // here is sharing, chat and assignments, and the student should know
+        // which of the two happened.
+        _cloudNote = e.message;
+      }
+    }
+
     if (!mounted) return;
+
+    if (_cloudNote != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Your notebook is ready, but the cloud account was not made: '
+            '$_cloudNote You can connect one later from the drawer.',
+          ),
+          duration: const Duration(seconds: 7),
+        ),
+      );
+    }
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const SetupFlow()),
@@ -102,8 +153,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     RiseIn(
                       delay: const Duration(milliseconds: 200),
                       child: Text(
-                        'Your notes stay on this device until you connect a '
-                        'cloud account later.',
+                        'Your notes live on this device. The cloud account is '
+                        'made alongside it, with the same password.',
                         style: t.bodySmall,
                       ),
                     ),
@@ -155,6 +206,50 @@ class _RegisterPageState extends State<RegisterPage> {
                             met: RegExp(r'[^A-Za-z0-9]').hasMatch(pw),
                             text: 'One special character',
                           ),
+                          const SizedBox(height: 20),
+                          const Text('YOU ARE A', style: nestEyebrow),
+                          const SizedBox(height: 8),
+                          SegmentedButton<CloudRole>(
+                            segments: const [
+                              ButtonSegment(
+                                value: CloudRole.student,
+                                icon: Icon(Icons.school_outlined, size: 17),
+                                label: Text('Student'),
+                              ),
+                              ButtonSegment(
+                                value: CloudRole.teacher,
+                                icon: Icon(Icons.cast_for_education_outlined,
+                                    size: 17),
+                                label: Text('Teacher'),
+                              ),
+                            ],
+                            selected: {_role},
+                            onSelectionChanged: (v) =>
+                                setState(() => _role = v.first),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _role.blurb,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          if (CloudService.instance.isReady) ...[
+                            const SizedBox(height: 16),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              value: _alsoCloud,
+                              onChanged: (v) =>
+                                  setState(() => _alsoCloud = v),
+                              title: const Text('Set up the cloud too'),
+                              subtitle: Text(
+                                _alsoCloud
+                                    ? 'One account, one password. Needed for '
+                                        'sharing, chat and assignments.'
+                                    : 'The notebook will work on this device '
+                                        'only. You can connect later.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
                           if (_error != null) ...[
                             const SizedBox(height: 16),
                             AuthErrorLine(message: _error!),

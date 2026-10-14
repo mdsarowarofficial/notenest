@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/auth_repository.dart';
+import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
+import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_paper.dart';
 import '../../widgets/pen_wordmark.dart';
@@ -25,6 +27,13 @@ class _LoginPageState extends State<LoginPage> {
   final _password = TextEditingController();
 
   String? _error;
+
+  /// Set when this device's account was rebuilt from the cloud, so the student
+  /// is told rather than left wondering why their notes are not here.
+  bool _restoredFromCloud = false;
+
+  /// Set when the stored password was brought into line after a reset.
+  bool _passwordCaughtUp = false;
   bool _busy = false;
   bool _obscure = true;
 
@@ -35,22 +44,167 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  /// Signs in against the cloud and brings this device into line with it.
+  ///
+  /// With [rekeyExisting] the account is already on this device and only its
+  /// stored password is out of date — the case after a reset by email.
+  /// Without it, the device has never seen the account and one is built from
+  /// the cloud profile.
+  ///
+  /// Returns null when it worked. Any failure returns an error rather than a
+  /// reason, because the caller already has a better one: what this device
+  /// said first.
+  Future<AuthError?> _signInFromCloud({bool rekeyExisting = false}) async {
+    final cloud = CloudService.instance;
+    if (!cloud.isReady) return AuthError.emailNotFound;
+
+    try {
+      await cloud.signIn(email: _email.text, password: _password.text);
+    } on CloudException {
+      return AuthError.emailNotFound;
+    }
+
+    final profile = cloud.profile;
+    if (profile == null) return AuthError.emailNotFound;
+
+    if (rekeyExisting) {
+      final failed = await AuthRepository.instance.rekeyPassword(
+        email: _email.text,
+        password: _password.text,
+      );
+      if (failed != null) return failed;
+      _passwordCaughtUp = true;
+    } else {
+      final failed = await AuthRepository.instance.adoptCloudAccount(
+        name: profile.name,
+        email: _email.text,
+        password: _password.text,
+        institution: profile.institution,
+      );
+      if (failed != null) return failed;
+      _restoredFromCloud = true;
+    }
+
+    await NoteRepository.instance.saveRole(profile.role.key);
+    return null;
+  }
+
+  /// "Forgot password" — the only route there is, and it goes through the
+  /// cloud because the device password exists nowhere else.
+  Future<void> _forgotPassword() async {
+    final controller = TextEditingController(text: _email.text);
+    final cloudReady = CloudService.instance.isReady;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: NestColor.card,
+        title: const Text('Forgot your password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              cloudReady
+                  ? 'We will email you a link to set a new one. Sign in here '
+                      'with the new password afterwards and this device will '
+                      'catch up on its own.'
+                  : 'The cloud is not available right now, so no email can be '
+                      'sent. Check your connection and try again.',
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Your email'),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              // Said out loud rather than discovered later. A password that
+              // only ever existed on one device cannot be mailed back.
+              'If you never connected a cloud account, there is nothing to '
+              'send: that password was only ever stored on this device.',
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: !cloudReady
+                ? null
+                : () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(dialogContext);
+                    try {
+                      await CloudService.instance
+                          .sendPasswordReset(controller.text);
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'If that address has a cloud account, a reset '
+                            'link is on its way. Check spam as well.',
+                          ),
+                          duration: Duration(seconds: 6),
+                        ),
+                      );
+                    } on CloudException catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(e.message)),
+                      );
+                    }
+                  },
+            child: const Text('Send the link'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     setState(() {
       _error = null;
       _busy = true;
     });
 
-    final failure = await AuthRepository.instance.signIn(
+    var failure = await AuthRepository.instance.signIn(
       email: _email.text,
       password: _password.text,
     );
 
+    // This device does not accept it — but the cloud might.
+    //
+    // Two different situations, both of which used to end in a message that
+    // was simply untrue:
+    //
+    //   emailNotFound  a new browser, a cleared cache, a second machine. The
+    //                  student has an account; this device has never seen it.
+    //   wrongPassword  they reset their password by email. The new one is
+    //                  right and the copy stored here is the stale one.
+    //
+    // In both cases the cloud is asked, and only if the cloud accepts the
+    // password does anything change here. If it refuses, the original local
+    // answer stands — so a genuinely wrong password still says so.
+    if (failure == AuthError.emailNotFound ||
+        failure == AuthError.wrongPassword) {
+      final viaCloud = await _signInFromCloud(
+        rekeyExisting: failure == AuthError.wrongPassword,
+      );
+      if (viaCloud == null) failure = null;
+    }
+
     if (!mounted) return;
 
-    if (failure != null) {
+    final problem = failure;
+    if (problem != null) {
       setState(() {
-        _error = failure.message;
+        _error = problem.message;
         _busy = false;
       });
       return;
@@ -58,6 +212,24 @@ class _LoginPageState extends State<LoginPage> {
 
     await NoteRepository.instance.load();
     if (!mounted) return;
+
+    if (_passwordCaughtUp) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password updated on this device too.'),
+        ),
+      );
+    } else if (_restoredFromCloud) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Signed in from your cloud account. Notes written on another '
+            'device are not here — only the account came across.',
+          ),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    }
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
@@ -123,11 +295,19 @@ class _LoginPageState extends State<LoginPage> {
                             onToggleObscure: () =>
                                 setState(() => _obscure = !_obscure),
                           ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _busy ? null : _forgotPassword,
+                              child: const Text('Forgot your password?'),
+                            ),
+                          ),
                           if (_error != null) ...[
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 10),
                             AuthErrorLine(message: _error!),
                           ],
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 18),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(

@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import '../models/attachment.dart';
 import '../models/exam.dart';
 import '../models/note.dart';
+import '../models/semester.dart';
 import '../models/note_bundle.dart';
 import '../models/note_query.dart';
 import '../models/subject.dart';
@@ -30,6 +31,8 @@ class NoteRepository extends ChangeNotifier {
   static final NoteRepository instance = NoteRepository._();
 
   static const _kSemester = 'semester_label';
+  static const _kSemesterSystem = 'semester_system';
+  static const _kRole = 'account_role';
   static const _kReminder = 'revision_reminder';
   static const _kSetupDone = 'setup_done';
   static const _kRecentSearches = 'recent_searches';
@@ -42,6 +45,18 @@ class NoteRepository extends ChangeNotifier {
   // ------------------------------------------------------------------ state
 
   String? semesterLabel;
+
+  /// How this student's university counts semesters, so the picker reopens
+  /// where they left it rather than at the top of the list.
+  SemesterSystem semesterSystem = SemesterSystem.bi;
+
+  /// Student or teacher, kept on the device as well as in the cloud profile.
+  ///
+  /// The cloud is optional, so the answer has to live somewhere that works
+  /// without it — otherwise a teacher who has not connected an account would
+  /// be offered a student's screens.
+  String roleKey = 'student';
+
   String? reminderChoice;
   bool setupDone = false;
 
@@ -98,6 +113,8 @@ class NoteRepository extends ChangeNotifier {
       for (final r in rows) r['key'] as String: r['value'] as String?,
     };
     semesterLabel = map[_kSemester];
+    semesterSystem = SemesterSystemData.fromKey(map[_kSemesterSystem]);
+    roleKey = map[_kRole] == 'teacher' ? 'teacher' : 'student';
     reminderChoice = map[_kReminder];
     setupDone = map[_kSetupDone] == '1';
     coverDraft = map[_kCoverDraft];
@@ -117,6 +134,8 @@ class NoteRepository extends ChangeNotifier {
     _exams = const [];
     _recentSearches = const [];
     semesterLabel = null;
+    semesterSystem = SemesterSystem.bi;
+    roleKey = 'student';
     reminderChoice = null;
     setupDone = false;
     coverDraft = null;
@@ -155,11 +174,24 @@ class NoteRepository extends ChangeNotifier {
 
   // --------------------------------------------------------------- semester
 
-  Future<void> saveSemester(String semester) async {
+  Future<void> saveSemester(String semester, {SemesterSystem? system}) async {
     semesterLabel = semester.trim();
     await _setSetting(_kSemester, semesterLabel);
+    if (system != null) {
+      semesterSystem = system;
+      await _setSetting(_kSemesterSystem, system.key);
+    }
     notifyListeners();
   }
+
+  /// Records whether this account is a student's or a teacher's.
+  Future<void> saveRole(String key) async {
+    roleKey = key == 'teacher' ? 'teacher' : 'student';
+    await _setSetting(_kRole, roleKey);
+    notifyListeners();
+  }
+
+  bool get isTeacher => roleKey == 'teacher';
 
   Future<void> saveReminder(String choice) async {
     reminderChoice = choice;
@@ -887,11 +919,15 @@ class NoteRepository extends ChangeNotifier {
       .where((n) => n.status != StudyStatus.mastered)
       .length;
 
-  bool get isSynced => false;
 
   // ------------------------------------------------------------ drawer menu
 
   List<NestDrawerLink> drawerLinks() => const [
+        NestDrawerLink(
+          id: 'cloud',
+          label: 'Cloud account',
+          icon: Icons.cloud_queue_rounded,
+        ),
         NestDrawerLink(
           id: 'cover',
           label: 'Cover page',
@@ -908,9 +944,14 @@ class NoteRepository extends ChangeNotifier {
           icon: Icons.move_to_inbox_rounded,
         ),
         NestDrawerLink(
+          id: 'chats',
+          label: 'Chats',
+          icon: Icons.forum_outlined,
+        ),
+        NestDrawerLink(
           id: 'groups',
-          label: 'Study groups',
-          icon: Icons.groups_rounded,
+          label: 'Groups',
+          icon: Icons.groups_2_outlined,
         ),
         NestDrawerLink(
           id: 'requests',

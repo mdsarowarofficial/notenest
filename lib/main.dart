@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
 import 'data/auth_repository.dart';
+import 'data/cloud_service.dart';
 import 'data/note_repository.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/setup/setup_flow.dart';
@@ -15,6 +16,12 @@ Future<void> main() async {
   await AppDatabase.instance.open();
   await AuthRepository.instance.restoreSession();
   await NoteRepository.instance.load();
+
+  // Started here so the drawer knows from the first frame whether the cloud is
+  // available. It never throws and it is never required: if Firebase cannot
+  // start, this returns having recorded why and the app carries on exactly as
+  // it did before there was a cloud at all.
+  await CloudService.instance.start();
 
   runApp(const NoteNestApp());
 }

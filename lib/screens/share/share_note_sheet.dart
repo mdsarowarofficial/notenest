@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
 import '../../data/share_service.dart';
 import '../../models/note.dart';
 import '../../models/note_bundle.dart';
 import '../../theme/nest_theme.dart';
+import 'cloud_send_sheet.dart';
 
 /// Hands one note over to a classmate. Requirement 9.1.
 ///
@@ -216,10 +218,39 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                         ? 'Preparing…'
                         : _preview == null
                             ? 'Measuring…'
-                            : 'Send  ·  ${readableBytes(total)}',
+                            : 'Send as a file  ·  ${readableBytes(total)}',
                   ),
                 ),
               ),
+              // The second route, offered only when there is an account to
+              // send from. Both hand over the same bundle; what differs is
+              // where it lands. A file goes out through WhatsApp or Telegram
+              // and arrives in Downloads, to be found and imported. This one
+              // arrives already labelled with who sent it, in the inbox the
+              // app already has.
+              if (CloudService.instance.isSignedIn) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _working
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            showCloudSendSheet(context, widget.note);
+                          },
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    label: const Text('Send inside NoteNest'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Straight to a classmate or a whole group, with an Accept '
+                  'step at their end. Large files may not fit this way — it '
+                  'will say so before sending.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ],
           ),
         ),

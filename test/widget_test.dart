@@ -6,13 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
+import 'package:notenest/models/cloud_profile.dart';
 import 'package:notenest/models/cover_spec.dart';
 import 'package:notenest/models/doc_text.dart';
 import 'package:notenest/models/exam.dart';
 import 'package:notenest/models/university.dart';
 import 'package:notenest/models/note.dart';
 import 'package:notenest/models/note_bundle.dart';
+import 'package:notenest/models/chat.dart';
 import 'package:notenest/models/note_query.dart';
+import 'package:notenest/models/note_share.dart';
+import 'package:notenest/models/semester.dart';
+import 'package:notenest/models/study_group.dart';
 import 'package:notenest/models/transcript.dart';
 import 'package:notenest/theme/nest_theme.dart';
 import 'package:notenest/widgets/nest_stepper.dart';
@@ -1017,6 +1022,113 @@ void main() {
     });
   });
 
+  group('cloud profile', () {
+    test('an address is folded only on case and space', () {
+      expect(normaliseEmail('  Sarowar@Example.COM '), 'sarowar@example.com');
+      // Deliberately not the provider-specific cleverness: dots and plus tags
+      // belong to particular mail services, and applying those rules
+      // everywhere would merge two people who really are different.
+      expect(normaliseEmail('a.b+tag@example.com'), 'a.b+tag@example.com');
+    });
+
+    test('an obviously wrong address is caught before Firebase sees it', () {
+      expect(looksLikeEmail('sarowar@example.com'), isTrue);
+      expect(looksLikeEmail('a@b.co.uk'), isTrue);
+      expect(looksLikeEmail(''), isFalse);
+      expect(looksLikeEmail('sarowar'), isFalse);
+      expect(looksLikeEmail('sarowar@'), isFalse);
+      expect(looksLikeEmail('@example.com'), isFalse);
+      expect(looksLikeEmail('sarowar@example'), isFalse);
+      expect(looksLikeEmail('two@at@example.com'), isFalse);
+      expect(looksLikeEmail('has space@example.com'), isFalse);
+    });
+
+    test('the password rule matches what Firebase will accept', () {
+      expect(passwordProblem(''), 'Type a password.');
+      expect(passwordProblem('abc'), isNotNull);
+      expect(passwordProblem('a' * minPasswordLength), isNull);
+    });
+
+    test('a profile survives the trip to Firestore and back', () {
+      final profile = CloudProfile(
+        uid: 'abc123',
+        name: 'Md. Sarowar Hossain',
+        email: 'Sarowar@Example.com',
+        role: CloudRole.teacher,
+        institution: 'City University',
+        createdAt: DateTime(2026, 10, 1),
+        updatedAt: DateTime(2026, 10, 2),
+      );
+      final back = CloudProfile.fromMap('abc123', profile.toMap());
+
+      expect(back.uid, 'abc123');
+      expect(back.name, 'Md. Sarowar Hossain');
+      // Stored folded, because Firestore cannot search case-insensitively.
+      expect(back.email, 'sarowar@example.com');
+      expect(back.role, CloudRole.teacher);
+      expect(back.isTeacher, isTrue);
+      expect(back.institution, 'City University');
+    });
+
+    test('a half-written profile does not take the screen down', () {
+      final back = CloudProfile.fromMap('u1', const {});
+      expect(back.uid, 'u1');
+      expect(back.name, '');
+      expect(back.role, CloudRole.student);
+      expect(back.createdAt, isNull);
+
+      // Wrong types where strings were expected, which is what a newer client
+      // writing a changed shape would look like.
+      final odd = CloudProfile.fromMap('u2', const {'name': 42, 'role': 7});
+      expect(odd.name, '');
+      expect(odd.role, CloudRole.student);
+    });
+
+    test('initials fall back to the address when there is no name', () {
+      expect(
+        const CloudProfile(uid: 'u', name: 'Md. Sarowar Hossain', email: 'a@b.com')
+            .initials,
+        'MH',
+      );
+      expect(
+        const CloudProfile(uid: 'u', name: '', email: 'sarowar.hossain@x.com')
+            .initials,
+        // Only the part before the @ — otherwise the second initial is the C
+        // of "com".
+        'SH',
+      );
+      expect(const CloudProfile(uid: 'u', name: '', email: '').initials, '?');
+    });
+
+    test('an unknown role reads as student rather than failing', () {
+      expect(CloudRoleData.fromKey('teacher'), CloudRole.teacher);
+      expect(CloudRoleData.fromKey('student'), CloudRole.student);
+      expect(CloudRoleData.fromKey('principal'), CloudRole.student);
+      expect(CloudRoleData.fromKey(null), CloudRole.student);
+    });
+
+    test('every Firebase error gets a message that says what to do', () {
+      expect(describeAuthError('email-already-in-use'), contains('Sign in'));
+      expect(describeAuthError('user-not-found'), contains('Create'));
+      expect(describeAuthError('weak-password'), contains('6'));
+      expect(
+        describeAuthError('operation-not-allowed'),
+        contains('Sign-in method'),
+      );
+      expect(describeAuthError('network-request-failed'), contains('internet'));
+      // An unrecognised code still produces a sentence, never a bare code.
+      expect(describeAuthError('something-new'), isNotEmpty);
+      expect(describeAuthError(null), isNotEmpty);
+    });
+
+    test('a Firestore refusal names the likely cause', () {
+      expect(describeStoreError('permission-denied'), contains('rules'));
+      expect(describeStoreError('unavailable'), contains('offline'));
+      expect(describeStoreError('failed-precondition'), contains('index'));
+      expect(describeStoreError('who-knows'), isNotEmpty);
+    });
+  });
+
   group('university search', () {
     const all = [
       University(name: 'City University', countryCode: 'BD', domain: 'cityuniversity.edu.bd'),
@@ -1347,6 +1459,555 @@ void main() {
       expect(pages.length, greaterThan(1));
       final total = pages.fold<int>(0, (n, p) => n + p.length);
       expect(total, greaterThan(1));
+    });
+  });
+
+  // ------------------------------------------------------------- groups
+
+  group('join codes', () {
+    test('the alphabet leaves out the characters people misread', () {
+      // The whole point of the alphabet. A code is read off one screen and
+      // typed into another, often across a room.
+      for (final ch in ['O', '0', 'I', '1']) {
+        expect(joinCodeAlphabet.contains(ch), isFalse, reason: ch);
+      }
+      expect(joinCodeAlphabet.length, 32);
+    });
+
+    test('spaces, dashes and case do not change a code', () {
+      expect(normaliseJoinCode('k3m9fp'), 'K3M9FP');
+      expect(normaliseJoinCode('K3M 9FP'), 'K3M9FP');
+      expect(normaliseJoinCode(' k3m-9fp '), 'K3M9FP');
+      expect(normaliseJoinCode('K3M.9FP'), 'K3M9FP');
+    });
+
+    test('characters outside the alphabet are dropped, not kept', () {
+      // A typed O is not a zero substitute — it is noise, and leaving it in
+      // would make a six-character code look seven characters long.
+      expect(normaliseJoinCode('K3MO9FP'), 'K3M9FP');
+    });
+
+    test('a code is six characters, and says so when it is not', () {
+      expect(joinCodeProblem('K3M9FP'), isNull);
+      expect(joinCodeProblem('k3m 9fp'), isNull);
+      expect(joinCodeProblem(''), isNotNull);
+      expect(joinCodeProblem('K3M'), isNotNull);
+      expect(joinCodeProblem('K3M9FPQ'), isNotNull);
+    });
+
+    test('a code is shown in two threes', () {
+      expect(prettyJoinCode('K3M9FP'), 'K3M 9FP');
+      // Anything that is not a full code is left alone rather than mangled.
+      expect(prettyJoinCode('K3M'), 'K3M');
+    });
+
+    test('a built code is six characters from the alphabet', () {
+      var n = 0;
+      final code = buildJoinCode((max) => (n++) % max);
+      expect(code.length, joinCodeLength);
+      for (final ch in code.split('')) {
+        expect(joinCodeAlphabet.contains(ch), isTrue);
+      }
+      // Pinned exactly: the randomness is passed in so this cannot drift.
+      expect(code, 'ABCDEF');
+    });
+
+    test('a stuck source of randomness is visible, not hidden', () {
+      expect(buildJoinCode((_) => 0), 'AAAAAA');
+    });
+  });
+
+  group('study group', () {
+    StudyGroup make({List<String> members = const ['owner']}) => StudyGroup(
+          id: 'g1',
+          name: 'Thesis group',
+          joinCode: 'K3M9FP',
+          ownerUid: 'owner',
+          memberUids: members,
+        );
+
+    test('a new member goes on the end, where concat would put them', () {
+      // Not cosmetic. The security rule compares the member list after the
+      // write against the list before it plus the joiner, and rules `concat`
+      // appends. Sorting here would make a legitimate join fail on the server.
+      final group = make(members: ['zed', 'amy']);
+      expect(group.withMember('bob'), ['zed', 'amy', 'bob']);
+    });
+
+    test('joining twice does not duplicate anybody', () {
+      final group = make(members: ['owner', 'bob']);
+      expect(group.withMember('bob'), ['owner', 'bob']);
+    });
+
+    test('leaving removes only that person', () {
+      final group = make(members: ['owner', 'bob', 'amy']);
+      expect(group.withoutMember('bob'), ['owner', 'amy']);
+    });
+
+    test('the owner cannot leave, but a member can', () {
+      final group = make(members: ['owner', 'bob']);
+      expect(group.canLeave('bob'), isTrue);
+      expect(group.canLeave('owner'), isFalse);
+      // Somebody who is not in it cannot leave it either.
+      expect(group.canLeave('stranger'), isFalse);
+      expect(group.canLeave(null), isFalse);
+    });
+
+    test('initials take the first and last word, not every word', () {
+      expect(
+        const StudyGroup(
+          id: 'g',
+          name: 'Data Structures Lab',
+          joinCode: 'K3M9FP',
+          ownerUid: 'o',
+        ).initials,
+        'DL',
+      );
+    });
+
+    test('an unknown kind falls back to the one that can do less', () {
+      // A group written by a newer version should not quietly gain the power
+      // to set assignments.
+      expect(GroupKindData.fromKey('class'), GroupKind.classroom);
+      expect(GroupKindData.fromKey('study'), GroupKind.study);
+      expect(GroupKindData.fromKey('headmaster'), GroupKind.study);
+      expect(GroupKindData.fromKey(null), GroupKind.study);
+    });
+
+    test('a half-written group document does not take the screen down', () {
+      final empty = StudyGroup.fromMap('g1', const {});
+      expect(empty.id, 'g1');
+      expect(empty.name, '');
+      expect(empty.memberUids, isEmpty);
+      expect(empty.kind, GroupKind.study);
+
+      // Wrong types everywhere, which is what a different client's shape
+      // looks like.
+      final odd = StudyGroup.fromMap('g2', const {
+        'name': 42,
+        'memberUids': 'bob',
+        'kind': 7,
+        'joinCode': 9,
+      });
+      expect(odd.name, '');
+      expect(odd.memberUids, isEmpty);
+      expect(odd.kind, GroupKind.study);
+
+      // A member list with rubbish in it keeps the real uids and drops the
+      // rest, rather than refusing the whole group.
+      final mixed = StudyGroup.fromMap('g3', const {
+        'memberUids': ['amy', 3, '', null, 'bob'],
+      });
+      expect(mixed.memberUids, ['amy', 'bob']);
+    });
+
+    test('a group name is required and bounded', () {
+      expect(groupNameProblem('Thesis group'), isNull);
+      expect(groupNameProblem('   '), isNotNull);
+      expect(groupNameProblem('x' * (maxGroupName + 1)), isNotNull);
+    });
+  });
+
+  // ------------------------------------------------------------- shares
+
+  group('note share', () {
+    test('an unrecognised state is treated as still waiting', () {
+      // Guessing "accepted" for a value this version does not understand
+      // would silently swallow somebody's note.
+      expect(ShareStateData.fromKey('accepted'), ShareState.accepted);
+      expect(ShareStateData.fromKey('declined'), ShareState.declined);
+      expect(ShareStateData.fromKey('posted'), ShareState.pending);
+      expect(ShareStateData.fromKey(null), ShareState.pending);
+    });
+
+    NoteShare share({
+      String fromName = 'Rafi',
+      String groupName = '',
+      int fileCount = 0,
+    }) =>
+        NoteShare(
+          id: 's1',
+          fromUid: 'u1',
+          fromName: fromName,
+          toUid: 'u2',
+          title: 'Joins',
+          payload: '{}',
+          groupId: groupName.isEmpty ? '' : 'g1',
+          groupName: groupName,
+          fileCount: fileCount,
+        );
+
+    test('the subtitle says who, through what, with what', () {
+      expect(share().subtitle, 'Rafi');
+      expect(
+        share(groupName: 'Thesis group').subtitle,
+        'Rafi · via Thesis group',
+      );
+      expect(share(fileCount: 1).subtitle, 'Rafi · 1 file');
+      expect(share(fileCount: 3).subtitle, 'Rafi · 3 files');
+      expect(
+        share(groupName: 'Thesis group', fileCount: 2).subtitle,
+        'Rafi · via Thesis group · 2 files',
+      );
+    });
+
+    test('a share with no sender name still says something', () {
+      expect(share(fromName: '   ').subtitle, 'Someone');
+    });
+
+    test('a half-written share document does not take the inbox down', () {
+      final empty = NoteShare.fromMap('s1', const {});
+      expect(empty.id, 's1');
+      expect(empty.state, ShareState.pending);
+      expect(empty.fileCount, 0);
+
+      final odd = NoteShare.fromMap('s2', const {
+        'title': 42,
+        'fileCount': 'three',
+        'state': 9,
+      });
+      expect(odd.title, '');
+      expect(odd.fileCount, 0);
+      expect(odd.state, ShareState.pending);
+
+      // A negative count is nonsense; it must not reach "−2 files".
+      expect(NoteShare.fromMap('s3', const {'fileCount': -2}).fileCount, 0);
+    });
+  });
+
+  group('share size budget', () {
+    test('the budget leaves room under the real Firestore limit', () {
+      // The gap is the point. The payload is not the only thing in the
+      // document, and Firestore counts its own overhead in ways this app
+      // cannot see.
+      expect(sharePayloadBudget, lessThan(firestoreDocumentLimit));
+      expect(firestoreDocumentLimit - sharePayloadBudget,
+          greaterThan(300 * 1024));
+    });
+
+    test('attachments cost a third more than they weigh', () {
+      // base64: three bytes become four characters.
+      expect(
+        estimatedPayloadBytes(textBytes: 0, attachmentBytes: 3000),
+        4000,
+      );
+      expect(
+        estimatedPayloadBytes(textBytes: 1000, attachmentBytes: 0),
+        1000,
+      );
+    });
+
+    test('what fits, fits', () {
+      expect(sharePayloadFits(0), isTrue);
+      expect(sharePayloadFits(sharePayloadBudget), isTrue);
+      expect(sharePayloadFits(sharePayloadBudget + 1), isFalse);
+    });
+
+    test('sizes are written the way a person would say them', () {
+      expect(formatBytes(512), '512 B');
+      expect(formatBytes(2048), '2 KB');
+      expect(formatBytes(3 * 1024 * 1024), '3.0 MB');
+    });
+
+    test('a warning appears only when the files really will not fit', () {
+      expect(
+        attachmentWarning(fileCount: 0, textBytes: 500, attachmentBytes: 0),
+        isNull,
+      );
+      // Small files travel.
+      expect(
+        attachmentWarning(
+          fileCount: 1,
+          textBytes: 2000,
+          attachmentBytes: 100 * 1024,
+        ),
+        isNull,
+      );
+      // A 2 MB photo does not.
+      final warned = attachmentWarning(
+        fileCount: 2,
+        textBytes: 2000,
+        attachmentBytes: 2 * 1024 * 1024,
+      );
+      expect(warned, isNotNull);
+      expect(warned, contains('2 files'));
+      expect(warned, contains('2.0 MB'));
+    });
+  });
+
+  // --------------------------------------------------------------- chat
+
+  group('chat addresses', () {
+    test('two people compute the same address whoever asks first', () {
+      // This is what removes the "start a conversation" step. If the two ends
+      // could disagree, each would be talking into a thread the other could
+      // not see.
+      expect(directChatId('bob', 'amy'), directChatId('amy', 'bob'));
+    });
+
+    test('the address is the two uids, sorted', () {
+      expect(directChatId('zed', 'amy'), 'dm_amy_zed');
+      expect(directChatId('amy', 'zed'), 'dm_amy_zed');
+    });
+
+    test('a group address is derived from the group', () {
+      expect(groupChatId('g1'), 'grp_g1');
+    });
+
+    test('an address can be checked against the people in it', () {
+      expect(isDirectChatId('dm_amy_zed', 'zed', 'amy'), isTrue);
+      expect(isDirectChatId('dm_amy_zed', 'amy', 'bob'), isFalse);
+      // The security rule rebuilds the address the same way, so a thread
+      // cannot be created at an address unrelated to its members.
+      expect(isDirectChatId('dm_zed_amy', 'amy', 'zed'), isFalse);
+    });
+
+    test('an unknown kind is treated as direct', () {
+      // Direct is the one that cannot borrow a group's membership.
+      expect(ChatKindData.fromKey('group'), ChatKind.group);
+      expect(ChatKindData.fromKey('direct'), ChatKind.direct);
+      expect(ChatKindData.fromKey('broadcast'), ChatKind.direct);
+      expect(ChatKindData.fromKey(null), ChatKind.direct);
+    });
+
+    test('a message kind from a newer version arrives as text', () {
+      expect(MessageKindData.fromKey('note'), MessageKind.note);
+      expect(MessageKindData.fromKey('voice'), MessageKind.voice);
+      // Shown as words rather than as nothing at all.
+      expect(MessageKindData.fromKey('hologram'), MessageKind.text);
+      expect(MessageKindData.fromKey(null), MessageKind.text);
+    });
+  });
+
+  group('unread and typing', () {
+    final noon = DateTime(2026, 10, 14, 12);
+
+    ChatThread thread({
+      String lastFrom = 'bob',
+      DateTime? lastAt,
+      Map<String, DateTime> readAt = const {},
+      Map<String, DateTime> typingAt = const {},
+    }) =>
+        ChatThread(
+          id: 'dm_amy_bob',
+          kind: ChatKind.direct,
+          memberUids: const ['amy', 'bob'],
+          lastFromUid: lastFrom,
+          lastAt: lastAt ?? noon,
+          readAt: readAt,
+          typingAt: typingAt,
+        );
+
+    test('a thread you have never read is unread', () {
+      expect(thread().isUnreadFor('amy'), isTrue);
+    });
+
+    test('reading after the last message clears it', () {
+      final t = thread(
+        readAt: {'amy': noon.add(const Duration(seconds: 1))},
+      );
+      expect(t.isUnreadFor('amy'), isFalse);
+    });
+
+    test('reading before the last message does not', () {
+      final t = thread(
+        readAt: {'amy': noon.subtract(const Duration(minutes: 5))},
+      );
+      expect(t.isUnreadFor('amy'), isTrue);
+    });
+
+    test('your own message is never unread to you', () {
+      // Without this every thread you spoke in last would sit there with a
+      // dot on it.
+      expect(thread(lastFrom: 'amy').isUnreadFor('amy'), isFalse);
+    });
+
+    test('an empty thread is not unread', () {
+      const t = ChatThread(id: 'x', kind: ChatKind.direct);
+      expect(t.isUnreadFor('amy'), isFalse);
+    });
+
+    test('a typing flag expires by age rather than being cleared', () {
+      // A phone that loses signal mid-word never gets to clear its flag, so
+      // the reader ages it out instead.
+      final t = thread(typingAt: {
+        'bob': noon.subtract(const Duration(seconds: 2)),
+        'cat': noon.subtract(const Duration(seconds: 30)),
+      });
+      expect(t.typingNow('amy', now: noon), ['bob']);
+    });
+
+    test('you are never shown as typing to yourself', () {
+      final t = thread(typingAt: {'amy': noon});
+      expect(t.typingNow('amy', now: noon), isEmpty);
+    });
+  });
+
+  group('chat text', () {
+    test('a message must have something in it and a limit', () {
+      expect(messageProblem('hello'), isNull);
+      expect(messageProblem('   '), isNotNull);
+      expect(messageProblem('x' * (maxMessageLength + 1)), isNotNull);
+    });
+
+    test('the clock is two digits either side', () {
+      expect(clockLabel(DateTime(2026, 10, 14, 9, 5)), '09:05');
+      expect(clockLabel(DateTime(2026, 10, 14, 23, 59)), '23:59');
+    });
+
+    test('when something happened is said at the right grain', () {
+      final now = DateTime(2026, 10, 14, 15);
+      expect(whenLabel(DateTime(2026, 10, 14, 9, 5), now: now), '09:05');
+      expect(whenLabel(DateTime(2026, 10, 13, 9, 5), now: now), 'Yesterday');
+      expect(whenLabel(DateTime(2026, 10, 2, 9, 5), now: now), '2/10');
+      expect(whenLabel(DateTime(2025, 10, 2, 9, 5), now: now), '2/10/2025');
+    });
+
+    test('yesterday is yesterday across a month boundary', () {
+      // DateTime(y, m, 0) is the last day of the previous month, which is why
+      // the label is built that way rather than by subtracting 24 hours.
+      final now = DateTime(2026, 11, 1, 10);
+      expect(whenLabel(DateTime(2026, 10, 31, 9), now: now), 'Yesterday');
+    });
+
+    test('typing reads as a sentence however many people there are', () {
+      expect(typingLabel([]), isNull);
+      expect(typingLabel(['  ']), isNull);
+      expect(typingLabel(['Rafi']), 'Rafi is typing…');
+      expect(typingLabel(['Rafi', 'Mim']), 'Rafi and Mim are typing…');
+      expect(
+        typingLabel(['Rafi', 'Mim', 'Zara']),
+        'Rafi and 2 others are typing…',
+      );
+    });
+  });
+
+  group('chat documents', () {
+    test('a half-written thread does not take the list down', () {
+      final empty = ChatThread.fromMap('c1', const {});
+      expect(empty.id, 'c1');
+      expect(empty.kind, ChatKind.direct);
+      expect(empty.memberUids, isEmpty);
+      expect(empty.readAt, isEmpty);
+
+      final odd = ChatThread.fromMap('c2', const {
+        'memberUids': 'amy',
+        'readAt': 'soon',
+        'typingAt': {'amy': 'now', 'bob': 12345},
+        'lastAt': 'later',
+      });
+      expect(odd.memberUids, isEmpty);
+      expect(odd.readAt, isEmpty);
+      // The one usable entry is kept and the rubbish dropped, rather than
+      // throwing the whole map away.
+      expect(odd.typingAt.keys.toList(), ['bob']);
+      expect(odd.lastAt, isNull);
+    });
+
+    test('a half-written message does not take the conversation down', () {
+      final odd = ChatMessage.fromMap('m1', const {
+        'text': 42,
+        'kind': 9,
+        'fileCount': -3,
+        'durationMs': 'long',
+      });
+      expect(odd.text, '');
+      expect(odd.kind, MessageKind.text);
+      expect(odd.fileCount, 0);
+      expect(odd.durationMs, 0);
+      expect(odd.createdAt, isNull);
+    });
+
+    test('the list preview says what kind of message it was', () {
+      ChatMessage m(MessageKind k, {String text = '', String title = ''}) =>
+          ChatMessage(
+            id: 'm',
+            fromUid: 'u',
+            fromName: 'Rafi',
+            kind: k,
+            text: text,
+            title: title,
+          );
+
+      expect(m(MessageKind.text, text: ' hello ').preview, 'hello');
+      expect(m(MessageKind.note, title: 'Joins').preview, '📄 Joins');
+      expect(m(MessageKind.note).preview, '📄 A note');
+      expect(m(MessageKind.image).preview, '🖼 Photo');
+      expect(m(MessageKind.voice).preview, '🎤 Voice message');
+    });
+
+    test('a message with no sender name still says something', () {
+      expect(
+        const ChatMessage(id: 'm', fromUid: 'u', fromName: '  ').fromLabel,
+        'Someone',
+      );
+    });
+
+    test('the other member of a direct thread is the one who is not you', () {
+      const t = ChatThread(
+        id: 'dm_amy_bob',
+        kind: ChatKind.direct,
+        memberUids: ['amy', 'bob'],
+      );
+      expect(t.otherMember('amy'), 'bob');
+      expect(t.otherMember('bob'), 'amy');
+      // A thread somebody has left should not crash the row that draws it.
+      expect(t.otherMember('zed'), 'amy');
+    });
+  });
+
+  // ------------------------------------------------------------ semester
+
+  group('semester', () {
+    test('each system offers the number of semesters it actually has', () {
+      // The reason the system is asked first: offering twelve to everybody
+      // would let a student pick a semester their university does not have.
+      expect(SemesterSystem.bi.count, 8);
+      expect(SemesterSystem.tri.count, 12);
+      expect(SemesterSystem.custom.count, 0);
+    });
+
+    test('an unknown system falls back to asking rather than assuming', () {
+      expect(SemesterSystemData.fromKey('bi'), SemesterSystem.bi);
+      expect(SemesterSystemData.fromKey('tri'), SemesterSystem.tri);
+      expect(SemesterSystemData.fromKey('quad'), SemesterSystem.custom);
+      expect(SemesterSystemData.fromKey(null), SemesterSystem.custom);
+    });
+
+    test('a semester is written one way', () {
+      expect(semesterLabelFor(5), 'Semester 5');
+      expect(semesterLabelFor(12), 'Semester 12');
+    });
+
+    test('a number is found inside labels typed before this screen', () {
+      // These are real values already sitting in people's settings from when
+      // the field was free text, and the picker should reopen on the right
+      // number rather than at 1.
+      expect(semesterNumberIn('Semester 5'), 5);
+      expect(semesterNumberIn('5th semester'), 5);
+      expect(semesterNumberIn('sem-11'), 11);
+      expect(semesterNumberIn(null), isNull);
+      expect(semesterNumberIn('final year'), isNull);
+      // Nonsense is refused rather than clamped: a stored "Semester 400" is a
+      // typo, and silently showing 20 would hide it.
+      expect(semesterNumberIn('Semester 400'), isNull);
+      expect(semesterNumberIn('Semester 0'), isNull);
+    });
+
+    test('a number has to fit the system', () {
+      expect(semesterNumberFits(SemesterSystem.bi, 8), isTrue);
+      expect(semesterNumberFits(SemesterSystem.bi, 9), isFalse);
+      expect(semesterNumberFits(SemesterSystem.tri, 12), isTrue);
+      expect(semesterNumberFits(SemesterSystem.tri, 13), isFalse);
+      expect(semesterNumberFits(SemesterSystem.bi, 0), isFalse);
+      // A university that counts its own way is not second-guessed.
+      expect(semesterNumberFits(SemesterSystem.custom, 99), isTrue);
+    });
+
+    test('a semester must be named and bounded', () {
+      expect(semesterProblem('Semester 5'), isNull);
+      expect(semesterProblem('   '), isNotNull);
+      expect(semesterProblem('x' * 41), isNotNull);
     });
   });
 }

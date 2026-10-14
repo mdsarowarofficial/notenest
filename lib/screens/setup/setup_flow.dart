@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/note_repository.dart';
+import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/semester_picker.dart';
 import '../../widgets/nest_stepper.dart';
 import '../shell/home_shell.dart';
 import '../subjects/subject_form.dart';
@@ -20,7 +22,9 @@ class SetupFlow extends StatefulWidget {
 class _SetupFlowState extends State<SetupFlow> {
   final _repo = NoteRepository.instance;
 
-  final _semester = TextEditingController();
+  /// What the picker has settled on, and under which system.
+  String _semesterLabel = '';
+  SemesterSystem _semesterSystem = SemesterSystem.bi;
 
   int _step = 0;
   String? _error;
@@ -55,13 +59,13 @@ class _SetupFlowState extends State<SetupFlow> {
   @override
   void initState() {
     super.initState();
-    _semester.text = _repo.semesterLabel ?? '';
+    _semesterLabel = _repo.semesterLabel ?? '';
+    _semesterSystem = _repo.semesterSystem;
     _reminder = _repo.reminderChoice ?? _reminder;
   }
 
   @override
   void dispose() {
-    _semester.dispose();
     super.dispose();
   }
 
@@ -69,10 +73,7 @@ class _SetupFlowState extends State<SetupFlow> {
   String? _validate() {
     switch (_step) {
       case 0:
-        if (_semester.text.trim().isEmpty) {
-          return 'Name this semester, for example "Semester 5"';
-        }
-        return null;
+        return semesterProblem(_semesterLabel);
       case 1:
         if (!_repo.hasSubjects) return 'Add at least one subject';
         return null;
@@ -93,7 +94,7 @@ class _SetupFlowState extends State<SetupFlow> {
     });
 
     if (_step == 0) {
-      await _repo.saveSemester(_semester.text);
+      await _repo.saveSemester(_semesterLabel, system: _semesterSystem);
     } else if (_step == 2) {
       await _repo.saveReminder(_reminder);
     }
@@ -202,16 +203,19 @@ class _SetupFlowState extends State<SetupFlow> {
       case 0:
         return _Sheet(
           children: [
-            _Field(
-              label: 'SEMESTER NAME',
-              hint: 'e.g. Semester 5',
-              controller: _semester,
-              capitalization: TextCapitalization.words,
+            SemesterPicker(
+              system: _semesterSystem,
+              label: _semesterLabel,
+              onChanged: (system, label) => setState(() {
+                _semesterSystem = system;
+                _semesterLabel = label;
+                _error = null;
+              }),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
-              'Notes and subjects are filed under this semester. You can '
-              'rename it later from your profile.',
+              'Notes and subjects are filed under this semester, and a cover '
+              'page prints it. You can change it later from your profile.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -372,52 +376,5 @@ class _Sheet extends StatelessWidget {
             children: children,
           ),
         ),
-      );
-}
-
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.hint,
-    required this.controller,
-    this.capitalization = TextCapitalization.none,
-  });
-
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  final TextCapitalization capitalization;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: nestEyebrow),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            textCapitalization: capitalization,
-            style: const TextStyle(fontSize: 15, color: NestColor.ink),
-            decoration: InputDecoration(
-              hintText: hint,
-              filled: true,
-              fillColor: NestColor.paper,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(NestRadius.tile),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(NestRadius.tile),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(NestRadius.tile),
-                borderSide: const BorderSide(color: NestColor.pen, width: 2),
-              ),
-            ),
-          ),
-        ],
       );
 }

@@ -1,0 +1,396 @@
+rules_version = '2';
+
+// NoteNest — Firestore security rules
+//
+// Paste this whole file into the Firebase console:
+//   Build → Firestore Database → Rules → replace everything → Publish
+//
+// The shape of these rules is: deny everything, then open the narrowest door
+// each feature actually needs. The last rule in the file is a catch-all deny,
+// so a collection added later is closed until it is deliberately opened.
+//
+// There is no server code in this project — the Spark plan has no Cloud
+// Functions — so this file is not a second line of defence behind a trusted
+// backend. It *is* the defence. Every write in the app is made by a client
+// that a determined person could replace, and the only thing standing between
+// a replaced client and everyone else's notes is what is written here.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------ helpers
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Which fields a write actually changes. Used to pin an update down to
+    // the one or two fields a feature is allowed to touch, so a rule that
+    // permits "join a group" cannot also be used to rename it.
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // A string that is present, of the right type, and not longer than it has
+    // any business being. Length limits are not fussiness: without them one
+    // client can write a megabyte into a field everyone else downloads.
+    function textWithin(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
+    // ------------------------------------------------------------- users
+    //
+    // One document per account, at users/{uid}. It holds the name classmates
+    // see, the folded email they are found by, and whether the account is a
+    // student or a teacher.
+
+    match /users/{userId} {
+
+      // Reading one known profile. Needed to show who sent a note, who is in
+      // a group, and who set an assignment.
+      allow get: if signedIn();
+
+      // Searching. The app only ever looks an account up by its exact
+      // address, which is a query of one. The limit is here so that this rule
+      // cannot also be used to page through every account in the project:
+      // a directory anyone can enumerate is the user table leaked.
+      //
+      // It is worth being straight about what this does not do — a determined
+      // caller can still make many small queries. It raises the cost of a bulk
+      // dump rather than making one impossible, and the only thing exposed is
+      // a name against an address the caller already knew.
+      allow list: if signedIn() && request.query.limit <= 20;
+
+      allow create: if isSelf(userId)
+        && incoming().uid == userId
+        // The address is taken from the signed-in token, not from whatever the
+        // client typed, so nobody can register themselves under someone
+        // else's address and receive their shared notes.
+        && incoming().email == request.auth.token.email.lower()
+        && textWithin(incoming().name, 80)
+        && textWithin(incoming().institution, 160)
+        && incoming().role in ['student', 'teacher'];
+
+      allow update: if isSelf(userId)
+        // Identity is fixed after creation. The name and the role can change;
+        // who the document belongs to cannot.
+        && incoming().uid == resource.data.uid
+        && incoming().email == resource.data.email
+        && textWithin(incoming().name, 80)
+        && textWithin(incoming().institution, 160)
+        && incoming().role in ['student', 'teacher'];
+
+      // Deleting a profile would leave shared notes and group memberships
+      // pointing at nothing. Removing an account is a job for the console.
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------ groups
+    //
+    // A study group and a teacher's class are the same document with a
+    // different `kind`, because a class is a study group where one member sets
+    // the work. Membership is a list of uids on the group itself.
+
+    match /groups/{groupId} {
+
+      function isMember() {
+        return signedIn() && request.auth.uid in resource.data.memberUids;
+      }
+
+      function isGroupOwner() {
+        return signedIn() && request.auth.uid == resource.data.ownerUid;
+      }
+
+      // Members only, for both reading one group and listing your own.
+      //
+      // Firestore refuses a query it cannot prove stays inside this rule, so
+      // the app's `array-contains` on memberUids is not merely how the right
+      // rows are found — it is what makes the read legal at all. A query
+      // without it fails rather than returning other people's groups.
+      allow read: if isMember();
+
+      allow create: if signedIn()
+        && incoming().ownerUid == request.auth.uid
+        // A group starts with exactly one member: the person making it. Nobody
+        // gets to create a group with other people already in it.
+        && incoming().memberUids == [request.auth.uid]
+        && textWithin(incoming().name, 60)
+        && textWithin(incoming().subject, 60)
+        && incoming().kind in ['study', 'class']
+        && textWithin(incoming().joinCode, 6);
+
+      // Joining with a code. The only change permitted to an outsider, and it
+      // is pinned to the bone: the member list afterwards must equal the list
+      // before plus this one uid. Not "contains" — equals. So a joiner cannot
+      // add a friend, cannot drop anyone, and cannot touch the name.
+      //
+      // This comparison is why the app joins with arrayUnion and never reads
+      // the group first: a person who is not yet a member is not allowed to
+      // read it, so the before-and-after check has to happen here, on the
+      // server, where both versions exist.
+      allow update: if signedIn()
+        && changedKeys().hasOnly(['memberUids', 'updatedAt'])
+        && request.resource.data.memberUids
+             == resource.data.memberUids.concat([request.auth.uid]);
+
+      // Leaving. The mirror image, and equally pinned.
+      allow update: if isMember()
+        && changedKeys().hasOnly(['memberUids', 'updatedAt'])
+        && request.resource.data.memberUids
+             == resource.data.memberUids.removeAll([request.auth.uid]);
+
+      // The owner may rename the group and remove people from it. Not the
+      // join code, not the kind, not who owns it: a group that can change its
+      // own code would invalidate every copy of it already written down, and a
+      // study group that can quietly become a class is a student who can
+      // quietly start setting assignments.
+      allow update: if isGroupOwner()
+        && changedKeys().hasOnly(['name', 'subject', 'memberUids', 'updatedAt'])
+        && textWithin(incoming().name, 60)
+        && textWithin(incoming().subject, 60);
+
+      allow delete: if isGroupOwner();
+    }
+
+    // --------------------------------------------------------- joinCodes
+    //
+    // code → group. A tiny lookup that exists for one reason: somebody holding
+    // a code is, by definition, not yet a member, so they cannot read the
+    // group. This holds only a name and an id — never the member list.
+
+    match /joinCodes/{code} {
+
+      // Looking up a code you have been given. `get` only: `list` would turn
+      // this into a catalogue of every group in the project, which is exactly
+      // what a join code is supposed to prevent.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && incoming().ownerUid == request.auth.uid
+        && incoming().groupId is string
+        && textWithin(incoming().name, 60);
+
+      // This single line is what makes a code unique.
+      //
+      // Firestore applies `create` only when the document does not exist, so
+      // two people racing for the same code do not both succeed: the first
+      // creates it, the second is refused and the app tries another code. No
+      // read-then-write, no window between checking and taking — the race is
+      // settled on the server, which is the only place it can be.
+      allow update: if false;
+
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ------------------------------------------------------------ shares
+    //
+    // One note sent to one person, waiting to be accepted. A note sent to a
+    // group of eight is eight documents, written in one batch — because
+    // accepting is a personal decision, and a shared document that everyone
+    // must write their answer into is far harder to make safe than one with a
+    // single owner.
+
+    match /shares/{shareId} {
+
+      // Both ends can see it: the recipient to answer, the sender to know it
+      // was received. Nobody else, including other members of the group it
+      // was sent through.
+      allow read: if signedIn()
+        && (resource.data.toUid == request.auth.uid
+            || resource.data.fromUid == request.auth.uid);
+
+      allow create: if signedIn()
+        // You can only send as yourself. Without this, a note could arrive
+        // wearing a classmate's name — and the receiving student has no way to
+        // tell, because the name is all the inbox has.
+        && incoming().fromUid == request.auth.uid
+        && incoming().toUid is string
+        && incoming().toUid != request.auth.uid
+        // It starts waiting. A share cannot be created already accepted.
+        && incoming().state == 'pending'
+        && textWithin(incoming().title, 200)
+        && textWithin(incoming().message, 500)
+        && textWithin(incoming().groupName, 60)
+        // The same budget the app enforces before sending, enforced again
+        // where it cannot be edited out. 700 KB.
+        && textWithin(incoming().payload, 716800);
+
+      // Only the recipient answers, and answering is the only thing an update
+      // may do. The note itself is fixed once sent: a sender who could edit the
+      // payload afterwards could swap the note for something else after it had
+      // already been accepted.
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && changedKeys().hasOnly(['state', 'respondedAt'])
+        && incoming().state in ['accepted', 'declined'];
+
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------- chats
+    //
+    // One collection for both kinds of conversation, and the kind is readable
+    // from the address itself:
+    //
+    //   grp_<groupId>   a group's thread — the GROUP decides who is in it
+    //   dm_<a>_<b>      two people, uids sorted
+    //
+    // Deriving it from the id rather than from a field inside the document is
+    // not a trick for its own sake. A batched write is checked against the
+    // state *before* the batch, so a rule that had to read the conversation
+    // document would refuse the very first message in a new group thread —
+    // the message and the document it depends on arrive together. Reading the
+    // address needs nothing that is not already in the request.
+
+    function isGroupThread(chatId) {
+      return chatId[0:4] == 'grp_';
+    }
+
+    function groupOf(chatId) {
+      return chatId[4:chatId.size()];
+    }
+
+    function isDirectThread(chatId) {
+      return chatId[0:3] == 'dm_';
+    }
+
+    function inGroup(groupId) {
+      return signedIn() && request.auth.uid in
+        get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids;
+    }
+
+    function threadData(chatId) {
+      return get(/databases/$(database)/documents/chats/$(chatId)).data;
+    }
+
+    // May this account read and write in this conversation at all.
+    function canUseThread(chatId) {
+      return signedIn() && (
+        (isGroupThread(chatId) && inGroup(groupOf(chatId)))
+        || (isDirectThread(chatId)
+            && request.auth.uid in threadData(chatId).memberUids)
+      );
+    }
+
+    match /chats/{chatId} {
+
+      allow get: if canUseThread(chatId);
+
+      // Listing is only ever "my direct conversations", and the app's
+      // array-contains on memberUids is what keeps that inside this rule.
+      // Group threads carry no member list, so they can never come back from
+      // this query — they are found through the groups instead.
+      allow list: if signedIn()
+        && request.auth.uid in resource.data.memberUids;
+
+      // A group thread. Nothing about who is in it is stored here, so there is
+      // nothing here to get out of step with the group.
+      allow create: if isGroupThread(chatId) && inGroup(groupOf(chatId));
+
+      // A direct thread, and the address must be the one these two people
+      // would compute. Checked rather than trusted: without this, a thread
+      // could be created at an address that has nothing to do with its
+      // members, and the people who would later compute the real address
+      // would find an empty conversation.
+      allow create: if signedIn()
+        && isDirectThread(chatId)
+        && incoming().memberUids.size() == 2
+        && request.auth.uid in incoming().memberUids
+        && incoming().memberUids[0] < incoming().memberUids[1]
+        && chatId == 'dm_' + incoming().memberUids[0]
+                   + '_' + incoming().memberUids[1];
+
+      // Sending a message updates what the list shows; opening the thread
+      // writes a read receipt; typing writes a flag. All three land here, and
+      // each is held to its own fields.
+      allow update: if canUseThread(chatId)
+        && changedKeys().hasOnly([
+             'kind', 'groupId', 'title', 'memberUids',
+             'lastText', 'lastFromUid', 'lastFromName', 'lastAt',
+             'readAt', 'typingAt',
+           ])
+        // You may only ever stamp your own receipt, and only your own typing
+        // flag. Otherwise one member could mark a conversation read for
+        // everybody, or leave somebody else showing as typing for good.
+        && (!changedKeys().hasAny(['readAt'])
+            || request.resource.data.readAt
+                 .diff(resource.data.get('readAt', {}))
+                 .affectedKeys().hasOnly([request.auth.uid]))
+        && (!changedKeys().hasAny(['typingAt'])
+            || request.resource.data.typingAt
+                 .diff(resource.data.get('typingAt', {}))
+                 .affectedKeys().hasOnly([request.auth.uid]))
+        // The member list of a direct thread is fixed once set. A thread that
+        // could gain a third person would make its own address a lie.
+        && (!changedKeys().hasAny(['memberUids'])
+            || request.resource.data.memberUids == resource.data.memberUids);
+
+      // A conversation is not deleted. Removing it would take everyone else's
+      // copy with it, and leaving a group is the way out of a group thread.
+      allow delete: if false;
+
+      // ------------------------------------------------------- messages
+
+      match /messages/{messageId} {
+
+        allow read: if canUseThread(chatId);
+
+        allow create: if canUseThread(chatId)
+          // You can only speak as yourself. The name beside a message is all
+          // the reader has.
+          && incoming().fromUid == request.auth.uid
+          && textWithin(incoming().text, 2000)
+          && textWithin(incoming().title, 200)
+          && textWithin(incoming().subjectCode, 40)
+          && incoming().kind in ['text', 'note', 'image', 'voice', 'system']
+          // Small enough to scroll past. The weight of a posted note lives in
+          // `blobs`, fetched only by whoever asks for it.
+          && textWithin(incoming().thumb, 40000);
+
+        // A message is said, not edited. Allowing an update would let the
+        // words above somebody's reply change after they replied to them.
+        allow update, delete: if false;
+      }
+
+      // ---------------------------------------------------------- blobs
+      //
+      // The heavy part of a message — a posted note's payload — kept out of
+      // the message so that scrolling a term's conversation does not download
+      // every note anybody ever posted.
+
+      match /blobs/{blobId} {
+
+        allow read: if canUseThread(chatId);
+
+        allow create: if canUseThread(chatId)
+          && incoming().fromUid == request.auth.uid
+          // The same 700 KB the app enforces, enforced again where it cannot
+          // be edited out.
+          && textWithin(incoming().payload, 716800);
+
+        allow update, delete: if false;
+      }
+    }
+
+    // --------------------------------------------------------- everything else
+    //
+    // Teacher assignments arrive in the next step and will get their own
+    // rules. Until then they stay shut, which is the right default: a
+    // collection nobody has thought about should not be writable just because
+    // nobody has thought about it.
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

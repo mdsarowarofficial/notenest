@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_drawer.dart';
@@ -7,6 +8,9 @@ import '../../widgets/nest_nav_bar.dart';
 import '../capture/capture_sheet.dart';
 import '../capture/dictation_page.dart';
 import '../capture/record_page.dart';
+import '../chat/chats_page.dart';
+import '../cloud/cloud_page.dart';
+import '../groups/groups_page.dart';
 import '../convert/convert_page.dart';
 import '../cover/cover_page.dart';
 import '../exam/exam_page.dart';
@@ -79,44 +83,6 @@ class _HomeShellState extends State<HomeShell> {
   void _openSearch() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SearchPage()),
-    );
-  }
-
-  /// Says plainly why study groups are not here, rather than showing an empty
-  /// screen that looks broken.
-  ///
-  /// Sharing one note works because the file travels through an app the
-  /// student already has. A group is different: it has to exist somewhere both
-  /// phones can see, and there is no such place until cloud sync is built.
-  void _explainStudyGroups() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: NestColor.card,
-        title: const Text('Study groups need an account server'),
-        content: const Text(
-          'Sending one note works without a server — the file goes through '
-          'WhatsApp or email like anything else.\n\n'
-          'A group is different. It has to live somewhere both phones can '
-          'reach, so everyone sees the same members and the same notes. That '
-          'is cloud sync, and it is the next stage of the project.\n\n'
-          'Until then, share notes one at a time from any note, and ask for '
-          'one with Note requests.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Got it'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              showRequestNoteSheet(context);
-            },
-            child: const Text('Ask for a note'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -213,7 +179,9 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: _repo,
+      // The drawer shows whether the cloud is connected, and that can change
+      // from the cloud screen, so this watches both.
+      listenable: Listenable.merge([_repo, CloudService.instance]),
       builder: (context, _) => Scaffold(
         extendBody: true,
         drawer: NestDrawer(
@@ -222,7 +190,7 @@ class _HomeShellState extends State<HomeShell> {
           subjects: _repo.subjects(),
           links: _repo.drawerLinks(),
           selectedId: _drawerSelection,
-          synced: _repo.isSynced,
+          synced: CloudService.instance.isSignedIn,
           onSelectSubject: (s) {
             setState(() {
               _drawerSelection = s.code;
@@ -233,6 +201,18 @@ class _HomeShellState extends State<HomeShell> {
           onSelectLink: (l) {
             Navigator.pop(context);
             switch (l.id) {
+              case 'cloud':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CloudPage()),
+                );
+              case 'chats':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ChatsPage()),
+                );
+              case 'groups':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const GroupsPage()),
+                );
               case 'cover':
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CoverPageScreen()),
@@ -249,8 +229,6 @@ class _HomeShellState extends State<HomeShell> {
                 setState(() => _tab = 2);
               case 'requests':
                 showRequestNoteSheet(context);
-              case 'groups':
-                _explainStudyGroups();
               default:
                 _toast('${l.label} is not built yet');
             }
