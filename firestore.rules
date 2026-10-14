@@ -401,6 +401,28 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/chats/$(chatId)).data;
     }
 
+    // True when [owner] has blocked the caller. `exists` first, because a
+    // `get` of a missing document is an error, and an error denies — which
+    // would refuse every message to anybody who has never blocked anyone.
+    function blockedBy(owner) {
+      return exists(/databases/$(database)/documents/blocks/$(owner))
+        && request.auth.uid in
+             get(/databases/$(database)/documents/blocks/$(owner)).data.uids;
+    }
+
+    // The member of a direct thread who is not the caller.
+    function otherInThread(chatId) {
+      let members = threadData(chatId).memberUids;
+      return members[0] == request.auth.uid ? members[1] : members[0];
+    }
+
+    // A direct thread whose other member has blocked the caller. Group
+    // threads are not covered: a group is shared space, and blocking there
+    // hides the person on the blocker's own screen instead.
+    function blockedInThread(chatId) {
+      return isDirectThread(chatId) && blockedBy(otherInThread(chatId));
+    }
+
     // May this account read and write in this conversation at all.
     function canUseThread(chatId) {
       return signedIn() && (
@@ -453,6 +475,10 @@ service cloud.firestore {
         && incoming().keys().hasOnly(['kind', 'memberUids'])
         && incoming().kind == 'direct'
         && incoming().memberUids.size() == 2
+        // Nobody can open a conversation with someone who has blocked them.
+        && !blockedBy(incoming().memberUids[0] == request.auth.uid
+                        ? incoming().memberUids[1]
+                        : incoming().memberUids[0])
         && request.auth.uid in incoming().memberUids
         && incoming().memberUids[0] < incoming().memberUids[1]
         && chatId == 'dm_' + incoming().memberUids[0]
@@ -503,6 +529,7 @@ service cloud.firestore {
         allow read: if canUseThread(chatId);
 
         allow create: if canUseThread(chatId)
+          && !blockedInThread(chatId)
           && incoming().keys().hasOnly([
                'fromUid', 'fromName', 'kind', 'text', 'title', 'subjectCode',
                'fileCount', 'blobId', 'thumb', 'durationMs', 'createdAt',
@@ -538,6 +565,7 @@ service cloud.firestore {
         allow read: if canUseThread(chatId);
 
         allow create: if canUseThread(chatId)
+          && !blockedInThread(chatId)
           && incoming().keys().hasOnly(['payload', 'fromUid', 'createdAt'])
           && incoming().fromUid == request.auth.uid
           // The same 700 KB the app enforces, enforced again where it cannot
@@ -547,6 +575,52 @@ service cloud.firestore {
 
         allow update, delete: if false;
       }
+    }
+
+    // ------------------------------------------------------------ blocks
+    //
+    // One document per account: the uids it has blocked. Private — only its
+    // owner can read it, so nobody can find out who has blocked them. The
+    // rules above read it with get(), which is not limited by this.
+
+    match /blocks/{userId} {
+      allow read: if isSelf(userId);
+
+      allow create, update: if isSelf(userId)
+        && incoming().keys().hasOnly(['uids', 'updatedAt'])
+        && incoming().uids is list
+        && incoming().uids.size() <= 500;
+
+      allow delete: if isSelf(userId);
+    }
+
+    // ----------------------------------------------------------- reports
+    //
+    // Write-only. A report is for the project owner, who reads them in the
+    // Firebase console; nobody can read one from the app — not the reporter,
+    // and certainly not the person reported. The reported text is copied in,
+    // because messages cannot be deleted and the report has to say what was
+    // reported even if the conversation is later out of reach.
+
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && incoming().keys().hasOnly([
+             'reporterUid', 'targetUid', 'reason', 'details', 'chatId',
+             'messageId', 'shareId', 'messageText', 'createdAt',
+           ])
+        && incoming().reporterUid == request.auth.uid
+        && incoming().targetUid is string
+        && incoming().targetUid.size() > 0
+        && incoming().targetUid != request.auth.uid
+        && incoming().reason in ['harassment', 'inappropriate', 'spam', 'other']
+        && textWithin(incoming().details, 500)
+        && textWithin(incoming().chatId, 200)
+        && textWithin(incoming().messageId, 200)
+        && textWithin(incoming().shareId, 200)
+        && textWithin(incoming().messageText, 2000)
+        && incoming().createdAt is int;
+
+      allow read, update, delete: if false;
     }
 
     // --------------------------------------------------------- everything else

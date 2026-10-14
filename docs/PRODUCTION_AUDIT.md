@@ -399,8 +399,8 @@ These are not fixed, and each one prevents a responsible public release.
 | B-1 | Every BLOCKED check above is unrun. The fixes are uncompiled | Project owner, with the Flutter SDK |
 | B-6 | **Google sign-in is untested on a device**, and it cannot work at all until both signing fingerprints are registered and `google-services.json` is re-downloaded. `TEST_PLAN.md` §10 | Owner, with the console and a phone |
 | B-7 | The Google button carries **no Google logo**. Google's branding guidelines require their supplied asset, and an approximation of someone else's mark is worse than none — so it is words only for now. This must be settled before a Play listing | Owner — add the official asset |
-| B-2 | **No privacy policy exists.** Play requires a reachable URL for any app that collects a name, an email address or user content. NoteNest collects all three | Owner must host one; a draft is in `PRIVACY_DATA_INVENTORY.md` |
-| B-3 | **No reporting, blocking or moderation for chat.** Play's user-generated-content policy requires an in-app way to report content and to block a user, for any app where people message each other. Not implemented | Needs building; scoped in `PLAY_STORE_RELEASE_CHECKLIST.md` |
+| B-2 | **Privacy policy written, not yet hosted.** `docs/privacy-policy.html` (October 2026). Play needs a reachable URL | Owner: enable GitHub Pages on `/docs` |
+| B-3 | **Report and block built (October 2026)**: hold a message, or the menu on a private chat or shared note. Blocking is enforced by the rules in private chats. Needs the updated rules deployed and a device test; reports are reviewed per `MODERATION.md` | Owner: deploy rules, test, review reports |
 | B-4 | Release AAB never built or installed on a real device | Owner |
 | B-5 | Teacher assignments are described in project documents and do not exist. If any store listing or report claims them, it is inaccurate | Owner — either build or stop claiming |
 

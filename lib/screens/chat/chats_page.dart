@@ -89,6 +89,17 @@ class _ThreadsState extends State<_Threads> {
 
   @override
   Widget build(BuildContext context) {
+    final cloud = CloudService.instance;
+    // Its own listener: this widget is built `const` by the page, so the
+    // page's rebuild does not reach it, and a block made in a conversation
+    // must still take that conversation off this list.
+    return ListenableBuilder(
+      listenable: cloud,
+      builder: (context, _) => _lists(context, cloud),
+    );
+  }
+
+  Widget _lists(BuildContext context, CloudService cloud) {
     return StreamBuilder<List<StudyGroup>>(
       stream: _groups,
       builder: (context, groupSnap) {
@@ -96,7 +107,10 @@ class _ThreadsState extends State<_Threads> {
           stream: _direct,
           builder: (context, directSnap) {
             final groups = groupSnap.data ?? const <StudyGroup>[];
-            final direct = directSnap.data ?? const <ChatThread>[];
+            final me = cloud.uid ?? '';
+            final direct = (directSnap.data ?? const <ChatThread>[])
+                .where((t) => !cloud.isBlocked(t.otherMember(me)))
+                .toList();
 
             if (!groupSnap.hasData && !directSnap.hasData) {
               return const Center(child: CircularProgressIndicator());

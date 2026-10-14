@@ -71,6 +71,20 @@ String groupChatId(String groupId) => 'grp_$groupId';
 /// True when an id is a well-formed direct address for exactly these two.
 bool isDirectChatId(String id, String a, String b) => id == directChatId(a, b);
 
+/// The other person in a direct conversation, read off its address, or '' when
+/// [chatId] is not a direct address that includes [me].
+///
+/// Firebase uids are letters and digits, so the underscore that joins them
+/// cannot appear inside one.
+String directChatOther(String chatId, String? me) {
+  if (me == null || !chatId.startsWith('dm_')) return '';
+  final parts = chatId.substring(3).split('_');
+  if (parts.length != 2) return '';
+  if (parts[0] == me) return parts[1];
+  if (parts[1] == me) return parts[0];
+  return '';
+}
+
 /// One `chats/{chatId}` document.
 class ChatThread {
   const ChatThread({

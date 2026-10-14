@@ -2012,6 +2012,21 @@ void main() {
     });
   });
 
+  group('direct chat address', () {
+    test('the other person is read off the address', () {
+      final id = directChatId('bob', 'alice');
+      expect(directChatOther(id, 'alice'), 'bob');
+      expect(directChatOther(id, 'bob'), 'alice');
+    });
+
+    test('anything that is not a direct thread of mine gives nobody', () {
+      expect(directChatOther(directChatId('a', 'b'), 'c'), '');
+      expect(directChatOther('grp_g1', 'a'), '');
+      expect(directChatOther('dm_a_b_c', 'a'), '');
+      expect(directChatOther(directChatId('a', 'b'), null), '');
+    });
+  });
+
   group('password hash', () {
     // The hash is built by hand from HMAC, so it is checked against the
     // published PBKDF2-HMAC-SHA256 vectors rather than against itself. A

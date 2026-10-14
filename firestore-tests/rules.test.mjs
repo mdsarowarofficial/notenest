@@ -246,3 +246,60 @@ test('blobs: payload only', async () => {
   await assertFails(setDoc(doc(a, 'chats/dm_alice_bob/blobs/b2'),
     { payload: 'x', fromUid: 'alice', createdAt: now(), more: 'y' }));
 });
+
+// ------------------------------------------------------- blocks, reports
+
+async function openDm(db) {
+  await setDoc(doc(db, 'chats/dm_alice_bob'),
+    { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true });
+}
+
+test('blocks: private to their owner', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertSucceeds(setDoc(doc(a, 'blocks/alice'),
+    { uids: ['bob'], updatedAt: now() }));
+  await assertSucceeds(getDoc(doc(a, 'blocks/alice')));
+  await assertFails(getDoc(doc(as('bob', 'bob@uni.edu'), 'blocks/alice')));
+  await assertFails(setDoc(doc(as('bob', 'bob@uni.edu'), 'blocks/alice'),
+    { uids: [], updatedAt: now() }));
+  await assertFails(setDoc(doc(a, 'blocks/alice'),
+    { uids: ['bob'], updatedAt: now(), extra: 1 }));
+});
+
+test('blocks: a blocked person cannot message or open a DM; others still can', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  const b = as('bob', 'bob@uni.edu');
+  await openDm(a);
+  await assertSucceeds(setDoc(doc(b, 'chats/dm_alice_bob/messages/m0'), message('bob')));
+  await setDoc(doc(a, 'blocks/alice'), { uids: ['bob'], updatedAt: now() });
+  await assertFails(setDoc(doc(b, 'chats/dm_alice_bob/messages/m1'), message('bob')));
+  await assertFails(setDoc(doc(b, 'chats/dm_alice_bob/blobs/x1'),
+    { payload: 'x', fromUid: 'bob', createdAt: now() }));
+  // Alice, who did the blocking, is not blocked herself.
+  await assertSucceeds(setDoc(doc(a, 'chats/dm_alice_bob/messages/m2'), message('alice')));
+  // A fresh DM with someone who blocked you is refused.
+  await setDoc(doc(as('carol', 'c@uni.edu'), 'blocks/carol'), { uids: ['bob'], updatedAt: now() });
+  await assertFails(setDoc(doc(b, 'chats/dm_bob_carol'),
+    { kind: 'direct', memberUids: ['bob', 'carol'] }));
+  // Unblocking restores it.
+  await setDoc(doc(a, 'blocks/alice'), { uids: [], updatedAt: now() });
+  await assertSucceeds(setDoc(doc(b, 'chats/dm_alice_bob/messages/m3'), message('bob')));
+});
+
+const report = (from, target, extra = {}) => ({
+  reporterUid: from, targetUid: target, reason: 'harassment', details: '',
+  chatId: 'dm_alice_bob', messageId: 'm1', shareId: '', messageText: 'mean',
+  createdAt: now(), ...extra,
+});
+
+test('reports: write-only, as yourself, about someone else', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertSucceeds(setDoc(doc(a, 'reports/r1'), report('alice', 'bob')));
+  await assertFails(getDoc(doc(a, 'reports/r1')));
+  await assertFails(getDoc(doc(as('bob', 'bob@uni.edu'), 'reports/r1')));
+  await assertFails(setDoc(doc(a, 'reports/r2'), report('bob', 'carol')));
+  await assertFails(setDoc(doc(a, 'reports/r3'), report('alice', 'alice')));
+  await assertFails(setDoc(doc(a, 'reports/r4'), report('alice', 'bob', { reason: 'boring' })));
+  await assertFails(setDoc(doc(a, 'reports/r5'), report('alice', 'bob', { extra: 1 })));
+  await assertFails(updateDoc(doc(a, 'reports/r1'), { details: 'edit' }));
+});

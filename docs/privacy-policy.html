@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoteNest — Privacy Policy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem;
+    color: #1b1e2b; background: #fbfaf7;
+  }
+  h1 { font-size: 1.9rem; margin-bottom: .2rem; }
+  h2 { font-size: 1.2rem; margin-top: 2.2rem; }
+  .meta { color: #6b6f80; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; margin: .8rem 0; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; padding: .5rem .6rem; border-bottom: 1px solid #e3e1da; }
+  th { background: #f1efe8; }
+  .wrap { overflow-x: auto; }
+  code { font-size: .9em; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e9e8e4; background: #17181d; }
+    th { background: #23252d; }
+    th, td { border-color: #33353f; }
+    .meta { color: #9a9daa; }
+  }
+</style>
+</head>
+<body>
+
+<h1>NoteNest — Privacy Policy</h1>
+<p class="meta">Effective 15 October 2026</p>
+
+<p>NoteNest is a notebook app for students. This policy explains what it
+collects, where that information goes, who can see it, and how to delete it.
+It describes the app as it is actually built; nothing here is boilerplate.</p>
+
+<p>NoteNest is run by <strong>Md Sarowar Hossain</strong>. Questions, requests and
+complaints: <strong>Seyamhossainpop@gmail.com</strong>.</p>
+
+<h2>1. The short version</h2>
+<ul>
+  <li>Your notes, subjects, exams, photos, PDFs and recordings are stored
+    <strong>on your phone</strong>. They leave it only when you choose to share
+    a note.</li>
+  <li>The cloud account is <strong>optional</strong>. You need it only to share
+    notes with classmates, join study groups and chat.</li>
+  <li>There are <strong>no ads, no analytics and no trackers</strong> in the
+    app, and your information is never sold.</li>
+  <li>You can delete your account, and everything on your phone, from inside
+    the app: <em>Profile → Delete account</em>.</li>
+</ul>
+
+<h2>2. What stays on your phone</h2>
+<p>When you create an account in NoteNest, these are kept in the app's private
+storage on your device:</p>
+<ul>
+  <li>your name, email address and (if you give it) your institution;</li>
+  <li>your password, stored only as a salted, slow hash (PBKDF2-HMAC-SHA256),
+    never as the password itself;</li>
+  <li>your notes, subjects, exams, reminders, settings and cover-page drafts;</li>
+  <li>photos, PDFs and voice recordings you attach to notes.</li>
+</ul>
+<p>This data is not encrypted by the app, so anyone who can unlock your phone
+can read it. If Android backup is switched on for your Google account, Android
+may include the app's data in that backup; that backup is controlled by your
+phone's settings and by Google, not by NoteNest.</p>
+
+<h2>3. What goes to the cloud, and only if you connect a cloud account</h2>
+<p>The cloud features run on <strong>Google Firebase</strong> (Authentication
+and Cloud Firestore). Google processes this data on our behalf; see
+<a href="https://policies.google.com/privacy">Google's Privacy Policy</a> and
+<a href="https://firebase.google.com/support/privacy">Firebase privacy information</a>.</p>
+
+<div class="wrap">
+<table>
+  <tr><th>What</th><th>Why</th><th>Who can see it in the app</th></tr>
+  <tr><td>Your email address, and your password (held by Firebase Authentication, never by us in readable form)</td>
+      <td>To sign you in</td><td>Nobody</td></tr>
+  <tr><td>If you sign in with Google: your Google account's name and email address</td>
+      <td>To sign you in without a password</td><td>Nobody beyond your profile below</td></tr>
+  <tr><td>Your profile: name, email address, student or teacher, institution</td>
+      <td>So classmates know who sent something</td>
+      <td>Other signed-in NoteNest users who already know your account, for example people in your groups</td></tr>
+  <tr><td>Your email address in a lookup index (only once you have confirmed it)</td>
+      <td>So a classmate who types your exact address can find you</td>
+      <td>Someone who types your exact address learns that it has an account; they do not get a list of anyone</td></tr>
+  <tr><td>Study groups: name, subject, members, join code</td>
+      <td>Groups and their chat</td><td>Members of that group</td></tr>
+  <tr><td>Notes you share, including any attached files (up to 700&nbsp;KB)</td>
+      <td>To deliver them</td><td>You and the person you sent it to</td></tr>
+  <tr><td>Chat messages, notes posted in chat, read receipts and "typing" status</td>
+      <td>Chat</td><td>The people in that conversation</td></tr>
+  <tr><td>The list of people you have blocked</td>
+      <td>To hide them from you</td><td>Only you. People are not told you blocked them</td></tr>
+  <tr><td>Reports you make, including the reported text</td>
+      <td>To review abuse</td><td>Only the NoteNest operator. The reported person is not told who reported them</td></tr>
+</table>
+</div>
+
+<p><strong>The operator can read cloud data.</strong> Through the Firebase
+console, the person running NoteNest can technically see everything stored in
+the cloud, including shared notes and messages. We look at it only to
+investigate reports, fix problems, or when the law requires it. Messages are
+not end-to-end encrypted. Data is encrypted in transit (HTTPS) and stored
+encrypted by Google.</p>
+
+<h2>4. Microphone and dictation</h2>
+<p>NoteNest asks for the microphone only when you record a voice note or use
+dictation. Recordings are saved on your phone. <strong>Dictation</strong> uses
+your phone's own speech-recognition service. On most Android phones that is
+Google's, which may send the audio to Google to turn it into text, unless an
+offline language pack is installed. That is how Android works; NoteNest does
+not receive or keep that audio.</p>
+
+<h2>5. What we do not do</h2>
+<ul>
+  <li>No advertising, analytics, crash-reporting or tracking software.</li>
+  <li>No selling or renting of personal information.</li>
+  <li>No access to your location, contacts, call logs or other apps' files.</li>
+</ul>
+
+<h2>6. Safety: reporting and blocking</h2>
+<p>Hold any message, or open the menu on a conversation or shared note, to
+report it or block its sender. You must not send anything abusive, hateful,
+sexual or illegal. We review reports and may remove content or delete accounts
+that break these rules.</p>
+
+<h2>7. Deleting your data</h2>
+<p>Go to <em>Profile → Delete account</em>. You will be asked to confirm with
+your password, or with Google if you sign in with Google. This deletes:</p>
+<ul>
+  <li>everything NoteNest stored on your phone;</li>
+  <li>your cloud profile, your email lookup entry and your Firebase sign-in;</li>
+  <li>study groups you created (for all their members); you are removed from
+    other groups;</li>
+  <li>notes you have sent that are still waiting, and notes waiting for you;</li>
+  <li>your block list.</li>
+</ul>
+<p>It does <strong>not</strong> delete messages you already sent in
+conversations, or notes other people already accepted into their own
+notebooks. Those now belong to the other people's copies, under the name you
+used when you sent them. Reports you made are kept for safety review.</p>
+<p>If you cannot use the app, email <strong>Seyamhossainpop@gmail.com</strong> from the
+address on your account and we will delete the cloud account for you.</p>
+
+<h2>8. Children</h2>
+<p>NoteNest is meant for students aged 13 and over. It is not directed at
+children under 13, and we do not knowingly collect their information. If you
+believe a child under 13 has created an account, contact us and we will delete
+it.</p>
+
+<h2>9. Changes to this policy</h2>
+<p>If this policy changes, the new version will be posted at this address with
+a new effective date. Significant changes will also be mentioned in the app's
+update notes.</p>
+
+<h2>10. Contact</h2>
+<p><strong>Md Sarowar Hossain</strong> — <strong>Seyamhossainpop@gmail.com</strong></p>
+
+</body>
+</html>

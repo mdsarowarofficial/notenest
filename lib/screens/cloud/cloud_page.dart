@@ -319,6 +319,13 @@ class _CloudPageState extends State<CloudPage> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
 
+        if (_cloud.blockedUids.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const Text('BLOCKED', style: nestEyebrow),
+          const SizedBox(height: 8),
+          _BlockedList(uids: _cloud.blockedUids.toList()..sort()),
+        ],
+
         const SizedBox(height: 26),
         OutlinedButton.icon(
           onPressed: _cloud.isBusy ? null : _disconnect,
@@ -501,12 +508,83 @@ class _CloudPageState extends State<CloudPage> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        // Google Play's user-generated content policy asks that the rules be
+        // shown before people can post. Short on purpose: a wall of terms is
+        // a wall nobody reads.
+        Text(
+          'By connecting you agree not to send anything abusive, hateful, '
+          'sexual or illegal. Hold any message to report or block its sender; '
+          'reported content is reviewed and accounts that break these rules '
+          'are removed.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }
 }
 
 // ------------------------------------------------------------- small parts
+
+/// Everyone this account has blocked, each with a way back.
+class _BlockedList extends StatelessWidget {
+  const _BlockedList({required this.uids});
+
+  final List<String> uids;
+
+  @override
+  Widget build(BuildContext context) {
+    final cloud = CloudService.instance;
+    return FutureBuilder<List<CloudProfile>>(
+      // Keyed on the list, so unblocking one person refetches the rest.
+      key: ValueKey(uids.join(',')),
+      future: cloud.profilesFor(uids),
+      builder: (context, snap) {
+        final names = {
+          for (final p in snap.data ?? const <CloudProfile>[])
+            p.uid: p.name.trim().isEmpty ? p.email : p.name.trim(),
+        };
+        return Column(
+          children: [
+            for (final id in uids)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.block_rounded,
+                        size: 16, color: NestColor.inkFaint),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        // A deleted account has no profile left to name it.
+                        names[id] ?? 'A former account',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: cloud.isBusy
+                          ? null
+                          : () async {
+                              try {
+                                await cloud.unblock(id);
+                              } on CloudException catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(e.message)),
+                                );
+                              }
+                            },
+                      child: const Text('Unblock'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
 
 class _Banner extends StatelessWidget {
   const _Banner({

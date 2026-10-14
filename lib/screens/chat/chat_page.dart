@@ -8,6 +8,7 @@ import '../../models/note.dart';
 import '../../models/note_bundle.dart';
 import '../../models/note_share.dart';
 import '../../theme/nest_theme.dart';
+import 'safety_actions.dart';
 
 /// One conversation — a group's or one person's.
 ///
@@ -155,8 +156,23 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  /// The other person, for a direct conversation; '' in a group.
+  String get _otherUid => directChatOther(widget.chatId, _cloud.uid);
+
   @override
   Widget build(BuildContext context) {
+    // Rebuilt when the block list changes, so blocking somebody from this
+    // screen hides them from it at once.
+    return ListenableBuilder(
+      listenable: _cloud,
+      builder: (context, _) => _scaffold(context),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
+    final other = _otherUid;
+    final blockedOther = other.isNotEmpty && _cloud.isBlocked(other);
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -169,6 +185,19 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ],
         ),
+        actions: [
+          if (other.isNotEmpty)
+            IconButton(
+              tooltip: 'Report or block',
+              icon: const Icon(Icons.more_vert_rounded),
+              onPressed: () => showSafetySheet(
+                context,
+                targetUid: other,
+                targetName: widget.title,
+                chatId: widget.chatId,
+              ),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -187,7 +216,11 @@ class _ChatPageState extends State<ChatPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final messages = snap.data!;
+                // Messages from anyone this account has blocked are not shown.
+                // They are still in the conversation for everybody else.
+                final messages = snap.data!
+                    .where((m) => !_cloud.isBlocked(m.fromUid))
+                    .toList();
                 if (messages.isEmpty) {
                   return const _Centered(
                     icon: Icons.chat_bubble_outline_rounded,
@@ -238,13 +271,49 @@ class _ChatPageState extends State<ChatPage> {
                     ?.copyWith(color: NestColor.redPen),
               ),
             ),
-          _Composer(
-            controller: _input,
-            sending: _sending,
-            onChanged: (_) => _cloud.setTyping(widget.chatId),
-            onSend: _send,
-            onPostNote: _postNote,
-          ),
+          if (blockedOther)
+            SafeArea(
+              top: false,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                decoration: const BoxDecoration(
+                  color: NestColor.card,
+                  border: Border(top: BorderSide(color: NestColor.rule)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'You blocked ${widget.title}.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        try {
+                          await _cloud.unblock(other);
+                        } on CloudException catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message)),
+                          );
+                        }
+                      },
+                      child: const Text('Unblock'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            _Composer(
+              controller: _input,
+              sending: _sending,
+              onChanged: (_) => _cloud.setTyping(widget.chatId),
+              onSend: _send,
+              onPostNote: _postNote,
+            ),
         ],
       ),
     );
@@ -300,6 +369,23 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final at = message.createdAt;
 
+    return GestureDetector(
+      // Holding somebody else's message is where people look for "report".
+      onLongPress: mine
+          ? null
+          : () => showSafetySheet(
+                context,
+                targetUid: message.fromUid,
+                targetName: message.fromLabel,
+                chatId: chatId,
+                messageId: message.id,
+                messageText: message.isNote ? message.title : message.text,
+              ),
+      child: _content(context, at),
+    );
+  }
+
+  Widget _content(BuildContext context, DateTime? at) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(

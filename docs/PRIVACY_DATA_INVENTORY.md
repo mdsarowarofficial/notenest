@@ -46,6 +46,14 @@ Only when the student creates a cloud account. The app works without one.
 | `chats/{id}` | last message text, sender name, read receipts, typing flags, member uids | participants |
 | `chats/{id}/messages` | text, sender uid and name, kind, thumbnail | participants |
 | `chats/{id}/blobs` | a posted note's payload | participants |
+| `blocks/{uid}` | the uids this account has blocked | the owner only |
+| `reports/{id}` | reporter, reported uid, reason, details, the reported text | **nobody in the app**; the project owner in the console |
+
+`emailIndex` entries are written only for addresses Firebase has verified
+(Google sign-in, or a password account whose confirmation link was opened).
+
+Signing in with Google (`google_sign_in`) hands Firebase the Google account's
+name and email address; nothing else from the Google account is requested.
 
 **The email address is taken from the Firebase token, not from what the client
 typed**, so nobody can register under someone else's address.
@@ -76,14 +84,23 @@ platform's behaviour, not something NoteNest chooses, and it must be disclosed.
 | `users/{uid}` | **deleted** |
 | `emailIndex/{address}` | **deleted**, so the address can be registered again |
 | Firebase Authentication user | **deleted** |
+| Groups the account owns | **deleted**, for every member, with their join codes |
+| Membership of other groups | **removed** |
+| Shares sent or received, answered or waiting | **deleted** |
+| `blocks/{uid}` | **deleted** |
 | Messages already sent | **kept**, in the recipients' threads, under the name they were sent with |
 | Notes already shared and accepted | **kept**, in the recipients' notebooks |
-| Group membership | the uid stays in the group's member list; the app shows a former member |
+| Reports the account made | **kept**, for safety review |
 
-The last three are disclosed in the deletion dialog before the student confirms,
-and they must be disclosed in the Data Safety form too. The reason is honest and
-should be given honestly: deleting them would mean reaching into other people's
-data, and on the Spark plan there is no server-side job that could do it safely.
+The kept items are disclosed in the deletion dialog before the student
+confirms, and must be disclosed in the Data Safety form too. The reason is
+honest and should be given honestly: messages and accepted notes are in other
+people's conversations and notebooks, and the rules let nobody delete a message.
+
+**Android backup.** The manifest leaves `allowBackup` at its default, so
+Android's Auto Backup may copy the app's database and files to the user's own
+Google account. That is what lets notes survive a change of phone — notes are
+otherwise device-only — and it is disclosed in the policy.
 
 ## Data Safety form — the answers this evidence supports
 
@@ -104,10 +121,12 @@ data, and on the Spark plan there is no server-side job that could do it safely.
 | Third-party advertising or analytics | **none** |
 | Data used for tracking | **no** |
 
-## Privacy policy — still to be written and hosted
+## Privacy policy
 
-**This is a release blocker.** Play requires a reachable URL. It can be a GitHub
-Pages page, which is free. The policy must state, at minimum:
+Written: `docs/privacy-policy.html`, built from this file. **Still a release
+blocker until it is hosted.** With GitHub Pages serving `/docs` from `main`, the
+URL is `https://mdsarowarofficial.github.io/notenest/privacy-policy.html`.
+Whatever changes here must change there. It covers, as Play requires:
 
 1. Who runs the app and how to reach them.
 2. That a name, an email address and whatever the student writes are collected.

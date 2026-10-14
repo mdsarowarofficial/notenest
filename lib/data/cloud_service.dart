@@ -201,6 +201,112 @@ class CloudService extends ChangeNotifier {
     _profile = null;
     _profileCache.clear();
     _lastTypingWrite.clear();
+    await _blockSub?.cancel();
+    _blockSub = null;
+    _blocked = const {};
+  }
+
+  // ---------------------------------------------------- blocking, reports
+  //
+  // Google Play requires an app where people message each other to let them
+  // block someone and report what they send. Blocking is private: the list
+  // lives at blocks/{uid}, readable only by its owner, and the person blocked
+  // is never told. Their messages and notes are hidden here, and the rules
+  // stop them writing to a direct conversation with whoever blocked them.
+
+  Set<String> _blocked = const {};
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _blockSub;
+
+  /// Everyone this account has blocked.
+  Set<String> get blockedUids => _blocked;
+
+  bool isBlocked(String? otherUid) =>
+      otherUid != null && _blocked.contains(otherUid);
+
+  DocumentReference<Map<String, dynamic>> _blockDoc(String me) =>
+      _store.collection('blocks').doc(me);
+
+  void _watchBlocks(String me) {
+    _blockSub?.cancel();
+    _blockSub = _blockDoc(me).snapshots().listen(
+      (snap) {
+        final raw = snap.data()?['uids'];
+        _blocked = raw is List ? raw.whereType<String>().toSet() : const {};
+        notifyListeners();
+      },
+      // A list that cannot be read is treated as empty rather than as an
+      // error on every screen; blocking is checked again by the rules.
+      onError: (Object _) {},
+    );
+  }
+
+  Future<void> block(String otherUid) => _setBlocked(otherUid, true);
+
+  Future<void> unblock(String otherUid) => _setBlocked(otherUid, false);
+
+  Future<void> _setBlocked(String otherUid, bool blocked) async {
+    _requireReady();
+    final me = uid;
+    if (me == null) {
+      throw const CloudException('You are not connected to the cloud.');
+    }
+    if (otherUid.isEmpty || otherUid == me) return;
+    await _run(() async {
+      await _blockDoc(me).set({
+        'uids': blocked
+            ? FieldValue.arrayUnion([otherUid])
+            : FieldValue.arrayRemove([otherUid]),
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      }, SetOptions(merge: true));
+    });
+    // Shown at once rather than when the listener catches up, so the screen
+    // that asked does not show the person for another second.
+    _blocked = blocked ? {..._blocked, otherUid} : ({..._blocked}..remove(otherUid));
+    notifyListeners();
+  }
+
+  /// Why someone is being reported. The keys are what the rules accept.
+  static const reportReasons = <String, String>{
+    'harassment': 'Bullying or harassment',
+    'inappropriate': 'Inappropriate or offensive content',
+    'spam': 'Spam or scam',
+    'other': 'Something else',
+  };
+
+  /// Sends a report for the project owner to review in the Firebase console.
+  ///
+  /// The text of the message is copied into the report, because a report that
+  /// only points at a message is a report of nothing once that message's
+  /// conversation is gone. Nobody can read reports from the app — not the
+  /// person reporting, and not the person reported.
+  Future<void> report({
+    required String targetUid,
+    required String reason,
+    String details = '',
+    String chatId = '',
+    String messageId = '',
+    String shareId = '',
+    String messageText = '',
+  }) async {
+    _requireReady();
+    final me = uid;
+    if (me == null) {
+      throw const CloudException('You are not connected to the cloud.');
+    }
+    String cap(String s, int n) => s.length > n ? s.substring(0, n) : s;
+    await _run(() async {
+      await _store.collection('reports').add({
+        'reporterUid': me,
+        'targetUid': targetUid,
+        'reason': reportReasons.containsKey(reason) ? reason : 'other',
+        'details': cap(details.trim(), 500),
+        'chatId': cap(chatId, 200),
+        'messageId': cap(messageId, 200),
+        'shareId': cap(shareId, 200),
+        'messageText': cap(messageText, 2000),
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    });
   }
 
   // -------------------------------------------------------- verification
@@ -300,6 +406,7 @@ class CloudService extends ChangeNotifier {
       await _users.doc(user.uid).set(profile.toMap());
       _writeEmailIndex(user.uid, profile.email);
       _profile = profile;
+      _watchBlocks(user.uid);
     });
   }
 
@@ -530,6 +637,12 @@ class CloudService extends ChangeNotifier {
         // Next query.
       }
     }
+
+    try {
+      await _blockDoc(me).delete();
+    } catch (_) {
+      // The block list is private and small; a leftover one harms nobody.
+    }
   }
 
   /// Deletes documents in batches below Firestore's 500-write ceiling.
@@ -636,6 +749,9 @@ class CloudService extends ChangeNotifier {
   }
 
   Future<void> _loadProfile(String id) async {
+    // Every way into the cloud passes through here, so this is where the block
+    // list starts being followed.
+    _watchBlocks(id);
     try {
       final snapshot = await _users.doc(id).get();
       final data = snapshot.data();
@@ -946,10 +1062,19 @@ class CloudService extends ChangeNotifier {
     final id = uid;
     if (!_ready || id == null) return Stream.value(const []);
     return _shares.where('toUid', isEqualTo: id).snapshots().map((snap) {
-      final shares = snap.docs
-          .map((d) => NoteShare.fromMap(d.id, d.data()))
-          .where((s) => s.isPending)
-          .toList();
+      final shares = <NoteShare>[];
+      for (final d in snap.docs) {
+        final share = NoteShare.fromMap(d.id, d.data());
+        if (!share.isPending) continue;
+        // From somebody this account has blocked: not shown, and removed so
+        // it does not sit in the project's storage either. The recipient is
+        // allowed to delete a share addressed to them.
+        if (isBlocked(share.fromUid)) {
+          unawaited(d.reference.delete().catchError((Object _) {}));
+          continue;
+        }
+        shares.add(share);
+      }
       shares.sort((a, b) {
         final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);

@@ -11,6 +11,7 @@ import '../../widgets/nest_empty_state.dart';
 import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
 import '../chat/chat_page.dart';
+import '../chat/safety_actions.dart';
 import '../share/import_page.dart';
 import '../share/request_note_sheet.dart';
 
@@ -210,42 +211,52 @@ class _PendingBandState extends State<_PendingBand> {
 
     return StreamBuilder<List<NoteShare>>(
       stream: _stream(),
-      builder: (context, snap) {
-        final waiting = snap.data ?? const <NoteShare>[];
-        if (waiting.isEmpty) return const SizedBox.shrink();
+      builder: (context, snap) => ListenableBuilder(
+        // So a sender blocked from one of these tiles leaves the band at once.
+        listenable: cloud,
+        builder: (context, _) => _band(
+          context,
+          (snap.data ?? const <NoteShare>[])
+              .where((s) => !cloud.isBlocked(s.fromUid))
+              .toList(),
+        ),
+      ),
+    );
+  }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _band(BuildContext context, List<NoteShare> waiting) {
+    if (waiting.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    waiting.length == 1
-                        ? '1 note waiting'
-                        : '${waiting.length} notes waiting',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                const Icon(
-                  Icons.mark_email_unread_outlined,
-                  color: NestColor.pen,
-                ),
-              ],
+            Expanded(
+              child: Text(
+                waiting.length == 1
+                    ? '1 note waiting'
+                    : '${waiting.length} notes waiting',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Nothing is added to your notebook until you accept it.',
-              style: Theme.of(context).textTheme.bodySmall,
+            const Icon(
+              Icons.mark_email_unread_outlined,
+              color: NestColor.pen,
             ),
-            const SizedBox(height: 12),
-            for (final share in waiting) _PendingTile(share: share),
-            const SizedBox(height: 22),
-            const Divider(color: NestColor.rule),
-            const SizedBox(height: 8),
           ],
-        );
-      },
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Nothing is added to your notebook until you accept it.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        for (final share in waiting) _PendingTile(share: share),
+        const SizedBox(height: 22),
+        const Divider(color: NestColor.rule),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
@@ -412,6 +423,22 @@ class _PendingTileState extends State<_PendingTile> {
                   icon: const Icon(Icons.forum_outlined, size: 20),
                   color: NestColor.pen,
                   onPressed: _busy ? null : _message,
+                ),
+                IconButton(
+                  tooltip: 'Report or block',
+                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  color: NestColor.inkFaint,
+                  onPressed: _busy
+                      ? null
+                      : () => showSafetySheet(
+                            context,
+                            targetUid: share.fromUid,
+                            targetName: share.fromLabel,
+                            shareId: share.id,
+                            messageText: [share.title, share.message]
+                                .where((s) => s.trim().isNotEmpty)
+                                .join(' — '),
+                          ),
                 ),
               ],
             ),
