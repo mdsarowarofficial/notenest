@@ -551,9 +551,9 @@ class _Honesty extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Notes live on this device. A cloud account is for sharing and '
-            'chat; it is not a backup, and notes are not copied to it. Delete '
-            'the app and the notes go with it.',
+            'Notes live on this device. A cloud account is for sharing, '
+            'classes and chat; notes are not copied to it. To keep them if '
+            'this phone is lost, use Google Drive backup above.',
             style: t.bodySmall,
           ),
         ],

@@ -66,7 +66,10 @@ class _TourOverlayState extends State<_TourOverlay> {
     final box = context?.findRenderObject();
     if (box is! RenderBox || !box.hasSize || !box.attached) return null;
     final origin = box.localToGlobal(Offset.zero);
-    return (origin & box.size).inflate(6);
+    // Kept inside the screen, so a control at the edge (the menu, search)
+    // gets a whole outline rather than one cut off by the glass.
+    final screen = Offset.zero & MediaQuery.of(this.context).size;
+    return (origin & box.size).inflate(6).intersect(screen.deflate(4));
   }
 
   void _next() {

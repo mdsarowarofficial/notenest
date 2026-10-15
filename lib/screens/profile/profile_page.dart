@@ -354,6 +354,16 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ],
                 ),
+              ] else if (_repo.isTeacher) ...[
+                // A teacher has no semester and no revision plan; showing
+                // "Not set" for questions they were never asked reads as
+                // something left undone.
+                _row('UNIVERSITY',
+                    _repo.university ?? user.institution ?? 'Not set'),
+                const PaperRule(),
+                _row('COURSE', _repo.teachingCourse ?? 'Not set'),
+                const PaperRule(),
+                _row('ACCOUNT', 'Teacher'),
               ] else ...[
                 _row('UNIVERSITY', user.institution ?? 'Not set'),
                 const PaperRule(),

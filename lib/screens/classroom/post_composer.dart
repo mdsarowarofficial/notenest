@@ -178,17 +178,14 @@ class _PostComposerPageState extends State<PostComposerPage> {
             segments: const [
               ButtonSegment(
                 value: PostKind.announcement,
-                icon: Icon(Icons.campaign_outlined),
                 label: Text('Announce'),
               ),
               ButtonSegment(
                 value: PostKind.material,
-                icon: Icon(Icons.menu_book_outlined),
                 label: Text('Material'),
               ),
               ButtonSegment(
                 value: PostKind.assignment,
-                icon: Icon(Icons.assignment_outlined),
                 label: Text('Assignment'),
               ),
             ],

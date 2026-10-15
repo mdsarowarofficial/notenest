@@ -122,24 +122,73 @@ class CloudService extends ChangeNotifier {
   /// the cloud is available without a flash of the wrong state.
   Future<void> start() async {
     if (_ready) return;
+    final connecting = _connect();
     try {
-      await _connect().timeout(startupTimeout);
+      await connecting.timeout(startupTimeout);
     } on TimeoutException {
-      _ready = false;
-      _startupError = 'Firebase did not answer within '
-          '${startupTimeout.inSeconds} seconds, so the cloud is off for now. '
-          'Everything stored on this device still works. Check your '
-          'connection and reopen the app to try again.';
+      // The first frame stops waiting; the connection does not.
+      //
+      // This used to give up for the whole session, and worse, it set the
+      // cloud to "not ready" even when Firebase had already started and only
+      // the profile read was slow. On a cold start on a budget phone that is
+      // the common case, and it left a student with no cloud — and a new
+      // account with no cloud half — until they happened to restart the app.
+      // Now the attempt carries on behind the notebook and the cloud switches
+      // on by itself when it lands.
+      if (!_ready) {
+        _startupError = 'Firebase is taking longer than usual to answer. The '
+            'cloud will switch on by itself as soon as it does; everything '
+            'stored on this device works meanwhile.';
+      }
+      unawaited(connecting.then(
+        (_) {
+          _startupError = null;
+          notifyListeners();
+        },
+        onError: (Object e) {
+          if (!_ready) {
+            _startupError = 'Firebase could not start. Everything that works '
+                'on this device still works; only the cloud features are '
+                'off.\n\n$e';
+          }
+          notifyListeners();
+        },
+      ));
       notifyListeners();
       return;
     } catch (e) {
-      _ready = false;
-      _startupError = 'Firebase could not start. Everything that works on '
-          'this device still works; only the cloud features are off.\n\n$e';
+      // Only if Firebase itself did not start. A failure after that — the
+      // profile read, offline — leaves Firebase usable, and calling it "off"
+      // would hide a working cloud behind an error screen.
+      if (!_ready) {
+        _startupError = 'Firebase could not start. Everything that works on '
+            'this device still works; only the cloud features are off.\n\n$e';
+      }
       notifyListeners();
       return;
     }
     notifyListeners();
+  }
+
+  /// Waits for Firebase to start, up to [limit]. True if it is ready.
+  ///
+  /// For the moments that need the cloud now — making an account, signing in
+  /// — so a slow start costs a few seconds of spinner instead of an account
+  /// quietly made without its cloud half.
+  Future<bool> waitUntilReady(
+      [Duration limit = const Duration(seconds: 15)]) async {
+    if (_ready) return true;
+    final done = Completer<bool>();
+    void check() {
+      if (_ready && !done.isCompleted) done.complete(true);
+    }
+
+    addListener(check);
+    try {
+      return await done.future.timeout(limit, onTimeout: () => _ready);
+    } finally {
+      removeListener(check);
+    }
   }
 
   /// The part that can hang. Separated so one timeout covers all of it —

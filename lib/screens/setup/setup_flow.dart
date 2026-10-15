@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/account_sync.dart';
+import '../../data/auth_repository.dart';
 import '../../data/note_repository.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
@@ -39,7 +40,10 @@ class _SetupFlowState extends State<SetupFlow> {
   bool get _teacher => _role == 'teacher';
 
   /// Where a teacher teaches, and what — the course is optional.
-  late String _university = _repo.university ?? '';
+  // What they typed at registration, if anything, so it is not asked twice.
+  late String _university = _repo.university ??
+      AuthRepository.instance.currentUser?.institution?.trim() ??
+      '';
   late final _course = TextEditingController(text: _repo.teachingCourse ?? '');
 
   static const _roleStep = NestStep(
@@ -246,8 +250,10 @@ class _SetupFlowState extends State<SetupFlow> {
                       child: const Text('Back'),
                     ),
                   const Spacer(),
-                  SizedBox(
-                    width: 180,
+                  ConstrainedBox(
+                    // A floor, not a fixed width: "Open my notebook" wrapped onto
+                    // two lines inside 180px at a normal text size.
+                    constraints: const BoxConstraints(minWidth: 180),
                     child: FilledButton(
                       onPressed: _busy ? null : _next,
                       child: Text(

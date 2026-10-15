@@ -175,11 +175,15 @@ Future<void> _openInDrive(BuildContext context, ClassFile file) async {
   }
 }
 
-Future<Uint8List> _download(BuildContext context, ClassFile file) async {
+Future<Uint8List> _download(
+  BuildContext context,
+  ClassFile file, {
+  String verb = 'Opening',
+}) async {
   final messenger = ScaffoldMessenger.of(context);
   messenger.showSnackBar(
     SnackBar(
-      content: Text('Opening ${file.name}…'),
+      content: Text('$verb ${file.name}…'),
       duration: const Duration(seconds: 20),
     ),
   );
@@ -259,7 +263,7 @@ Future<void> saveClassFileToNotes(
 
   final messenger = ScaffoldMessenger.of(context);
   try {
-    final bytes = await _download(context, file);
+    final bytes = await _download(context, file, verb: 'Downloading');
     final ext = file.isPdf
         ? 'pdf'
         : (file.name.contains('.') ? file.name.split('.').last : 'jpg');

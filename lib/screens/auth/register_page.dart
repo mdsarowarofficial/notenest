@@ -139,7 +139,12 @@ class _RegisterPageState extends State<RegisterPage> {
     // after the device account on purpose: the device account is the one that
     // owns the notes, and it must not depend on a network that may not be
     // there.
-    if (_alsoCloud && CloudService.instance.isReady) {
+    if (_alsoCloud && !await CloudService.instance.waitUntilReady()) {
+      // Said, not skipped. This used to be a silent `isReady &&`, so on a slow
+      // start the student got a notebook with no cloud account and no word of
+      // why classes and sharing then asked them to connect one.
+      _cloudNote = 'the cloud could not be reached just now.';
+    } else if (_alsoCloud) {
       try {
         await CloudService.instance.createAccount(
           name: _name.text,
@@ -163,7 +168,8 @@ class _RegisterPageState extends State<RegisterPage> {
         SnackBar(
           content: Text(
             'Your notebook is ready, but the cloud account was not made: '
-            '$_cloudNote You can connect one later from the drawer.',
+            '$_cloudNote Connect it later from Settings → Cloud account, '
+            'with the same email and password.',
           ),
           duration: const Duration(seconds: 7),
         ),
@@ -185,7 +191,7 @@ class _RegisterPageState extends State<RegisterPage> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 48, 24),
+              padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 430),
                 child: Column(
@@ -283,7 +289,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _role.blurb,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (CloudService.instance.isReady) ...[
+                          ...[
                             const SizedBox(height: 16),
                             SwitchListTile.adaptive(
                               contentPadding: EdgeInsets.zero,

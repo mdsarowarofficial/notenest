@@ -406,17 +406,20 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
 
 // ------------------------------------------------------------ join a group
 
-Future<void> showJoinGroupSheet(BuildContext context) {
+Future<void> showJoinGroupSheet(BuildContext context, {bool asClass = false}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _JoinGroupSheet(),
+    builder: (_) => _JoinGroupSheet(asClass: asClass),
   );
 }
 
 class _JoinGroupSheet extends StatefulWidget {
-  const _JoinGroupSheet();
+  const _JoinGroupSheet({this.asClass = false});
+
+  /// Opened from Classes, where "group" is the wrong word for what is joined.
+  final bool asClass;
 
   @override
   State<_JoinGroupSheet> createState() => _JoinGroupSheetState();
@@ -470,7 +473,7 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
   @override
   Widget build(BuildContext context) {
     return _Sheet(
-      title: 'Join a group',
+      title: widget.asClass ? 'Join a class' : 'Join a group',
       error: _error,
       children: [
         TextField(

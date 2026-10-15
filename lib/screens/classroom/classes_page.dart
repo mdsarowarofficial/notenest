@@ -65,7 +65,7 @@ class _ClassesPageState extends State<ClassesPage> {
                     Expanded(
                       child: Text(
                         teacher ? 'Your classes' : 'Classes',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ),
                     if (teacher)
@@ -76,7 +76,7 @@ class _ClassesPageState extends State<ClassesPage> {
                       )
                     else
                       FilledButton.icon(
-                        onPressed: () => showJoinGroupSheet(context),
+                        onPressed: () => showJoinGroupSheet(context, asClass: true),
                         icon: const Icon(Icons.login_rounded, size: 18),
                         label: const Text('Join a class'),
                       ),
@@ -109,7 +109,7 @@ class _ClassesPageState extends State<ClassesPage> {
                     actionLabel: teacher ? 'New class' : 'Join a class',
                     onAction: teacher
                         ? () => showCreateClassSheet(context)
-                        : () => showJoinGroupSheet(context),
+                        : () => showJoinGroupSheet(context, asClass: true),
                   )
                 else
                   for (final c in classes) _ClassCard(group: c, me: uid),

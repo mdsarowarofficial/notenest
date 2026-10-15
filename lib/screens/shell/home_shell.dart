@@ -55,7 +55,9 @@ class _HomeShellState extends State<HomeShell> {
   final _menuKey = GlobalKey();
   final _searchKey = GlobalKey();
   final _avatarKey = GlobalKey();
-  bool _touring = false;
+  /// App-wide, not per screen: a tour already on screen must not be joined by
+  /// a second one from another copy of this page.
+  static bool _touring = false;
 
   @override
   void initState() {
@@ -103,12 +105,18 @@ class _HomeShellState extends State<HomeShell> {
     if (_touring || _repo.tourDone) return;
     _touring = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
+      if (!mounted) {
+        _touring = false;
+        return;
+      }
       setState(() => _tab = 0);
       // After the opening animation (1.75 s), which the tour would otherwise
       // cover, and with Today laid out so there is something to point at.
       await Future<void>.delayed(const Duration(milliseconds: 1900));
-      if (!mounted) return;
+      if (!mounted) {
+        _touring = false;
+        return;
+      }
       await showNestTour(context, _tourSteps());
       await _repo.saveTourDone(true);
       _touring = false;
@@ -482,7 +490,11 @@ class _HomeShellState extends State<HomeShell> {
             ? (_repo.teachingCourse ?? _repo.university ?? 'Teacher')
             : _repo.semesterLabel ?? 'No semester set',
         subjects: _repo.subjects(),
-        links: _repo.drawerLinks(),
+        // A teacher has no semesters to look back through.
+        links: _repo
+            .drawerLinks()
+            .where((l) => !_teacher || l.id != 'semesters')
+            .toList(),
         selectedId: _drawerSelection,
         synced: CloudService.instance.isSignedIn,
         onSelectSubject: (s) {

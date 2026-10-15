@@ -53,7 +53,7 @@ Future<GoogleResult> continueWithGoogle() async {
       'email and password.',
     );
   }
-  if (!cloud.isReady) {
+  if (!await cloud.waitUntilReady()) {
     return GoogleResult(
       GoogleOutcome.failed,
       cloud.startupError ??

@@ -29,6 +29,9 @@ class RestoreReport {
   final int skipped;
 
   String get summary {
+    if (notes == 0 && subjects == 0 && exams == 0) {
+      return 'Everything in the backup is already on this phone.';
+    }
     final parts = <String>[
       '$notes ${notes == 1 ? 'note' : 'notes'}',
       if (files > 0) '$files ${files == 1 ? 'file' : 'files'}',

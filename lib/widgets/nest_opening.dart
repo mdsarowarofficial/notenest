@@ -49,12 +49,16 @@ class _NestOpeningState extends State<NestOpening>
 
   @override
   Widget build(BuildContext context) {
-    if (_done) return widget.child;
-
+    // Always the same Stack with the child first, finished or not. Returning
+    // the bare child once the fold lifted changed the tree's shape, and
+    // Flutter answered by throwing the first screen away and building a new
+    // one — its state lost, and everything it started on opening (the
+    // first-run tour, the account sync) started a second time.
     return Stack(
       children: [
         widget.child,
-        Positioned.fill(
+        if (!_done)
+          Positioned.fill(
           child: IgnorePointer(
             child: AnimatedBuilder(
               animation: _c,

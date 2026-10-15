@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
   /// said first.
   Future<AuthError?> _signInFromCloud({bool rekeyExisting = false}) async {
     final cloud = CloudService.instance;
-    if (!cloud.isReady) return AuthError.emailNotFound;
+    if (!await cloud.waitUntilReady()) return AuthError.emailNotFound;
 
     try {
       await cloud.signIn(email: _email.text, password: _password.text);
@@ -252,7 +252,8 @@ class _LoginPageState extends State<LoginPage> {
       // use one password for both; try it quietly, and if it is not the cloud
       // password they can still connect from the Cloud screen.
       final cloud = CloudService.instance;
-      if (cloud.isReady && !cloud.isSignedIn) {
+      if (!cloud.isSignedIn &&
+          await cloud.waitUntilReady(const Duration(seconds: 8))) {
         try {
           await cloud.signIn(email: _email.text, password: _password.text);
         } on CloudException {
@@ -285,8 +286,9 @@ class _LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Signed in from your cloud account. Notes written on another '
-            'device are not here — only the account came across.',
+            'Signed in from your cloud account. Notes from another phone '
+            'are not here yet — if you backed them up, use Settings → '
+            'Google Drive backup → Restore.',
           ),
           duration: Duration(seconds: 6),
         ),
@@ -305,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 48, 24),
+              padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 430),
                 child: Column(
