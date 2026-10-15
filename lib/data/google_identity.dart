@@ -101,7 +101,8 @@ class GoogleAccounts {
   /// non-sensitive, needs only basic verification, and the student can see and
   /// keep every file the app saves.
   ///
-  /// Used from Stage 3. Named here so the scope lives next to the sign-in.
+  /// Used by `drive_service.dart`. Named here so the scope lives next to the
+  /// sign-in.
   static const List<String> driveScopes = <String>[
     'https://www.googleapis.com/auth/drive.file',
   ];
@@ -225,8 +226,7 @@ class GoogleAccounts {
   /// they decline — which is a real answer, not an error, and the caller is
   /// expected to carry on without Drive.
   ///
-  /// Not called yet. It is here because the scope and the sign-in belong
-  /// together, and Stage 3 should not have to reopen this file's decisions.
+  /// Called by [DriveService] for backups and class files.
   Future<String?> authorizeDrive({bool promptIfNeeded = true}) async {
     if (!isSupported) return null;
     await _ensureInitialised();

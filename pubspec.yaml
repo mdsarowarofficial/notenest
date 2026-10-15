@@ -75,6 +75,8 @@ dependencies:
   # OAuth client entry. Without that, sign-in fails as a *cancellation*, which
   # is the single most misleading error in this whole dependency.
   google_sign_in: ^7.2.0
+  http: ^1.6.0
+  url_launcher: ^6.3.3
 
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.

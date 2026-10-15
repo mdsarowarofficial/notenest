@@ -43,6 +43,7 @@ class CloudProfile {
     required this.email,
     this.role = CloudRole.student,
     this.institution = '',
+    this.photo = '',
     this.createdAt,
     this.updatedAt,
   });
@@ -55,6 +56,12 @@ class CloudProfile {
 
   final CloudRole role;
   final String institution;
+
+  /// A small square JPEG as base64, or empty. Carried in the document itself
+  /// because the project has no file storage, and kept to about ten kilobytes
+  /// so a class of sixty downloading every face is still cheap.
+  final String photo;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -78,6 +85,7 @@ class CloudProfile {
     String? name,
     CloudRole? role,
     String? institution,
+    String? photo,
     DateTime? updatedAt,
   }) =>
       CloudProfile(
@@ -86,6 +94,7 @@ class CloudProfile {
         email: email,
         role: role ?? this.role,
         institution: institution ?? this.institution,
+        photo: photo ?? this.photo,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -99,6 +108,10 @@ class CloudProfile {
         'email': normaliseEmail(email),
         'role': role.key,
         'institution': institution.trim(),
+        // Only when there is one. The rules list every field a profile may
+        // have, and a phone running this version against rules published
+        // before photos existed must still be able to create an account.
+        if (photo.isNotEmpty) 'photo': photo,
         'createdAt': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
         'updatedAt': (updatedAt ?? DateTime.now()).millisecondsSinceEpoch,
       };
@@ -126,6 +139,7 @@ class CloudProfile {
       // factory promises to survive.
       role: CloudRoleData.fromKey(text('role')),
       institution: text('institution'),
+      photo: text('photo'),
       createdAt: at('createdAt'),
       updatedAt: at('updatedAt'),
     );

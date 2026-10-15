@@ -71,5 +71,13 @@
         <intent>
             <action android:name="android.speech.RecognitionService"/>
         </intent>
+
+        <!-- Class files that are not a PDF or a picture (slides, Word files)
+             open in Google Drive's own viewer, through a browser or the Drive
+             app. url_launcher needs to be able to see what can open a link. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

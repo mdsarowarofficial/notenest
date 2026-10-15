@@ -17,14 +17,18 @@ import 'register_page.dart';
 /// The screen is drawn as the first page of the notebook: ruled paper, a red
 /// margin, subject tabs at the edge, and the form on a card laid over it.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.initialEmail});
+
+  /// Filled in when the account switcher sent somebody here for a particular
+  /// account, so they only have to type the password.
+  final String? initialEmail;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _email = TextEditingController();
+  late final _email = TextEditingController(text: widget.initialEmail ?? '');
   final _password = TextEditingController();
 
   String? _error;

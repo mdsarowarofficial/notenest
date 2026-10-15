@@ -611,6 +611,7 @@ class CloudService extends ChangeNotifier {
         final group = StudyGroup.fromMap(d.id, d.data());
         try {
           if (group.isOwner(me)) {
+            if (group.isClass) await _deleteClasswork(group.id);
             final batch = _store.batch();
             batch.delete(_groups.doc(group.id));
             batch.delete(_joinCodes.doc(normaliseJoinCode(group.joinCode)));
@@ -676,6 +677,7 @@ class CloudService extends ChangeNotifier {
     String? name,
     CloudRole? role,
     String? institution,
+    String? photo,
   }) async {
     _requireReady();
     final current = _profile;
@@ -689,12 +691,18 @@ class CloudService extends ChangeNotifier {
         name: name,
         role: role,
         institution: institution,
+        photo: photo,
         updatedAt: DateTime.now(),
       );
       // merge, so a field this version of the app does not know about is not
-      // wiped by an older client writing the whole document.
-      await _users.doc(id).set(next.toMap(), SetOptions(merge: true));
+      // wiped by an older client writing the whole document. A removed photo
+      // is the exception: merge never deletes, so it has to be said outright.
+      await _users.doc(id).set({
+        ...next.toMap(),
+        if (photo != null && photo.isEmpty) 'photo': FieldValue.delete(),
+      }, SetOptions(merge: true));
       _profile = next;
+      _profileCache[id] = next;
     });
   }
 
@@ -1043,11 +1051,31 @@ class CloudService extends ChangeNotifier {
   Future<void> deleteGroup(StudyGroup group) async {
     _requireReady();
     await _run(() async {
+      if (group.isClass) await _deleteClasswork(group.id);
       final batch = _store.batch();
       batch.delete(_groups.doc(group.id));
       batch.delete(_joinCodes.doc(normaliseJoinCode(group.joinCode)));
       await batch.commit();
     });
+  }
+
+  /// Deletes every post in a class and the work handed in under it.
+  ///
+  /// Firestore does not delete subcollections with their parent. Left behind,
+  /// classwork could never be read again — the rules read the class to decide
+  /// — but it would sit in the project for ever, students' answers included.
+  /// The teacher can read all of it, so it goes before the class does.
+  Future<void> _deleteClasswork(String classId) async {
+    final posts = await _groups.doc(classId).collection('posts').get();
+    for (final post in posts.docs) {
+      final subs = await post.reference.collection('submissions').get();
+      final batch = _store.batch();
+      for (final s in subs.docs) {
+        batch.delete(s.reference);
+      }
+      batch.delete(post.reference);
+      await batch.commit();
+    }
   }
 
   // -------------------------------------------------------------- shares

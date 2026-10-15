@@ -45,7 +45,9 @@ complaints: <strong>Seyamhossainpop@gmail.com</strong>.</p>
     <strong>on your phone</strong>. They leave it only when you choose to share
     a note.</li>
   <li>The cloud account is <strong>optional</strong>. You need it only to share
-    notes with classmates, join study groups and chat.</li>
+    notes with classmates, join study groups and classes, and chat.</li>
+  <li><strong>Google Drive</strong> is used only if you turn on backup or post a
+    file to a class, and then only for files NoteNest itself saves there.</li>
   <li>There are <strong>no ads, no analytics and no trackers</strong> in the
     app, and your information is never sold.</li>
   <li>You can delete your account, and everything on your phone, from inside
@@ -80,14 +82,18 @@ and Cloud Firestore). Google processes this data on our behalf; see
       <td>To sign you in</td><td>Nobody</td></tr>
   <tr><td>If you sign in with Google: your Google account's name and email address</td>
       <td>To sign you in without a password</td><td>Nobody beyond your profile below</td></tr>
-  <tr><td>Your profile: name, email address, student or teacher, institution</td>
+  <tr><td>Your profile: name, email address, student or teacher, institution, and a small profile photo if you add one</td>
       <td>So classmates know who sent something</td>
-      <td>Other signed-in NoteNest users who already know your account, for example people in your groups</td></tr>
+      <td>Other signed-in NoteNest users who already know your account, for example people in your groups and classes. In a class, students see each other's names and photos; only the teacher sees students' email addresses</td></tr>
   <tr><td>Your email address in a lookup index (only once you have confirmed it)</td>
       <td>So a classmate who types your exact address can find you</td>
       <td>Someone who types your exact address learns that it has an account; they do not get a list of anyone</td></tr>
   <tr><td>Study groups: name, subject, members, join code</td>
       <td>Groups and their chat</td><td>Members of that group</td></tr>
+  <tr><td>Classes: what a teacher posts (announcements, materials, assignments with deadlines and points) and the links to its files</td>
+      <td>Classwork</td><td>Members of that class</td></tr>
+  <tr><td>Work you hand in to a class: your answer text, links to your files, when you handed it in, and the grade and private feedback the teacher gives</td>
+      <td>Handing in and grading</td><td>You and the class's teacher. Other students cannot see it</td></tr>
   <tr><td>Notes you share, including any attached files (up to 700&nbsp;KB)</td>
       <td>To deliver them</td><td>You and the person you sent it to</td></tr>
   <tr><td>Chat messages, notes posted in chat, read receipts and "typing" status</td>
@@ -105,6 +111,28 @@ the cloud, including shared notes and messages. We look at it only to
 investigate reports, fix problems, or when the law requires it. Messages are
 not end-to-end encrypted. Data is encrypted in transit (HTTPS) and stored
 encrypted by Google.</p>
+
+<h3>Google Drive</h3>
+<p>If you turn on <em>Google Drive backup</em>, or attach a file to a class
+post or to work you hand in, NoteNest asks Google for permission to use your
+Drive with the <code>drive.file</code> scope. That permission lets the app see
+and change <strong>only the files NoteNest itself creates</strong> — never the
+rest of your Drive. Files go in a folder called <em>NoteNest</em> in your own
+Drive, where you can open, move or delete them like any other file.</p>
+<ul>
+  <li><strong>Backup:</strong> one file holding your notes, subjects, exams,
+    settings and attachments. It is private to your Drive and is not shared
+    with anyone.</li>
+  <li><strong>Class files:</strong> a file you post to a class, or hand in, is
+    set to "anyone with the link can view", and the link is stored in that class
+    in the cloud, where only its members (or, for handed-in work, only the
+    teacher and you) can read it. Anyone you pass the link to yourself could
+    open the file. Deleting a post or a class does not delete the file from your
+    Drive; you can delete it there.</li>
+</ul>
+<p>NoteNest has no server of its own: the app talks to Google Drive directly
+from your phone, and the operator never receives your Drive files or your
+Drive access.</p>
 
 <h2>4. Microphone and dictation</h2>
 <p>NoteNest asks for the microphone only when you record a voice note or use
@@ -133,15 +161,19 @@ your password, or with Google if you sign in with Google. This deletes:</p>
 <ul>
   <li>everything NoteNest stored on your phone;</li>
   <li>your cloud profile, your email lookup entry and your Firebase sign-in;</li>
-  <li>study groups you created (for all their members); you are removed from
-    other groups;</li>
+  <li>study groups and classes you created (for all their members), with a
+    class's posts and handed-in work; you are removed from other groups and
+    classes;</li>
   <li>notes you have sent that are still waiting, and notes waiting for you;</li>
   <li>your block list.</li>
 </ul>
 <p>It does <strong>not</strong> delete messages you already sent in
 conversations, or notes other people already accepted into their own
 notebooks. Those now belong to the other people's copies, under the name you
-used when you sent them. Reports you made are kept for safety review.</p>
+used when you sent them. Work you handed in to someone else's class stays with
+that class, for its teacher, until the teacher deletes the assignment or the
+class. Reports you made are kept for safety review. Files in
+your Google Drive are yours and stay there until you delete them in Drive.</p>
 <p>If you cannot use the app, email <strong>Seyamhossainpop@gmail.com</strong> from the
 address on your account and we will delete the cloud account for you.</p>
 

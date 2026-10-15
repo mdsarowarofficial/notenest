@@ -48,6 +48,11 @@ class NoteRepository extends ChangeNotifier {
   static const _kCoverDraft = 'cover_draft';
   static const _kBrandLogo = 'brand_logo';
   static const _kImportedShares = 'imported_shares';
+  static const _kPhoto = 'profile_photo';
+  static const _kTourDone = 'tour_done';
+  static const _kCourse = 'teaching_course';
+  static const _kBackupAt = 'drive_backup_at';
+  static const _kBackupAuto = 'drive_backup_auto';
 
   final _db = AppDatabase.instance;
   final _auth = AuthRepository.instance;
@@ -93,6 +98,21 @@ class NoteRepository extends ChangeNotifier {
   /// to be retyped for every assignment. [CoverSpec.asNextDraft] decides what
   /// carries over and what is cleared.
   String? coverDraft;
+
+  /// The account's own photo, a small square JPEG. Null shows initials.
+  Uint8List? profilePhoto;
+
+  /// True once the first-run tour has been shown to this account.
+  bool tourDone = false;
+
+  /// What a teacher said they teach at setup, free text. Optional, and only a
+  /// teacher is asked: it fills the subject line of a new class.
+  String? teachingCourse;
+
+  /// When this account's notes were last copied to Google Drive, and whether
+  /// that should happen on its own once a day.
+  DateTime? lastBackupAt;
+  bool autoBackup = false;
 
   List<Subject> _subjects = const [];
 
@@ -151,6 +171,11 @@ class NoteRepository extends ChangeNotifier {
     brandLogo = BrandStore.decode(map[_kBrandLogo]);
     _recentSearches = _splitSearches(map[_kRecentSearches]);
     _importedShares = _splitSearches(map[_kImportedShares]).toSet();
+    profilePhoto = BrandStore.decode(map[_kPhoto]);
+    tourDone = map[_kTourDone] == '1';
+    teachingCourse = map[_kCourse];
+    lastBackupAt = _readDate(map[_kBackupAt]);
+    autoBackup = map[_kBackupAuto] == '1';
 
     await _reloadSubjects();
     await _reloadNotes();
@@ -177,6 +202,11 @@ class NoteRepository extends ChangeNotifier {
     setupDone = false;
     coverDraft = null;
     brandLogo = null;
+    profilePhoto = null;
+    tourDone = false;
+    teachingCourse = null;
+    lastBackupAt = null;
+    autoBackup = false;
     notifyListeners();
   }
 
@@ -390,6 +420,37 @@ class NoteRepository extends ChangeNotifier {
   }
 
   bool get isTeacher => roleKey == 'teacher';
+
+  Future<void> saveProfilePhoto(Uint8List? jpeg) async {
+    profilePhoto = jpeg;
+    await _setSetting(_kPhoto, jpeg == null ? null : BrandStore.encode(jpeg));
+    notifyListeners();
+  }
+
+  Future<void> saveTourDone(bool done) async {
+    tourDone = done;
+    await _setSetting(_kTourDone, done ? '1' : null);
+    notifyListeners();
+  }
+
+  Future<void> saveTeachingCourse(String? course) async {
+    final clean = course?.trim();
+    teachingCourse = (clean == null || clean.isEmpty) ? null : clean;
+    await _setSetting(_kCourse, teachingCourse);
+    notifyListeners();
+  }
+
+  Future<void> saveBackupState({DateTime? at, bool? auto}) async {
+    if (at != null) {
+      lastBackupAt = at;
+      await _setSetting(_kBackupAt, at.millisecondsSinceEpoch.toString());
+    }
+    if (auto != null) {
+      autoBackup = auto;
+      await _setSetting(_kBackupAuto, auto ? '1' : null);
+    }
+    notifyListeners();
+  }
 
   Future<void> saveReminder(String choice) async {
     reminderChoice = choice;

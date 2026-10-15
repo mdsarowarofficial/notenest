@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../models/subject.dart';
@@ -39,9 +41,13 @@ class NestDrawer extends StatelessWidget {
     this.onOpenProfile,
     this.synced = false,
     this.lastSynced,
+    this.userPhoto,
   });
 
   final String userName;
+
+  /// The account's photo; initials are drawn when null.
+  final Uint8List? userPhoto;
   final String semester;
   final List<Subject> subjects;
   final List<NestDrawerLink> links;
@@ -159,11 +165,20 @@ class NestDrawer extends StatelessWidget {
                 width: 44,
                 height: 44,
                 alignment: Alignment.center,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: NestColor.pen,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
+                child: userPhoto != null
+                    ? Image.memory(
+                        userPhoto!,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                      )
+                    : Text(
                   _initials(userName),
                   style: const TextStyle(
                     color: Colors.white,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/auth_repository.dart';
 import '../../data/cloud_service.dart';
+import '../../data/note_repository.dart';
 import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
 
@@ -26,7 +27,11 @@ class _CloudPageState extends State<CloudPage> {
 
   bool _creating = true;
   bool _hidePassword = true;
-  CloudRole _role = CloudRole.student;
+  // Starts from the role this device already knows, so connecting a cloud
+  // account does not quietly turn a teacher into a student.
+  CloudRole _role = NoteRepository.instance.isTeacher
+      ? CloudRole.teacher
+      : CloudRole.student;
   String? _error;
 
   @override
@@ -80,6 +85,9 @@ class _CloudPageState extends State<CloudPage> {
         );
       } else {
         await _cloud.signIn(email: email, password: password);
+        // An existing cloud account already says what it is.
+        final role = _cloud.profile?.role;
+        if (role != null) await NoteRepository.instance.saveRole(role.key);
       }
       if (!mounted) return;
       _password.clear();
@@ -370,6 +378,8 @@ class _CloudPageState extends State<CloudPage> {
   Future<void> _setRole(CloudRole role) async {
     try {
       await _cloud.updateProfile(role: role);
+      // The device keeps the role too, and decides which screens are shown.
+      await NoteRepository.instance.saveRole(role.key);
     } on CloudException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

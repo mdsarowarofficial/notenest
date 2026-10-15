@@ -651,6 +651,18 @@ class AuthRepository extends ChangeNotifier {
     ];
   }
 
+  /// Every account that has signed in on this device, newest first, for the
+  /// account switcher. Only names and addresses: nothing that proves identity
+  /// leaves the table, and switching still asks for the password.
+  Future<List<UserAccount>> deviceAccounts() async {
+    final rows = await _db.db.query(
+      'users',
+      columns: ['id', 'name', 'email', 'institution', 'created_at'],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(UserAccount.fromMap).toList();
+  }
+
   Future<void> signOut() async {
     await _clearSession();
     _current = null;

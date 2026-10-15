@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/cloud_service.dart';
 import '../../theme/nest_theme.dart';
 import '../chat/chats_page.dart';
+import '../classroom/classes_page.dart';
 import '../groups/groups_page.dart';
 import '../share/request_note_sheet.dart';
 import '../shared/shared_page.dart';
@@ -17,7 +18,11 @@ import '../shared/shared_page.dart';
 /// under. Here they are three segments of one destination, and the drawer goes
 /// back to being a list of places rather than a menu of features.
 class PeoplePage extends StatefulWidget {
-  const PeoplePage({super.key});
+  const PeoplePage({super.key, this.showClasses = false});
+
+  /// Leads with the student's classes. A teacher has Classes as a tab of its
+  /// own, so for them this stays the three social lists.
+  final bool showClasses;
 
   @override
   State<PeoplePage> createState() => _PeoplePageState();
@@ -26,10 +31,21 @@ class PeoplePage extends StatefulWidget {
 class _PeoplePageState extends State<PeoplePage> {
   int _segment = 0;
 
-  static const _labels = ['Chats', 'Groups', 'Shared'];
+  List<String> get _labels => [
+        if (widget.showClasses) 'Classes',
+        'Chats',
+        'Groups',
+        'Shared',
+      ];
+
+  /// Which of the three social lists the selected segment is, or -1 for
+  /// Classes, so the actions row does not have to know about the offset.
+  int get _social => widget.showClasses ? _segment - 1 : _segment;
 
   @override
   Widget build(BuildContext context) {
+    // The role can change under this page, and with it the segment count.
+    if (_segment >= _labels.length) _segment = 0;
     return Column(
       children: [
         Padding(
@@ -40,7 +56,8 @@ class _PeoplePageState extends State<PeoplePage> {
             onPick: (i) => setState(() => _segment = i),
           ),
         ),
-        _Actions(segment: _segment),
+        // Classes carries its own button (Join a class) in its header.
+        if (_social >= 0) _Actions(segment: _social),
         Expanded(
           // IndexedStack rather than swapping the child, so a thread you have
           // scrolled and a Firestore stream you have opened survive a tap on
@@ -48,10 +65,11 @@ class _PeoplePageState extends State<PeoplePage> {
           // every time, which on a metered phone connection is rude.
           child: IndexedStack(
             index: _segment,
-            children: const [
-              ChatsPage(embedded: true),
-              GroupsPage(embedded: true),
-              SharedPage(),
+            children: [
+              if (widget.showClasses) const ClassesPage(embedded: true),
+              const ChatsPage(embedded: true),
+              const GroupsPage(embedded: true),
+              const SharedPage(),
             ],
           ),
         ),

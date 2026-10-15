@@ -28,8 +28,8 @@ class NestNavItem {
 /// making the app feel current: the page runs underneath it, and the bar is
 /// obviously a control rather than part of the page.
 ///
-/// The selected destination grows a filled pill with its label; the others are
-/// icons alone. The capture button is unchanged from the original design — the
+/// Every destination shows its icon and its name; the selected one's icon sits
+/// in a filled pill. The capture button is unchanged from the original design — the
 /// offset highlighter block behind a blue key — because it was the one piece
 /// of the old bar that was already doing something nobody else does.
 class NestNavBar extends StatelessWidget {
@@ -40,7 +40,14 @@ class NestNavBar extends StatelessWidget {
     required this.onTap,
     required this.onCapture,
     this.captureLabel = 'New note',
+    this.itemKeys,
+    this.captureKey,
   });
+
+  /// Optional handles on each tab and on the capture button, so the first-run
+  /// tour can point at them.
+  final List<GlobalKey>? itemKeys;
+  final GlobalKey? captureKey;
 
   /// Exactly four destinations; the capture button sits between items 1 and 2.
   final List<NestNavItem> items;
@@ -49,7 +56,7 @@ class NestNavBar extends StatelessWidget {
   final VoidCallback onCapture;
   final String captureLabel;
 
-  static const double _pillHeight = 66;
+  static const double _pillHeight = 72;
   static const double _sideMargin = 16;
   static const double _bottomMargin = 14;
 
@@ -106,6 +113,9 @@ class NestNavBar extends StatelessWidget {
     final selected = index == currentIndex;
 
     return Semantics(
+      key: itemKeys != null && index < itemKeys!.length
+          ? itemKeys![index]
+          : null,
       button: true,
       selected: selected,
       label: item.label,
@@ -115,53 +125,49 @@ class NestNavBar extends StatelessWidget {
           if (!selected) HapticFeedback.selectionClick();
           onTap(index);
         },
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOut,
-            height: 42,
-            padding: EdgeInsets.symmetric(horizontal: selected ? 12 : 8),
-            decoration: BoxDecoration(
-              // A plain filled pill, no outline. The outline was mine, not the
-              // design's: a 2px ring in a third colour around a filled shape
-              // makes the one control you look at most read as a sticker.
-              color: selected ? NestColor.pen : Colors.transparent,
-              borderRadius: BorderRadius.circular(NestRadius.pill),
+        // Every tab carries its name, not only the selected one. Icons alone
+        // were the bar's real failure: somebody who had not yet learned which
+        // glyph was People and which was Exam had to tap to find out, and the
+        // one label that did show was 12.5px white on a coloured pill.
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOut,
+              height: 30,
+              width: selected ? 54 : 40,
+              decoration: BoxDecoration(
+                // A plain filled pill, no outline: a ring in a third colour
+                // around a filled shape reads as a sticker.
+                color: selected ? NestColor.pen : Colors.transparent,
+                borderRadius: BorderRadius.circular(NestRadius.pill),
+              ),
+              child: Icon(
+                selected ? item.activeIcon : item.icon,
+                size: 22,
+                color: selected ? Colors.white : NestColor.inkSoft,
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  selected ? item.activeIcon : item.icon,
-                  size: 21,
-                  color: selected ? Colors.white : NestColor.inkFaint,
+            const SizedBox(height: 4),
+            // Scaled down rather than clipped, so a large system font on a
+            // narrow phone shrinks the word instead of striping the bar with
+            // an overflow warning.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                item.label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontFamily: NestFont.display,
+                  fontSize: 13,
+                  height: 1.1,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected ? NestColor.pen : NestColor.inkSoft,
                 ),
-                if (selected) ...[
-                  const SizedBox(width: 7),
-                  // Flexible and scaled down rather than clipped. Four labels
-                  // plus a capture well on a narrow phone is exactly where a
-                  // fixed row overflows, and an overflow stripe across the
-                  // navigation bar is the worst place to find one.
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                        style: const TextStyle(
-                          fontFamily: NestFont.display,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -169,6 +175,7 @@ class NestNavBar extends StatelessWidget {
 
   Widget _captureButton(BuildContext context) {
     return Semantics(
+      key: captureKey,
       button: true,
       label: captureLabel,
       child: SizedBox(

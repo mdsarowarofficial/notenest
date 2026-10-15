@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../models/note.dart';
@@ -140,13 +142,23 @@ class MarkTile extends StatelessWidget {
   }
 }
 
-/// The person's own initials, as a white tile that floats rather than a tinted
-/// one that sinks. Used in the Today greeting and beside their own name.
+/// A person's photo, or their initials when there is none, as a white tile
+/// that floats rather than a tinted one that sinks. Used in the Today greeting,
+/// the drawer, the profile and beside people in a class.
 class InitialsTile extends StatelessWidget {
-  const InitialsTile({super.key, required this.name, this.size = 44});
+  const InitialsTile({
+    super.key,
+    required this.name,
+    this.size = 44,
+    this.photo,
+  });
 
   final String name;
   final double size;
+
+  /// JPEG bytes. When present the photo fills the tile and the initials are
+  /// not drawn.
+  final Uint8List? photo;
 
   /// At most two letters, taken from the first and last word of the name. An
   /// empty or whitespace name gives a dash rather than throwing or showing an
@@ -166,6 +178,7 @@ class InitialsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final picture = photo;
     return Container(
       width: size,
       height: size,
@@ -175,15 +188,30 @@ class InitialsTile extends StatelessWidget {
         boxShadow: NestShadow.resting,
       ),
       alignment: Alignment.center,
-      child: Text(
-        initialsOf(name),
-        style: TextStyle(
-          fontFamily: NestFont.display,
-          fontSize: size * 0.34,
-          fontWeight: FontWeight.w700,
-          height: 1,
-          color: NestColor.pen,
-        ),
+      clipBehavior: Clip.antiAlias,
+      child: picture != null
+          ? Image.memory(
+              picture,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              // Rebuilds with the same bytes must not flash blank.
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => _letters(),
+            )
+          : _letters(),
+    );
+  }
+
+  Widget _letters() {
+    return Text(
+      initialsOf(name),
+      style: TextStyle(
+        fontFamily: NestFont.display,
+        fontSize: size * 0.34,
+        fontWeight: FontWeight.w700,
+        height: 1,
+        color: NestColor.pen,
       ),
     );
   }

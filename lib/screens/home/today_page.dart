@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../data/cloud_service.dart';
+import '../../data/classroom_service.dart';
 import '../../data/note_repository.dart';
+import '../../data/profile_photo.dart';
 import '../../models/exam.dart';
 import '../../models/semester.dart';
+import '../../models/study_group.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/note_row.dart';
+import '../classroom/classes_page.dart';
 import '../convert/convert_page.dart';
 import '../cover/cover_page.dart';
 import '../notes/note_detail.dart';
+import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
 
 /// The landing screen.
@@ -26,26 +32,42 @@ class TodayPage extends StatelessWidget {
     required this.onOpenNotes,
     required this.onCapture,
     required this.onOpenExams,
+    this.onOpenClasses,
+    this.avatarKey,
   });
 
   final VoidCallback onOpenNotes;
   final VoidCallback onCapture;
   final VoidCallback onOpenExams;
+  final VoidCallback? onOpenClasses;
+
+  /// Lets the first-run tour point at the profile picture.
+  final GlobalKey? avatarKey;
 
   @override
   Widget build(BuildContext context) {
     final repo = NoteRepository.instance;
 
     return ListenableBuilder(
-      listenable: repo,
+      // The cloud too, because the corner photo can arrive from the cloud
+      // profile on a phone that has none of its own yet.
+      listenable: Listenable.merge([repo, CloudService.instance]),
       builder: (context, _) {
+        if (repo.isTeacher) {
+          return _TeacherToday(
+            greeting: _Greeting(name: repo.userName, avatarKey: avatarKey),
+            onPost: onCapture,
+            onOpenClasses: onOpenClasses,
+          );
+        }
+
         final recent = repo.recentNotes(limit: 4);
         final reminders = repo.dueReminders();
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
           children: [
-            _Greeting(name: repo.userName),
+            _Greeting(name: repo.userName, avatarKey: avatarKey),
             const SizedBox(height: 20),
 
             // A term has begun that the student has not acknowledged. Asked
@@ -139,9 +161,10 @@ class TodayPage extends StatelessWidget {
 // ------------------------------------------------------------------- header
 
 class _Greeting extends StatelessWidget {
-  const _Greeting({required this.name});
+  const _Greeting({required this.name, this.avatarKey});
 
   final String name;
+  final GlobalKey? avatarKey;
 
   /// First name only. "Good evening, Md. Sarowar Hossain" wraps onto two lines
   /// and reads like a letter from a bank.
@@ -184,7 +207,17 @@ class _Greeting extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        InitialsTile(name: name, size: 46),
+        Semantics(
+          key: avatarKey,
+          button: true,
+          label: 'Your profile',
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            ),
+            child: InitialsTile(name: name, size: 46, photo: myPhoto()),
+          ),
+        ),
       ],
     );
   }
@@ -622,5 +655,175 @@ class _SemesterStrip extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ------------------------------------------------------------------ teacher
+
+/// Today for a teacher: the classes, and the two things done most often.
+///
+/// No revision number and no exam countdown — those answer a student's
+/// question. A teacher opens the app to post something or to see what came
+/// back, so those are the first two things on the page.
+class _TeacherToday extends StatelessWidget {
+  const _TeacherToday({
+    required this.greeting,
+    required this.onPost,
+    this.onOpenClasses,
+  });
+
+  final Widget greeting;
+  final VoidCallback onPost;
+  final VoidCallback? onOpenClasses;
+
+  @override
+  Widget build(BuildContext context) {
+    final cloud = CloudService.instance;
+    final t = Theme.of(context).textTheme;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
+      children: [
+        greeting,
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickAction(
+                icon: Icons.assignment_add,
+                label: 'Post to a class',
+                onTap: onPost,
+                primary: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickAction(
+                icon: Icons.add_rounded,
+                label: 'New class',
+                onTap: () => showCreateClassSheet(context),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: Text('Your classes', style: t.titleMedium)),
+            if (onOpenClasses != null)
+              TextButton(
+                  onPressed: onOpenClasses, child: const Text('See all')),
+          ],
+        ),
+        const SizedBox(height: 6),
+        if (!cloud.isSignedIn)
+          _StartCard(
+            eyebrow: 'FIRST STEP',
+            title: 'Connect a cloud account',
+            body: 'Classes live where your students\' phones can see them, so '
+                'they need an account. Your own notes work either way.',
+            actionLabel: 'Open Classes',
+            onAction: onOpenClasses ?? () {},
+          )
+        else
+          StreamBuilder<List<StudyGroup>>(
+            stream: ClassroomService.instance.watchClasses(),
+            builder: (context, snap) {
+              final mine = (snap.data ?? const <StudyGroup>[])
+                  .where((c) => c.isOwner(cloud.uid))
+                  .toList();
+              if (snap.connectionState == ConnectionState.waiting &&
+                  !snap.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (mine.isEmpty) {
+                return _StartCard(
+                  eyebrow: 'FIRST STEP',
+                  title: 'Make your first class',
+                  body: 'Give it a name, then share its six-letter code with '
+                      'your students so they can join.',
+                  actionLabel: 'New class',
+                  onAction: () => showCreateClassSheet(context),
+                );
+              }
+              return Column(
+                children: [
+                  for (final c in mine)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Material(
+                        color: NestColor.card,
+                        borderRadius: BorderRadius.circular(NestRadius.tile),
+                        elevation: 2,
+                        shadowColor: NestColor.o(NestColor.ink, 0.3),
+                        surfaceTintColor: Colors.transparent,
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(NestRadius.tile),
+                          ),
+                          leading: MarkTile.tool(Icons.co_present_rounded),
+                          title: Text(c.name, style: t.titleSmall),
+                          subtitle: Text(
+                            '${c.subject.isEmpty ? '' : '${c.subject} · '}'
+                            '${c.memberCount - 1} '
+                            '${c.memberCount - 1 == 1 ? 'student' : 'students'}'
+                            ' · code ${prettyJoinCode(c.joinCode)}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => openClass(context, c),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        const SizedBox(height: 14),
+        const _Tools(),
+      ],
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 54)),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NestRadius.chip),
+        ),
+      ),
+    );
+    return primary
+        ? FilledButton.icon(
+            style: style,
+            onPressed: onTap,
+            icon: Icon(icon, size: 20),
+            label: Text(label),
+          )
+        : OutlinedButton.icon(
+            style: style,
+            onPressed: onTap,
+            icon: Icon(icon, size: 20),
+            label: Text(label),
+          );
   }
 }

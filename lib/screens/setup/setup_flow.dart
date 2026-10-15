@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../data/account_sync.dart';
 import '../../data/note_repository.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/semester_picker.dart';
 import '../../widgets/nest_stepper.dart';
+import '../cover/university_picker.dart';
 import '../shell/home_shell.dart';
 import '../subjects/subject_form.dart';
 
@@ -30,7 +32,40 @@ class _SetupFlowState extends State<SetupFlow> {
   String? _error;
   bool _busy = false;
 
-  static const _steps = <NestStep>[
+  /// Student or teacher. Asked first, because it decides every step after it:
+  /// a teacher has no semester and takes no subjects, so the student's three
+  /// steps would be questions with no true answer.
+  late String _role = _repo.roleKey;
+  bool get _teacher => _role == 'teacher';
+
+  /// Where a teacher teaches, and what — the course is optional.
+  late String _university = _repo.university ?? '';
+  late final _course = TextEditingController(text: _repo.teachingCourse ?? '');
+
+  static const _roleStep = NestStep(
+    title: 'Who are you',
+    icon: Icons.badge_rounded,
+    hint: 'NoteNest works a little differently for teachers.',
+  );
+
+  static const _teachStep = NestStep(
+    title: 'Where you teach',
+    icon: Icons.co_present_rounded,
+    hint: 'Your university, and the course if you like. Both can change later.',
+  );
+
+  List<NestStep> get _steps =>
+      _teacher ? const [_roleStep, _teachStep] : [_roleStep, ..._studentSteps];
+
+  /// What the current index means, so the logic below reads by name rather
+  /// than by a number that shifts with the role.
+  String get _stepId {
+    if (_step == 0) return 'role';
+    if (_teacher) return 'teach';
+    return const ['semester', 'subjects', 'routine'][_step - 1];
+  }
+
+  static const _studentSteps = <NestStep>[
     NestStep(
       title: 'Your semester',
       icon: Icons.school_rounded,
@@ -76,16 +111,20 @@ class _SetupFlowState extends State<SetupFlow> {
 
   @override
   void dispose() {
+    _course.dispose();
     super.dispose();
   }
 
   /// Returns an error message when the current step is not ready.
   String? _validate() {
-    switch (_step) {
-      case 0:
+    switch (_stepId) {
+      case 'semester':
         return semesterProblem(_semesterLabel);
-      case 1:
+      case 'subjects':
         if (!_repo.hasSubjects) return 'Add at least one subject';
+        return null;
+      case 'teach':
+        if (_university.trim().isEmpty) return 'Pick your university';
         return null;
       default:
         return null;
@@ -103,10 +142,20 @@ class _SetupFlowState extends State<SetupFlow> {
       _busy = true;
     });
 
-    if (_step == 0) {
-      await _repo.saveSemester(_semesterLabel, system: _semesterSystem);
-    } else if (_step == 2) {
-      await _repo.saveReminder(_reminder);
+    switch (_stepId) {
+      case 'role':
+        await _repo.saveRole(_role);
+        // The cloud profile carries the role too, and the rules read it there
+        // before letting anybody make a class. Best effort: setup must not
+        // stall on a network.
+        await syncCloudRole();
+      case 'semester':
+        await _repo.saveSemester(_semesterLabel, system: _semesterSystem);
+      case 'routine':
+        await _repo.saveReminder(_reminder);
+      case 'teach':
+        await _repo.saveProgramme(university: _university);
+        await _repo.saveTeachingCourse(_course.text);
     }
 
     if (!mounted) return;
@@ -123,6 +172,15 @@ class _SetupFlowState extends State<SetupFlow> {
         MaterialPageRoute(builder: (_) => const HomeShell()),
       );
     }
+  }
+
+  Future<void> _pickUniversity() async {
+    final picked = await showUniversityPicker(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _university = picked.name;
+      _error = null;
+    });
   }
 
   @override
@@ -209,8 +267,98 @@ class _SetupFlowState extends State<SetupFlow> {
   }
 
   Widget _body(int step) {
-    switch (step) {
-      case 0:
+    switch (_stepId) {
+      case 'role':
+        return _Sheet(
+          children: [
+            const Text('I AM A', style: nestEyebrow),
+            const SizedBox(height: 12),
+            _RoleCard(
+              icon: Icons.backpack_rounded,
+              title: 'Student',
+              blurb: 'Notes by semester and subject, exam countdowns, and '
+                  'classes you join with a code.',
+              selected: !_teacher,
+              onTap: () => setState(() {
+                _role = 'student';
+                _error = null;
+              }),
+            ),
+            const SizedBox(height: 10),
+            _RoleCard(
+              icon: Icons.co_present_rounded,
+              title: 'Teacher',
+              blurb: 'Make classes, share slides and PDFs, set assignments '
+                  'with a deadline, and grade what comes back.',
+              selected: _teacher,
+              onTap: () => setState(() {
+                _role = 'teacher';
+                _error = null;
+              }),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You can change this later in Settings.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        );
+      case 'teach':
+        return _Sheet(
+          children: [
+            const Text('UNIVERSITY', style: nestEyebrow),
+            const SizedBox(height: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(NestRadius.tile),
+              onTap: _pickUniversity,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: NestColor.paper,
+                  borderRadius: BorderRadius.circular(NestRadius.tile),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_rounded,
+                        color: NestColor.pen),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _university.isEmpty
+                            ? 'Pick your university'
+                            : _university,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          color: _university.isEmpty
+                              ? NestColor.inkFaint
+                              : NestColor.ink,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.search_rounded, color: NestColor.inkFaint),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('COURSE (OPTIONAL)', style: nestEyebrow),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _course,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CSE 211 — Data Structures',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No semester to choose: that is a student\'s question. You make '
+              'classes from the Classes tab, and students join with the code.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        );
+      case 'semester':
         return _Sheet(
           children: [
             SemesterPicker(
@@ -230,7 +378,7 @@ class _SetupFlowState extends State<SetupFlow> {
             ),
           ],
         );
-      case 1:
+      case 'subjects':
         final subjects = _repo.subjects();
         return _Sheet(
           children: [
@@ -281,8 +429,8 @@ class _SetupFlowState extends State<SetupFlow> {
                     if (added && mounted) setState(() => _error = null);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(NestRadius.chip),
                       border: Border.all(color: NestColor.rule),
@@ -387,4 +535,68 @@ class _Sheet extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
+    required this.icon,
+    required this.title,
+    required this.blurb,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String blurb;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(NestRadius.tile),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? NestColor.tintPen : NestColor.paper,
+            borderRadius: BorderRadius.circular(NestRadius.tile),
+            border: Border.all(
+              color: selected ? NestColor.pen : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon,
+                  size: 30,
+                  color: selected ? NestColor.pen : NestColor.inkSoft),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(blurb, style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? NestColor.pen : NestColor.inkFaint,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

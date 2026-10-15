@@ -5,6 +5,7 @@ import '../../data/cloud_service.dart';
 import '../../models/study_group.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_empty_state.dart';
+import '../classroom/classroom_page.dart';
 import '../cloud/cloud_page.dart';
 import 'group_detail.dart';
 
@@ -152,7 +153,7 @@ class _GroupTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(NestRadius.tile),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => GroupDetailPage(groupId: group.id),
+              builder: (_) => groupScreen(group),
             ),
           ),
           child: Padding(
@@ -312,7 +313,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
       if (!mounted) return;
       navigator.pop();
       navigator.push(
-        MaterialPageRoute(builder: (_) => GroupDetailPage(groupId: group.id)),
+        MaterialPageRoute(builder: (_) => groupScreen(group)),
       );
     } on CloudException catch (e) {
       if (!mounted) return;
@@ -455,7 +456,7 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
         SnackBar(content: Text('Joined ${group.name}')),
       );
       navigator.push(
-        MaterialPageRoute(builder: (_) => GroupDetailPage(groupId: group.id)),
+        MaterialPageRoute(builder: (_) => groupScreen(group)),
       );
     } on CloudException catch (e) {
       if (!mounted) return;
@@ -589,3 +590,9 @@ class _Sheet extends StatelessWidget {
     );
   }
 }
+
+/// The screen a group opens on: a class as a classroom, with its stream,
+/// classwork and people; anything else as a group.
+Widget groupScreen(StudyGroup group) => group.isClass
+    ? ClassroomPage(classId: group.id)
+    : GroupDetailPage(groupId: group.id);

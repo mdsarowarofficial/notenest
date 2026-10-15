@@ -5,10 +5,13 @@ import '../../data/attachment_store.dart';
 import '../../data/cloud_service.dart';
 import '../../data/google_identity.dart';
 import '../../data/note_repository.dart';
+import '../../data/profile_photo.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
+import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/semester_picker.dart';
 import '../../widgets/nest_marks.dart';
+import '../auth/account_switch.dart';
 import '../auth/login_page.dart';
 import '../subjects/subject_form.dart';
 
@@ -223,37 +226,15 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _signOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: NestColor.card,
-        title: const Text('Sign out?'),
-        content: const Text(
-          'Your notes stay on this device. You can sign back in any time.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    await _auth.signOut();
-    _repo.clear();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
+  Future<void> _changePhoto() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final message = await changeMyPhoto(context);
+    if (message != null) {
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    }
   }
+
+  Future<void> _signOut() => confirmSignOut(context);
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +260,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
       body: ListenableBuilder(
-        listenable: Listenable.merge([_auth, _repo]),
+        listenable: Listenable.merge([_auth, _repo, CloudService.instance]),
         builder: (context, _) {
           final user = _auth.currentUser;
           if (user == null) return const SizedBox.shrink();
@@ -289,21 +270,36 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 62,
-                    height: 62,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: NestColor.pen,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Text(
-                      user.initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
+                  Semantics(
+                    button: true,
+                    label: 'Change profile photo',
+                    child: GestureDetector(
+                      onTap: _changePhoto,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          InitialsTile(
+                            name: user.name,
+                            size: 68,
+                            photo: myPhoto(),
+                          ),
+                          Positioned(
+                            right: -4,
+                            bottom: -4,
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: NestColor.pen,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: NestColor.paper, width: 2),
+                              ),
+                              child: const Icon(Icons.photo_camera_rounded,
+                                  size: 13, color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

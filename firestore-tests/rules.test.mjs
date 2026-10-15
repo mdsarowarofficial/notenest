@@ -303,3 +303,151 @@ test('reports: write-only, as yourself, about someone else', async () => {
   await assertFails(setDoc(doc(a, 'reports/r5'), report('alice', 'bob', { extra: 1 })));
   await assertFails(updateDoc(doc(a, 'reports/r1'), { details: 'edit' }));
 });
+
+// ------------------------------------------------------------ profile photo
+
+test('profile: a small photo is allowed, an oversized one refused', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertSucceeds(setDoc(doc(a, 'users/alice'),
+    profile('alice', 'alice@uni.edu', { photo: 'x'.repeat(30000) })));
+  await assertFails(setDoc(doc(a, 'users/alice'),
+    profile('alice', 'alice@uni.edu', { photo: 'x'.repeat(40001) }),
+    { merge: true }));
+});
+
+// --------------------------------------------------------------- classwork
+
+async function createClass(db, owner, classId, code) {
+  const b = writeBatch(db);
+  b.set(doc(db, 'groups', classId), group(owner, code, { kind: 'class' }));
+  b.set(doc(db, 'joinCodes', code), {
+    groupId: classId, name: 'Algorithms', ownerUid: owner, createdAt: now(),
+  });
+  return b.commit();
+}
+
+const post = (author, extra = {}) => ({
+  kind: 'assignment', title: 'Lab 3', body: 'Do it', topic: 'Week 3',
+  dueAt: now() + 86400000, points: 100,
+  files: [{ id: 'drive123', name: 'lab3.pdf', mime: 'application/pdf', size: 10 }],
+  authorUid: author, authorName: author, createdAt: now(), updatedAt: now(),
+  ...extra,
+});
+
+const work = (uid, extra = {}) => ({
+  uid, name: uid, text: 'my answer', files: [], state: 'turnedIn',
+  submittedAt: now(), updatedAt: now(), ...extra,
+});
+
+// A teacher with a class, and two students in it.
+async function seedClass() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users/tara'),
+      profile('tara', 'tara@uni.edu', { role: 'teacher' }));
+    await setDoc(doc(db, 'users/sam'), profile('sam', 'sam@uni.edu'));
+    await setDoc(doc(db, 'users/sue'), profile('sue', 'sue@uni.edu'));
+  });
+  const t = as('tara', 'tara@uni.edu');
+  await createClass(t, 'tara', 'c1', 'CLASS1');
+  for (const s of ['sam', 'sue']) {
+    await updateDoc(doc(as(s, `${s}@uni.edu`), 'groups/c1'),
+      { memberUids: arrayUnion(s), updatedAt: now() });
+  }
+  return t;
+}
+
+test('classes: a student account cannot make a class; a teacher can', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users/sam'), profile('sam', 'sam@uni.edu'));
+    await setDoc(doc(db, 'users/tara'),
+      profile('tara', 'tara@uni.edu', { role: 'teacher' }));
+  });
+  await assertFails(createClass(as('sam', 'sam@uni.edu'), 'sam', 'c9', 'SAMSAM'));
+  await assertSucceeds(createClass(as('tara', 'tara@uni.edu'), 'tara', 'c1', 'CLASS1'));
+  // A study group is still anyone's to make.
+  await assertSucceeds(createGroup(as('sam', 'sam@uni.edu'), 'sam', 'g1', 'STUDY1'));
+});
+
+test('posts: teacher posts, members read, students and outsiders cannot post', async () => {
+  const t = await seedClass();
+  await assertSucceeds(setDoc(doc(t, 'groups/c1/posts/p1'), post('tara')));
+  await assertFails(setDoc(doc(t, 'groups/c1/posts/p2'),
+    post('tara', { junk: 1 })));
+  await assertFails(setDoc(doc(t, 'groups/c1/posts/p3'),
+    post('tara', { points: 5000 })));
+
+  const sam = as('sam', 'sam@uni.edu');
+  await assertSucceeds(getDoc(doc(sam, 'groups/c1/posts/p1')));
+  await assertSucceeds(getDocs(collection(sam, 'groups/c1/posts')));
+  await assertFails(setDoc(doc(sam, 'groups/c1/posts/p4'), post('sam')));
+
+  const out = as('olly', 'olly@uni.edu');
+  await assertFails(getDoc(doc(out, 'groups/c1/posts/p1')));
+
+  // The deadline can move; the files cannot be swapped.
+  await assertSucceeds(updateDoc(doc(t, 'groups/c1/posts/p1'),
+    { dueAt: now() + 2 * 86400000, updatedAt: now() }));
+  await assertFails(updateDoc(doc(t, 'groups/c1/posts/p1'),
+    { files: [], updatedAt: now() }));
+});
+
+test('posts: a study group owner gets no classwork', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await createGroup(a, 'alice', 'g1', 'ABCDEF');
+  await assertFails(setDoc(doc(a, 'groups/g1/posts/p1'), post('alice')));
+});
+
+test('submissions: own work only, private from classmates, honest hand-in time', async () => {
+  const t = await seedClass();
+  await setDoc(doc(t, 'groups/c1/posts/p1'), post('tara'));
+  const sam = as('sam', 'sam@uni.edu');
+  const sue = as('sue', 'sue@uni.edu');
+
+  await assertSucceeds(setDoc(doc(sam, 'groups/c1/posts/p1/submissions/sam'),
+    work('sam'), { merge: true }));
+  // Not as somebody else.
+  await assertFails(setDoc(doc(sam, 'groups/c1/posts/p1/submissions/sue'),
+    work('sue')));
+  // Not with a grade.
+  await assertFails(setDoc(doc(sue, 'groups/c1/posts/p1/submissions/sue'),
+    work('sue', { grade: 100 })));
+  // Not backdated to dodge "late".
+  await assertFails(setDoc(doc(sue, 'groups/c1/posts/p1/submissions/sue'),
+    work('sue', { submittedAt: now() - 3 * 86400000 })));
+  // A classmate cannot read it; the teacher can.
+  await assertFails(getDoc(doc(sue, 'groups/c1/posts/p1/submissions/sam')));
+  await assertSucceeds(getDocs(collection(t, 'groups/c1/posts/p1/submissions')));
+  // A draft needs no hand-in time.
+  await assertSucceeds(setDoc(doc(sue, 'groups/c1/posts/p1/submissions/sue'),
+    work('sue', { state: 'draft', submittedAt: null })));
+});
+
+test('submissions: teacher grades and returns, but cannot rewrite the work', async () => {
+  const t = await seedClass();
+  await setDoc(doc(t, 'groups/c1/posts/p1'), post('tara'));
+  const sam = as('sam', 'sam@uni.edu');
+  await setDoc(doc(sam, 'groups/c1/posts/p1/submissions/sam'), work('sam'));
+
+  await assertSucceeds(updateDoc(doc(t, 'groups/c1/posts/p1/submissions/sam'), {
+    grade: 88, feedback: 'Good', state: 'returned', returnedAt: now(),
+  }));
+  await assertFails(updateDoc(doc(t, 'groups/c1/posts/p1/submissions/sam'),
+    { text: 'something else' }));
+  // The student cannot change their own grade afterwards.
+  await assertFails(updateDoc(doc(sam, 'groups/c1/posts/p1/submissions/sam'),
+    { grade: 100, updatedAt: now() }));
+  // But may take the work back to change it.
+  await assertSucceeds(setDoc(doc(sam, 'groups/c1/posts/p1/submissions/sam'),
+    work('sam', { state: 'draft', submittedAt: null }), { merge: true }));
+});
+
+test('submissions: only on an assignment, not a material', async () => {
+  const t = await seedClass();
+  await setDoc(doc(t, 'groups/c1/posts/m1'),
+    post('tara', { kind: 'material', dueAt: null, points: null }));
+  await assertFails(setDoc(
+    doc(as('sam', 'sam@uni.edu'), 'groups/c1/posts/m1/submissions/sam'),
+    work('sam')));
+});

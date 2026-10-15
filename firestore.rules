@@ -77,8 +77,15 @@ service cloud.firestore {
       // limits below are decoration: a client could add a megabyte under a
       // name nobody checks, and every classmate who opens a group downloads it.
       function profileKeys() {
-        return ['uid', 'name', 'email', 'role', 'institution',
+        return ['uid', 'name', 'email', 'role', 'institution', 'photo',
                 'createdAt', 'updatedAt'];
+      }
+
+      // The profile photo is a small JPEG carried inside the document, because
+      // there is no file storage. Optional, and capped: everybody in a class
+      // downloads every member's profile, so this cap is the cost of a face.
+      function photoFits() {
+        return !('photo' in incoming()) || textWithin(incoming().photo, 40000);
       }
 
       allow create: if isSelf(userId)
@@ -90,7 +97,8 @@ service cloud.firestore {
         && incoming().email == request.auth.token.email.lower()
         && textWithin(incoming().name, 80)
         && textWithin(incoming().institution, 160)
-        && incoming().role in ['student', 'teacher'];
+        && incoming().role in ['student', 'teacher']
+        && photoFits();
 
       allow update: if isSelf(userId)
         && incoming().keys().hasOnly(profileKeys())
@@ -100,7 +108,8 @@ service cloud.firestore {
         && incoming().email == resource.data.email
         && textWithin(incoming().name, 80)
         && textWithin(incoming().institution, 160)
-        && incoming().role in ['student', 'teacher'];
+        && incoming().role in ['student', 'teacher']
+        && photoFits();
 
       // Your own profile, and only your own.
       //
@@ -194,6 +203,14 @@ service cloud.firestore {
         && textWithin(incoming().subject, 60)
         && textWithin(incoming().ownerName, 80)
         && incoming().kind in ['study', 'class']
+        // Only a teacher account makes a class. A class is where work is set
+        // and graded; a student who could make one could set work for their
+        // classmates in the app's own teacher voice. The role is read from
+        // the profile, which only its owner writes — so this is a statement
+        // about the account, not a promise from the client.
+        && (incoming().kind != 'class'
+            || get(/databases/$(database)/documents/users/$(request.auth.uid))
+                 .data.role == 'teacher')
         // Exactly six, and reserved in the same batch. The app always writes
         // the group and its code together; a group whose code was never
         // reserved could not be joined, and one with an empty code could
@@ -251,6 +268,138 @@ service cloud.firestore {
                 && request.auth.uid in request.resource.data.memberUids));
 
       allow delete: if isGroupOwner();
+
+      // ------------------------------------------------------ classwork
+      //
+      // groups/{classId}/posts/{postId}                    teacher writes
+      // groups/{classId}/posts/{postId}/submissions/{uid}  one per student
+      //
+      // Files are never in here — only Google Drive ids. The weight of a
+      // class lives in its teacher's and students' own Drives.
+
+      function classData() {
+        return get(/databases/$(database)/documents/groups/$(groupId)).data;
+      }
+
+      function inClass() {
+        return signedIn() && request.auth.uid in classData().memberUids;
+      }
+
+      // The owner of a group whose kind is class. A study group's owner is
+      // not a teacher and gets no classwork.
+      function teachesClass() {
+        return signedIn()
+          && classData().ownerUid == request.auth.uid
+          && classData().kind == 'class';
+      }
+
+      function filesFit(files) {
+        return files is list && files.size() <= 10;
+      }
+
+      function maybeInt(value) {
+        return value == null || value is int;
+      }
+
+      match /posts/{postId} {
+
+        allow read: if inClass();
+
+        allow create: if teachesClass()
+          && incoming().keys().hasOnly([
+               'kind', 'title', 'body', 'topic', 'dueAt', 'points', 'files',
+               'authorUid', 'authorName', 'createdAt', 'updatedAt',
+             ])
+          && incoming().authorUid == request.auth.uid
+          && incoming().kind in ['announcement', 'material', 'assignment']
+          && textWithin(incoming().title, 200)
+          && textWithin(incoming().body, 5000)
+          && textWithin(incoming().topic, 60)
+          && textWithin(incoming().authorName, 80)
+          && maybeInt(incoming().dueAt)
+          && (incoming().points == null
+              || (incoming().points is int
+                  && incoming().points >= 1 && incoming().points <= 1000))
+          && filesFit(incoming().files);
+
+        // The words and the deadline may change; the kind, the files and who
+        // posted it may not.
+        allow update: if teachesClass()
+          && changedKeys().hasOnly(
+               ['title', 'body', 'topic', 'dueAt', 'points', 'updatedAt'])
+          && textWithin(incoming().title, 200)
+          && textWithin(incoming().body, 5000)
+          && textWithin(incoming().topic, 60)
+          && maybeInt(incoming().dueAt)
+          && (incoming().points == null
+              || (incoming().points is int
+                  && incoming().points >= 1 && incoming().points <= 1000));
+
+        allow delete: if teachesClass();
+
+        // ------------------------------------------------ submissions
+        //
+        // The document id is the student's uid, so "your own" needs no read,
+        // and a second submission from the same student cannot exist.
+
+        match /submissions/{studentUid} {
+
+          function postData() {
+            return get(/databases/$(database)/documents/groups/$(groupId)/posts/$(postId)).data;
+          }
+
+          function studentKeys() {
+            return ['uid', 'name', 'text', 'files', 'state', 'submittedAt',
+                    'updatedAt'];
+          }
+
+          // What a student writes, checked the same way on create and update.
+          // A handed-in time must be now, give or take a few minutes of clock
+          // drift — otherwise "late" would be whatever the student typed.
+          function studentWorkFits() {
+            return incoming().uid == studentUid
+              && textWithin(incoming().name, 80)
+              && textWithin(incoming().text, 5000)
+              && filesFit(incoming().files)
+              && incoming().state in ['draft', 'turnedIn']
+              && (incoming().state == 'draft'
+                  || (incoming().submittedAt is int
+                      && incoming().submittedAt > request.time.toMillis() - 300000
+                      && incoming().submittedAt < request.time.toMillis() + 300000))
+              && maybeInt(incoming().submittedAt);
+          }
+
+          // Your own work, and the teacher's view of everyone's. Classmates
+          // cannot read each other's answers.
+          allow read: if (isSelf(studentUid) && inClass()) || teachesClass();
+
+          allow create: if isSelf(studentUid)
+            && inClass()
+            && postData().kind == 'assignment'
+            && incoming().keys().hasOnly(studentKeys())
+            && studentWorkFits();
+
+          // A student edits, hands in or takes back their own work. Never the
+          // grade or the feedback — those keys are simply not theirs to change.
+          allow update: if isSelf(studentUid)
+            && inClass()
+            && changedKeys().hasOnly(studentKeys())
+            && studentWorkFits();
+
+          // The teacher grades and returns. Only those four fields.
+          allow update: if teachesClass()
+            && changedKeys().hasOnly(['grade', 'feedback', 'state', 'returnedAt'])
+            && incoming().state == 'returned'
+            && (incoming().grade == null
+                || (incoming().grade is int
+                    && incoming().grade >= 0 && incoming().grade <= 1000))
+            && textWithin(incoming().feedback, 2000)
+            && incoming().returnedAt is int;
+
+          // Only as part of deleting the assignment.
+          allow delete: if teachesClass();
+        }
+      }
     }
 
     // --------------------------------------------------------- joinCodes
@@ -625,10 +774,8 @@ service cloud.firestore {
 
     // --------------------------------------------------------- everything else
     //
-    // Teacher assignments arrive in the next step and will get their own
-    // rules. Until then they stay shut, which is the right default: a
-    // collection nobody has thought about should not be writable just because
-    // nobody has thought about it.
+    // Shut. A collection nobody has thought about should not be writable just
+    // because nobody has thought about it.
 
     match /{document=**} {
       allow read, write: if false;

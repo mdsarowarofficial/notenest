@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notenest/data/auth_repository.dart';
 import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
+import 'package:notenest/models/classwork.dart';
 import 'package:notenest/models/cloud_profile.dart';
 import 'package:notenest/models/cover_spec.dart';
 import 'package:notenest/models/doc_text.dart';
@@ -2050,6 +2051,143 @@ void main() {
         AuthRepository.pbkdf2ForTest('password', 'salt', 4096),
         b64('c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a'),
       );
+    });
+  });
+  group('classwork', () {
+    final due = DateTime(2026, 10, 20, 23, 59);
+    ClassPost assignment({DateTime? dueAt}) => ClassPost(
+          id: 'p',
+          kind: PostKind.assignment,
+          title: 'Lab 3',
+          dueAt: dueAt,
+          points: 100,
+          authorUid: 't',
+        );
+
+    test('nothing handed in is "assigned" before the deadline, "missing" after',
+        () {
+      final post = assignment(dueAt: due);
+      expect(workStatus(post, null, DateTime(2026, 10, 19)),
+          WorkStatus.assigned);
+      expect(workStatus(post, null, DateTime(2026, 10, 21)),
+          WorkStatus.missing);
+      // No deadline: never missing.
+      expect(workStatus(assignment(), null, DateTime(2030)),
+          WorkStatus.assigned);
+    });
+
+    test('handed in after the deadline is late; graded beats late', () {
+      final post = assignment(dueAt: due);
+      final onTime = Submission(
+        uid: 's',
+        state: SubmissionState.turnedIn,
+        submittedAt: DateTime(2026, 10, 20, 12),
+      );
+      final late = Submission(
+        uid: 's',
+        state: SubmissionState.turnedIn,
+        submittedAt: DateTime(2026, 10, 21, 9),
+      );
+      expect(workStatus(post, onTime), WorkStatus.turnedIn);
+      expect(workStatus(post, late), WorkStatus.late);
+      final graded = Submission(
+        uid: 's',
+        state: SubmissionState.returned,
+        submittedAt: DateTime(2026, 10, 21, 9),
+        grade: 70,
+      );
+      expect(workStatus(post, graded), WorkStatus.returned);
+      // A draft is not handed in.
+      const draft = Submission(uid: 's', text: 'half done');
+      expect(workStatus(post, draft, DateTime(2026, 10, 22)),
+          WorkStatus.missing);
+    });
+
+    test('a post needs a title, an announcement needs words', () {
+      expect(
+        postProblem(kind: PostKind.assignment, title: ' ', body: ''),
+        isNotNull,
+      );
+      expect(
+        postProblem(kind: PostKind.announcement, title: '', body: ''),
+        isNotNull,
+      );
+      expect(
+        postProblem(kind: PostKind.announcement, title: '', body: 'Hi all'),
+        isNull,
+      );
+      expect(
+        postProblem(
+            kind: PostKind.assignment, title: 'Lab', body: '', points: 0),
+        isNotNull,
+      );
+      expect(
+        postProblem(
+            kind: PostKind.material, title: 'Slides', body: '', fileCount: 11),
+        isNotNull,
+      );
+    });
+
+    test('documents from the server never throw', () {
+      final post = ClassPost.fromMap('p', {
+        'kind': 'nonsense',
+        'title': 42,
+        'dueAt': 'tomorrow',
+        'points': '100',
+        'files': [
+          {'id': 'abc', 'name': 'a.pdf', 'mime': 'application/pdf'},
+          {'name': 'no id'},
+          'junk',
+        ],
+      });
+      expect(post.kind, PostKind.announcement);
+      expect(post.title, '');
+      expect(post.dueAt, isNull);
+      expect(post.points, isNull);
+      expect(post.files.single.isPdf, isTrue);
+
+      final s = Submission.fromMap('u', {'state': 'returned', 'grade': 'A'});
+      expect(s.state, SubmissionState.returned);
+      expect(s.grade, isNull);
+    });
+
+    test('a round trip keeps everything', () {
+      final post = ClassPost(
+        id: 'p',
+        kind: PostKind.assignment,
+        title: 'Lab 3',
+        body: 'Linked lists',
+        topic: 'Week 3',
+        dueAt: due,
+        points: 50,
+        files: const [ClassFile(driveId: 'd1', name: 'lab.pdf', size: 9)],
+        authorUid: 't',
+        authorName: 'Tara',
+      );
+      final back = ClassPost.fromMap('p', post.toMap());
+      expect(back.title, 'Lab 3');
+      expect(back.topic, 'Week 3');
+      expect(back.dueAt, due);
+      expect(back.points, 50);
+      expect(back.files.single.driveId, 'd1');
+    });
+
+    test('deadlines read the way people say them', () {
+      final now = DateTime(2026, 10, 15, 10);
+      expect(formatDue(DateTime(2026, 10, 15, 23, 59), now), 'Today, 11:59 PM');
+      expect(formatDue(DateTime(2026, 10, 16, 9, 5), now), 'Tomorrow, 9:05 AM');
+      expect(formatDue(DateTime(2026, 11, 2, 12), now), '2 Nov, 12:00 PM');
+      expect(formatDue(DateTime(2027, 1, 2, 0), now), '2 Jan 2027, 12:00 AM');
+    });
+  });
+
+  group('profile photo', () {
+    test('only included in the profile when there is one', () {
+      const bare = CloudProfile(uid: 'u', name: 'A', email: 'a@b.co');
+      expect(bare.toMap().containsKey('photo'), isFalse);
+      final withPhoto = bare.copyWith(photo: 'abc');
+      expect(withPhoto.toMap()['photo'], 'abc');
+      expect(CloudProfile.fromMap('u', withPhoto.toMap()).photo, 'abc');
     });
   });
 }
