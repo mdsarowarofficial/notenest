@@ -243,17 +243,32 @@ class _ChatPageState extends State<ChatPage> {
                   reverse: true,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
                   itemCount: messages.length,
-                  itemBuilder: (context, i) => _Bubble(
-                    message: messages[i],
-                    chatId: widget.chatId,
-                    mine: messages[i].fromUid == _cloud.uid,
-                    // The name is worth showing only when the one above it is
-                    // somebody else's.
-                    showName: widget.groupId.isNotEmpty &&
-                        messages[i].fromUid != _cloud.uid &&
-                        (i == messages.length - 1 ||
-                            messages[i + 1].fromUid != messages[i].fromUid),
-                  ),
+                  itemBuilder: (context, i) {
+                    final m = messages[i];
+                    final bubble = _Bubble(
+                      message: m,
+                      chatId: widget.chatId,
+                      mine: m.fromUid == _cloud.uid,
+                      // The name is worth showing only when the one above it
+                      // is somebody else's.
+                      showName: widget.groupId.isNotEmpty &&
+                          m.fromUid != _cloud.uid &&
+                          (i == messages.length - 1 ||
+                              messages[i + 1].fromUid != m.fromUid),
+                    );
+                    // The list is reversed, so i + 1 is the older message. A
+                    // heading goes above the first message of each day.
+                    final at = m.createdAt;
+                    if (at == null) return bubble;
+                    final older = i == messages.length - 1
+                        ? null
+                        : messages[i + 1].createdAt;
+                    if (older != null && !isNewDay(at, older)) return bubble;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [_DayHeading(at: at), bubble],
+                    );
+                  },
                 );
               },
             ),
@@ -352,6 +367,33 @@ class _TypingLine extends StatelessWidget {
   }
 }
 
+/// "Today", "Yesterday" or a date, centred above that day's messages.
+class _DayHeading extends StatelessWidget {
+  const _DayHeading({required this.at});
+
+  final DateTime at;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: NestColor.o(NestColor.inkFaint, 0.18),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            dayHeading(at),
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -432,7 +474,7 @@ class _Bubble extends StatelessWidget {
                         if (at != null) ...[
                           const SizedBox(height: 3),
                           Text(
-                            clockLabel(at),
+                            clockLabel12(at),
                             style: TextStyle(
                               fontSize: 10,
                               color: mine

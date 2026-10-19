@@ -346,26 +346,23 @@ class _Direction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    // The label sits above its line: a fixed-width label column ran out of
+    // room at larger text sizes and overlapped the description.
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 86,
-          child: Row(
-            children: [
-              Text(from, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(width: 4),
-              const Icon(Icons.arrow_right_alt_rounded,
-                  size: 16, color: NestColor.inkFaint),
-              const SizedBox(width: 4),
-              Text(to, style: Theme.of(context).textTheme.titleSmall),
-            ],
-          ),
+        Row(
+          children: [
+            Text(from, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_right_alt_rounded,
+                size: 16, color: NestColor.inkFaint),
+            const SizedBox(width: 4),
+            Text(to, style: Theme.of(context).textTheme.titleSmall),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(line, style: Theme.of(context).textTheme.bodySmall),
-        ),
+        const SizedBox(height: 2),
+        Text(line, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

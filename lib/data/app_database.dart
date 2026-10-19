@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 7;
+  static const _version = 10;
 
   Database? _db;
 
@@ -110,6 +110,57 @@ class AppDatabase {
     await _createNotes(db);
     await _createAttachments(db);
     await _createExams(db);
+    await _createTasks(db);
+    await _createCourseFiles(db);
+  }
+
+  /// Version 9: files kept under a course. Rows go with the course; the bytes
+  /// are removed by the repository when a file is deleted.
+  Future<void> _createCourseFiles(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS course_files (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL,
+        subject_id  INTEGER NOT NULL,
+        file_name   TEXT    NOT NULL,
+        stored_name TEXT    NOT NULL,
+        size_bytes  INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        -- The copy in the owner's Google Drive; null until it is uploaded.
+        drive_id    TEXT,
+        FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_course_files_subject '
+      'ON course_files (user_id, subject_id, created_at)',
+    );
+  }
+
+  /// Version 8 added the to-do list. Private to the account that owns it; a
+  /// course (subject) is optional, and removing a course keeps its tasks.
+  Future<void> _createTasks(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tasks (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL,
+        subject_id  INTEGER,
+        title       TEXT    NOT NULL,
+        description TEXT,
+        due_at      INTEGER,
+        priority    TEXT    NOT NULL DEFAULT 'normal',
+        done_at     INTEGER,
+        in_progress INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tasks_user_due '
+      'ON tasks (user_id, done_at, due_at)',
+    );
   }
 
   /// Version 6 added exams, which also carry the academic calendar: a quiz or
@@ -229,6 +280,25 @@ class AppDatabase {
       // A whole new table, so no guard is needed — nothing below version 6
       // has it, and version 6 installs go through _create instead.
       await _createExams(db);
+    }
+    if (from == 8) {
+      // Installs that already have the v8 tasks table gain the new column.
+      await db.execute(
+        'ALTER TABLE tasks ADD COLUMN in_progress INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (from < 9) {
+      await _createCourseFiles(db);
+    }
+    if (from == 9) {
+      // Only installs that already had the v9 table lack the column; newer
+      // tables are created with it.
+      await db.execute('ALTER TABLE course_files ADD COLUMN drive_id TEXT');
+    }
+    if (from < 8) {
+      // A new table only; nothing existing is touched. A fresh install gets it
+      // from _create, so this step is for installs coming from 7 or older.
+      await _createTasks(db);
     }
     if (from < 7) {
       // Courses gain the semester they were taught in.

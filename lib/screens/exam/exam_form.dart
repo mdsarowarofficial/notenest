@@ -343,8 +343,9 @@ class _ExamFormState extends State<_ExamForm> {
                 // wake their phone and does not is worse than no reminder.
                 Text(
                   'Shown inside NoteNest from '
-                  '${reminderLabel(_remindDays).toLowerCase()}. A phone '
-                  'notification while the app is closed is not set up yet.',
+                  '${reminderLabel(_remindDays).toLowerCase()}. It also rings '
+                  'from this phone when phone reminders are switched on in '
+                  'the notifications settings.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

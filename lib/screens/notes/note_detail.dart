@@ -62,6 +62,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
       SnackBar(
         content: const Text('Note moved to Trash'),
         behavior: SnackBarBehavior.floating,
+        // A snackbar with an action stays until dismissed unless told not to.
+        persist: false,
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () => _repo.restoreNote(note),

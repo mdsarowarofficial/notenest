@@ -25,7 +25,14 @@ class _TrashPageState extends State<TrashPage> {
     _future = _repo.trashedNotes();
   }
 
-  void _refresh() => setState(() => _future = _repo.trashedNotes());
+  void _refresh() {
+    // A block body, not an arrow: an arrow would hand setState the Future that
+    // the assignment evaluates to, and Flutter rejects that.
+    final next = _repo.trashedNotes();
+    setState(() {
+      _future = next;
+    });
+  }
 
   Future<void> _restore(Note note) async {
     await _repo.restoreNote(note);

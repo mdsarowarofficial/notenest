@@ -1,0 +1,795 @@
+# NoteNest — Complete System Audit, Feature Development, UI/UX Improvement & Testing
+
+## 1. Your Role and Primary Objective
+
+Act as a Senior Full-Stack Software Engineer, System Architect, Database Engineer, Security Engineer, QA Engineer, and UI/UX Designer.
+
+You are working on my existing **NoteNest** application. Your task is to inspect the entire existing project, understand its architecture, identify missing or incorrectly implemented features, and systematically improve the application into a complete, secure, reliable, scalable, and professional platform for students and teachers.
+
+**This is an existing-project improvement task, not permission to rebuild the application from scratch.**
+
+You must understand the current system before making changes. Preserve all working functionality and use the existing architecture wherever appropriate.
+
+Do not make random changes, blindly replace files, introduce unnecessary dependencies, or perform risky database migrations.
+
+The final application should feel intuitive from the moment a user logs in, with minimal unnecessary navigation and a consistent professional UI/UX.
+
+---
+
+## 2. Mandatory Initial Project Inspection
+
+Before modifying any code:
+
+1. Inspect the complete project structure.
+2. Read `README`, `CLAUDE.md`, configuration files, environment variable examples, package manifests, routing, authentication, database models, migrations, API endpoints, existing components, and available tests.
+3. Identify the frontend framework, backend framework, database, ORM, authentication system, real-time communication system, file storage, notification infrastructure, and deployment architecture.
+4. Trace the existing user flows for login, registration, courses, notes, chat, and other major features.
+5. Determine which requested features already exist, which are partially implemented, and which are missing.
+6. Identify database inefficiencies, duplicate logic, authorization gaps, race conditions, UI inconsistencies, security vulnerabilities, and possible regressions.
+7. Check the current Git status and preserve existing user changes. Never discard or overwrite unrelated work.
+8. Create a concise implementation plan based on the actual codebase.
+
+Produce a feature audit and prioritized task list before starting major modifications.
+
+**Important:** Do not ask me to manually explain things that can be discovered by inspecting the repository.
+
+Do not expose secrets from `.env` files in terminal output, logs, reports, or generated documentation.
+
+---
+
+## 3. Real-Time Chat System — Socket.IO
+
+Inspect the existing chat implementation and improve it without breaking the current authentication or messaging functionality.
+
+### 3.1 Message Timestamps
+
+Every message should display an accurate date and time.
+
+Requirements:
+
+- Display the message time in the conversation.
+- Show a date separator when the date changes.
+- Use friendly labels such as Today, Yesterday, or an appropriate formatted date.
+- Display precise times when useful, such as `8:35 PM`.
+- Group messages sent on the same date where appropriate.
+- Store timestamps consistently in the database, preferably in UTC, and display them in the user's local timezone.
+- Ensure timestamps remain correct after refreshing, reopening a conversation, or loading older messages.
+- Handle pagination and message ordering correctly.
+
+Do not rely exclusively on the frontend clock to establish authoritative message timestamps.
+
+### 3.2 Real-Time Messaging
+
+Use Socket.IO if it is already present or is appropriate for the current architecture.
+
+Implement or verify:
+
+- Real-time message delivery.
+- Authenticated socket connections.
+- Authorization for conversation access.
+- Correct conversation-room membership.
+- Message persistence before acknowledging successful delivery.
+- Reliable message ordering.
+- Reconnection handling.
+- Duplicate-message prevention where appropriate.
+- Online/offline status and last-seen information, if appropriate.
+- Unread message counts.
+- Read receipts and delivery status if they fit the existing design.
+- Secure handling of socket events and payload validation.
+
+A client must never be able to join an arbitrary conversation room or read another user's messages simply by supplying a conversation ID.
+
+Avoid unnecessary socket listeners, duplicated events, memory leaks, and multiple event handlers after reconnection.
+
+If the application uses multiple backend instances, evaluate whether a compatible Socket.IO adapter and shared infrastructure are required.
+
+### 3.3 Chat List Management
+
+The chat list should be easy to manage.
+
+Implement the following behaviors:
+
+- Allow users to remove a conversation from their own chat list.
+- Support a press-and-hold gesture on mobile, or an appropriate context menu on desktop, to reveal conversation actions.
+- Provide a confirmation dialog before permanent deletion or destructive actions.
+- Provide a clear option to remove a conversation from the list without affecting the other participant.
+- Allow users to reopen or access conversations according to the application's conversation-request and history-retention rules.
+- Update the UI immediately when appropriate, while correctly handling server failures and rollback.
+
+Distinguish carefully between:
+
+1. Hiding or removing a conversation from the current user's list.
+2. Deleting messages for the current user only.
+3. Deleting a conversation or messages for all participants.
+
+Do not implement global deletion when the user only intends to remove a conversation from their own chat list.
+
+Use the safest behavior consistent with the existing data model. Do not permanently delete shared conversation history unless that behavior is explicitly intended and authorized.
+
+---
+
+## 4. Email-Based User Search and Message Requests
+
+The current user experience must prevent strangers from immediately sending unrestricted messages to anyone simply because they know that person's email address.
+
+### 4.1 User Search
+
+Allow users to find other registered users by email.
+
+Requirements:
+
+- Validate email format.
+- Normalize email addresses consistently.
+- Use indexed queries rather than loading every user.
+- Return only the minimum information needed to identify the intended recipient.
+- Never expose passwords, password hashes, OTPs, tokens, private profile information, or other sensitive fields.
+- Apply appropriate authentication, authorization, and rate limits to search.
+- Prevent email enumeration and abuse through carefully designed responses and throttling.
+
+Use the existing product's privacy rules to decide what information can be shown before a connection is accepted.
+
+### 4.2 Message Request Workflow
+
+Implement a proper message-request system.
+
+Expected workflow:
+
+1. User A searches for User B using their email.
+2. User A sends a message or connection request.
+3. The request is stored persistently in the database.
+4. User B receives an appropriate notification.
+5. User B can accept or decline the request.
+6. Before acceptance, User A cannot initiate unrestricted conversations or continue sending unrestricted messages.
+7. After acceptance, both users can access their conversation and exchange messages according to the application's messaging rules.
+8. Declined requests cannot be abused to repeatedly contact the recipient.
+9. Duplicate requests and simultaneous requests must be handled safely.
+10. Blocked users must not bypass the restriction by creating a new conversation.
+
+Design clear states such as pending, accepted, declined, and blocked where applicable.
+
+Prevent unauthorized state transitions and concurrent duplicate requests through appropriate backend validation and database constraints.
+
+The recipient should have a straightforward way to manage pending requests.
+
+Do not trust frontend checks alone. Enforce every permission on the server.
+
+---
+
+## 5. Course-Based Learning Experience
+
+Improve the course organization so users can see their relevant courses immediately without repeatedly opening the semester menu.
+
+The semester structure should remain intact if it already exists.
+
+### 5.1 Dashboard and Course Cards
+
+Create an intuitive course dashboard on the home page or Today page.
+
+After login, users should immediately see their relevant courses as cards or another suitable visual layout.
+
+Each card should show useful information, such as:
+
+- Course name and code.
+- Semester or academic term.
+- A course icon or visual identifier.
+- Number of notes or documents, if available.
+- Relevant pending tasks or recent activity, if useful.
+
+Use a responsive layout suitable for mobile and desktop.
+
+Allow users to access a course directly from its card.
+
+Avoid cluttering the dashboard with unnecessary statistics.
+
+### 5.2 Course Management
+
+Users should be able to add courses from the appropriate course-management area.
+
+Where appropriate, support:
+
+- Adding a course.
+- Editing course information.
+- Removing a course safely.
+- Assigning courses to a semester.
+- Filtering courses by semester.
+- Searching for a course.
+- Selecting a course to view its resources.
+
+Do not introduce duplicate courses or orphaned resources.
+
+Before deleting a course, handle its associated notes, files, and tasks safely. Prefer an appropriate archive or soft-delete approach if permanent deletion would risk losing valuable data.
+
+Follow the existing application's user and semester ownership model.
+
+### 5.3 Today and Notes Pages
+
+Make the Today and Notes pages course-aware.
+
+The user should be able to:
+
+- See relevant courses without repeatedly opening the semester menu.
+- Select a course card or course filter.
+- Open that course's notes and resources.
+- Add a note directly to the selected course.
+- View and manage course-specific files.
+- Search or filter notes by course.
+- Edit or remove their own notes.
+- Return easily to the complete course overview.
+
+Use a consistent course selector or card-based navigation system.
+
+The semester menu can remain available for changing the active semester, but it should not be the only way to access course resources.
+
+Avoid implementing two conflicting sources of truth for the active course.
+
+### 5.4 Course Resources and File Attachments
+
+Support course-specific resources, including PDF, DOC, DOCX, and other formats that the current application can safely support.
+
+Users should be able to upload, view, download, and remove their own resources according to the permission model.
+
+Implement:
+
+- File type and size validation.
+- Secure storage and authorization.
+- Safe file download and access.
+- Clear upload progress and error feedback.
+- Resource metadata and timestamps.
+- Course association and ownership checks.
+- Duplicate handling where appropriate.
+- Safe deletion and cleanup of associated storage objects.
+
+Do not store large files directly in the database unless the existing architecture has a strong reason for doing so.
+
+Use the project's existing storage solution where appropriate.
+
+Never trust file extensions alone. Validate content where feasible and prevent executable or malicious uploads from being served unsafely.
+
+---
+
+## 6. Database Architecture, Integrity, and Performance
+
+Audit the entire database architecture before changing it.
+
+Do not assume that the current database is inefficient simply because it may need improvement. Measure and inspect its actual behavior.
+
+Review:
+
+- Data models and relationships.
+- Primary and foreign keys.
+- Unique constraints.
+- Indexes.
+- Query patterns.
+- Transactions.
+- Connection pooling.
+- Pagination.
+- N+1 query problems.
+- Duplicate records.
+- Referential integrity.
+- Soft deletion and retention rules.
+- Existing migrations and rollback options.
+
+Pay special attention to users, semesters, courses, notes, attachments, chat conversations, participants, messages, message requests, notifications, and to-do tasks.
+
+### Database requirements
+
+1. Use the existing database and ORM unless a change is justified.
+2. Preserve all existing user data.
+3. Add indexes for demonstrated or expected high-frequency query patterns.
+4. Use unique constraints to prevent duplicate records where required.
+5. Use transactions for operations that must succeed or fail together.
+6. Use pagination for large message histories and resource lists.
+7. Avoid fetching unnecessary columns and entire tables.
+8. Avoid duplicate queries and unnecessary database round trips.
+9. Ensure deletion and archival rules do not leave orphaned records.
+10. Use safe, versioned migrations.
+11. Verify migration compatibility with the current deployment environment.
+12. Document any migration that could affect existing data.
+
+Do not drop tables, delete columns, reset the production database, or wipe user data as a shortcut.
+
+If a migration could cause data loss or require downtime, stop before executing the destructive step and explain the risk and required approval.
+
+Where relevant, evaluate query plans and realistic data volumes instead of making unsupported performance claims.
+
+---
+
+## 7. Authentication, Login Rate Limiting, and Account Security
+
+Audit the current authentication system.
+
+Determine whether login rate limiting already exists and whether it is correctly enforced.
+
+If protection is missing or insufficient, implement an appropriate solution compatible with the existing backend.
+
+Consider:
+
+- Login attempt throttling.
+- Per-IP and per-account limits.
+- Brute-force protection.
+- Temporary cooldowns.
+- Secure password hashing.
+- Password policy and validation.
+- Session or token expiration.
+- Secure logout and session invalidation.
+- Protection against account enumeration.
+- CSRF protection where applicable.
+- Secure cookies and CORS configuration where applicable.
+- Input validation and authorization checks.
+- Rate limiting for registration, password reset, OTP verification, email search, and message requests.
+
+Avoid simplistic permanent account lockouts that attackers could use to deny service to legitimate users.
+
+If the application runs across multiple backend instances, ensure that rate-limit state is shared when required rather than relying exclusively on process-local memory.
+
+Never log passwords, OTPs, session tokens, or authorization headers.
+
+---
+
+## 8. Forgot Password and OTP Workflow
+
+Inspect the existing forgot-password implementation.
+
+If incomplete or insecure, implement a complete password-reset workflow suitable for the current authentication architecture.
+
+Expected workflow:
+
+1. User selects Forgot Password.
+2. User submits their registered email address.
+3. The server returns a privacy-safe response.
+4. A short-lived verification code or secure reset link is sent through the configured delivery provider.
+5. The user verifies the code or opens the reset link.
+6. The server validates expiry, purpose, attempt limits, and single-use status.
+7. The user sets a new password.
+8. The reset credential becomes invalid after successful use.
+9. Existing sessions are invalidated or handled according to the application's security policy.
+10. The user receives confirmation and can log in securely.
+
+If OTP is used:
+
+- Generate codes securely.
+- Set a short expiry.
+- Limit verification attempts.
+- Limit resend frequency.
+- Invalidate previous codes when appropriate.
+- Prevent replay and reuse.
+- Store verification data securely, preferably using a suitable hash.
+- Bind the verification process to the intended account and purpose.
+- Ensure only one successful reset can occur for a given valid code.
+- Do not reveal the OTP in application logs or API responses.
+
+Use an existing configured email provider if available. Do not invent credentials or silently pretend email delivery works when it has not been configured.
+
+Provide clear setup instructions if a required email service or environment variable is missing.
+
+Test expired codes, invalid codes, repeated attempts, resend behavior, and successful password reset.
+
+---
+
+## 9. Complete Notification System
+
+Design a unified notification system that encourages users to return to NoteNest without becoming intrusive.
+
+First inspect whether browser push notifications, service workers, WebSockets, email delivery, or an existing notification service are already implemented.
+
+Reuse suitable infrastructure rather than creating competing notification systems.
+
+### 9.1 In-App Notifications
+
+Provide a notification center with:
+
+- Unread notification count.
+- Read/unread status.
+- Mark-as-read functionality.
+- Mark-all-as-read functionality.
+- Navigation to the relevant course, task, message, or resource.
+- Appropriate notification grouping.
+- Safe deletion or dismissal where appropriate.
+
+Examples:
+
+- A new message request.
+- A request being accepted or declined.
+- A new message from an accepted contact.
+- A new course resource.
+- A reminder for an upcoming task.
+- A relevant system announcement.
+
+Only generate notifications for events that are meaningful to the recipient.
+
+### 9.2 Reminders and Engagement
+
+Implement appropriate reminders for:
+
+- Upcoming to-do deadlines.
+- Overdue tasks.
+- Scheduled study sessions, if supported.
+- Important user-configured reminders.
+- Relevant activity requiring the user's attention.
+
+Consider a gentle inactivity reminder for users who have not visited the application for a configurable period, provided they have opted into the relevant notifications.
+
+Avoid excessive reminders, duplicate notifications, and notification spam.
+
+Respect notification preferences, quiet hours where appropriate, and opt-out controls.
+
+Do not send inactivity reminders to every user on every scheduled job execution.
+
+### 9.3 Notification Delivery Architecture
+
+Separate notification creation from notification delivery when necessary.
+
+Ensure that:
+
+- Important notifications are persisted.
+- Socket.IO can deliver in-app updates in real time.
+- Offline users can see notifications after returning.
+- Failed deliveries can be retried safely where appropriate.
+- Duplicate delivery is controlled through idempotency.
+- Notification jobs do not create duplicates after restarts.
+- Browser push is implemented only if appropriate and supported by the existing application.
+- Email notifications are sent only through a properly configured provider.
+- Permission requests are explained clearly to users.
+
+If a scheduled job, queue, Redis instance, service worker, VAPID configuration, or external provider is needed, verify whether the existing infrastructure supports it before adding dependencies.
+
+Do not claim that browser push works merely because an in-app notification exists.
+
+### 9.4 User Notification Settings
+
+Provide settings for controlling relevant notification categories, such as:
+
+- Messages and message requests.
+- Task reminders.
+- Course activity.
+- Push notifications.
+- Email notifications.
+- Optional inactivity reminders.
+
+Keep essential security notifications separate from optional engagement notifications where appropriate.
+
+---
+
+## 10. To-Do List for Students and Teachers
+
+Add a fully functional to-do list as a first-class NoteNest feature.
+
+The goal is to help students and teachers organize academic work and give them a useful reason to return to the application regularly.
+
+### 10.1 Core Task Features
+
+Users should be able to:
+
+- Create a task.
+- Edit a task.
+- Delete or archive a task.
+- Mark a task as complete or incomplete.
+- Set a title and optional description.
+- Set a due date and time.
+- Assign a priority.
+- Associate a task with a course.
+- View upcoming tasks.
+- View overdue tasks.
+- Filter tasks by status, priority, date, and course.
+- Search tasks where appropriate.
+- Sort tasks by due date or priority.
+- Add a task without navigating through several unnecessary screens.
+
+Use suitable states such as pending, in progress, completed, and overdue where they make sense.
+
+Overdue status should be calculated consistently from the due date and completion status rather than stored redundantly without a clear reason.
+
+### 10.2 Student and Teacher Workflows
+
+Support both students and teachers without assuming their workflows are identical.
+
+Students may use tasks for assignments, exam preparation, classwork, and personal study goals.
+
+Teachers may use tasks for lesson preparation, grading, class planning, and other teaching responsibilities.
+
+If the existing application has teacher/student roles, respect them. If it does not, implement a shared personal task model without introducing unnecessary role complexity.
+
+Personal tasks must remain private by default.
+
+Do not expose a user's private tasks to other users unless an explicit, authorized collaboration feature exists.
+
+### 10.3 Best UI Placement
+
+Choose the placement after inspecting the existing navigation and dashboard.
+
+Prefer a prominent but unobtrusive Today dashboard section showing:
+
+- Today's tasks.
+- Upcoming deadlines.
+- Overdue tasks requiring attention.
+- A quick-add task action.
+- A link to the complete task manager.
+
+Course-related tasks should be accessible from the corresponding course page.
+
+Avoid overcrowding the dashboard. Prioritize the information most useful for the user's next action.
+
+Ensure that all task operations work on mobile and desktop.
+
+---
+
+## 11. Professional UI/UX and Visual Design
+
+Improve the application's design while preserving its established visual identity and working interactions.
+
+The result should look polished, consistent, modern, and suitable for a professional educational platform.
+
+### 11.1 Design Principles
+
+- Compact, well-balanced layouts.
+- Efficient use of available page space.
+- Clear visual hierarchy.
+- Consistent spacing, typography, colors, and component behavior.
+- Attractive course cards.
+- Clear primary and secondary actions.
+- Accessible contrast and readable text.
+- Responsive layouts for mobile, tablet, and desktop.
+- Consistent loading, empty, error, and success states.
+- Clear confirmation dialogs for destructive actions.
+- Useful hover, focus, pressed, and disabled states.
+- Accessible keyboard navigation and appropriate touch targets.
+- Consistent iconography and button styles.
+
+Avoid excessive empty areas, oversized cards, unnecessary scrolling, redundant headings, and excessive decorative effects.
+
+Do not redesign every screen arbitrarily. Improve the actual screens based on their function and existing design system.
+
+### 11.2 Dashboard Experience
+
+After login, the user should be able to understand the most important available actions without opening multiple menus.
+
+Prioritize:
+
+1. Relevant courses.
+2. Today's tasks and upcoming deadlines.
+3. Recent notes or resources.
+4. Important unread messages or notifications.
+5. Quick actions such as adding a note or creating a task.
+
+Adapt the layout to the existing application and avoid presenting every feature at once if that makes the dashboard overwhelming.
+
+### 11.3 Cover Page and Proposal Document
+
+If the repository contains the NoteNest proposal or a cover-page document that needs improvement, inspect and update that existing artifact.
+
+Cover-page requirements:
+
+- Use space efficiently.
+- Reduce unnecessary blank areas.
+- Maintain balanced margins and alignment.
+- Use a compact, professional composition.
+- Keep the project title and essential proposal information readable.
+- Include a small, unobtrusive `NoteNest` footer near the bottom of the page.
+- Preserve required institutional or academic information.
+- Do not invent university names, student IDs, supervisor names, dates, or other project details.
+
+The NoteNest footer should be subtle and should not compete with the proposal title.
+
+If the proposal file does not exist, do not invent an entire academic document without checking the available project context. Report the missing artifact and prepare an appropriate cover page only when sufficient project details are available.
+
+---
+
+## 12. Backend Validation and Authorization
+
+Every feature must be enforced on the server, not just hidden or disabled in the frontend.
+
+Review all relevant API endpoints and socket events.
+
+Verify that:
+
+- Users can access only their own private data.
+- Course ownership and membership are checked.
+- Notes and attachments cannot be accessed by unauthorized users.
+- Message requests follow the correct state transitions.
+- Chat participants are authorized before reading or sending messages.
+- Conversation removal affects only the intended user's view.
+- Task ownership is enforced.
+- Notification recipients are validated.
+- User-supplied IDs cannot bypass access control.
+- All important inputs are validated.
+- Errors do not expose internal secrets or stack traces in production.
+
+Use consistent error handling and appropriate HTTP status codes.
+
+Do not rely on client-provided role names, ownership flags, or permissions.
+
+---
+
+## 13. Testing and Continuous Verification
+
+Testing is mandatory. Do not stop after writing code or confirming that the application starts.
+
+First discover the existing test framework and scripts.
+
+Add or update unit, integration, and end-to-end tests according to the actual architecture.
+
+### 13.1 Functional Tests
+
+Verify:
+
+- Login and logout.
+- Rate limiting.
+- Password reset and OTP expiry.
+- Course creation, editing, and removal.
+- Course-based notes and resource management.
+- File upload, download, and access restrictions.
+- Email-based user search.
+- Message request creation, acceptance, and rejection.
+- Real-time message delivery.
+- Message timestamps and date separators.
+- Conversation removal and privacy behavior.
+- Unread counts and notification updates.
+- Task creation, editing, completion, and deletion.
+- Due dates and overdue filtering.
+- Notification preferences.
+- Dashboard responsiveness and navigation.
+
+### 13.2 Security Tests
+
+Test:
+
+- Unauthorized API access.
+- Cross-user data access.
+- Invalid or forged conversation IDs.
+- Unauthorized Socket.IO room joins.
+- Repeated OTP attempts.
+- Expired and reused reset codes.
+- Brute-force login attempts.
+- Duplicate requests and messages.
+- Malicious or invalid file uploads.
+- Unauthorized task, note, and attachment deletion.
+- Rate-limit bypass attempts.
+- Duplicate notification creation.
+
+### 13.3 Regression and Integration Tests
+
+Ensure that changes do not break existing features.
+
+Verify compatibility between:
+
+- Frontend and backend.
+- Database models and API responses.
+- Socket.IO events and persisted messages.
+- Courses and notes.
+- Courses and tasks.
+- File storage and resource metadata.
+- Notification creation and delivery.
+- Authentication and authorization.
+
+Test realistic concurrent operations where relevant.
+
+Do not claim that a test passed unless it was actually executed and its result was checked.
+
+### 13.4 Build and Runtime Verification
+
+Run the applicable checks available in the project, including:
+
+- Linting.
+- Type checking.
+- Unit tests.
+- Integration tests.
+- Production build.
+- Database migration validation.
+- Relevant end-to-end tests.
+
+Start the application using the correct development procedure and inspect runtime errors when the environment permits.
+
+If browser automation or a real email provider is unavailable, explicitly report what could not be verified and provide the exact remaining verification steps.
+
+Fix discovered errors and regressions before continuing to unrelated features.
+
+---
+
+## 14. Safe Implementation Workflow
+
+Work in small, verifiable stages.
+
+### Phase 1 — Audit
+
+Inspect the codebase, architecture, database, existing UI, security, and tests.
+
+Deliver an initial summary of existing functionality, gaps, risks, and a prioritized implementation plan.
+
+### Phase 2 — Architecture and Data Model
+
+Define the minimal required model changes, API changes, socket events, notification workflow, and database migrations.
+
+Verify backward compatibility and data integrity.
+
+### Phase 3 — Core Backend
+
+Implement and test the necessary database, API, validation, authorization, messaging, authentication, and task-management changes.
+
+### Phase 4 — Frontend and UI/UX
+
+Implement the improved dashboard, course cards, course-aware notes, chat management, message requests, notification center, settings, and to-do experience.
+
+### Phase 5 — Integration
+
+Connect frontend actions to real backend functionality. Verify real-time updates, persistence, permissions, and error handling.
+
+### Phase 6 — Testing and Bug Fixing
+
+Run all available tests, inspect the logs, investigate failures, fix root causes, and rerun affected tests.
+
+Do not merely suppress errors, weaken assertions, or disable tests to obtain a green result.
+
+### Phase 7 — Final Review
+
+Review the complete changeset for:
+
+- Missing requirements.
+- Broken functionality.
+- Security vulnerabilities.
+- Database inconsistencies.
+- UI/UX problems.
+- Unnecessary dependencies.
+- Duplicate logic.
+- Incomplete integrations.
+- Documentation gaps.
+
+Provide a final report with implementation details, modified files, migrations, test results, remaining limitations, and setup instructions.
+
+---
+
+## 15. Strict Rules — Do Not Break the Existing System
+
+These rules take priority over implementation speed.
+
+1. Never rebuild the project from scratch without explicit justification and approval.
+2. Never replace the existing architecture merely because another framework is preferred.
+3. Never overwrite user work or discard uncommitted changes.
+4. Never delete or reset the database to simplify implementation.
+5. Never run destructive migrations without understanding their impact.
+6. Never introduce fake data into production workflows.
+7. Never create frontend-only features that pretend to persist data.
+8. Never trust client-side authorization.
+9. Never expose secrets, passwords, OTPs, or private user information.
+10. Never add unnecessary libraries or services without a clear technical benefit.
+11. Never duplicate existing functionality without checking the current implementation.
+12. Never silently remove a working feature.
+13. Never hide a failed test or claim success without verification.
+14. Never leave broken imports, missing environment variables, or incomplete integrations unexplained.
+15. Never implement a risky change when the correct behavior is unclear; investigate first and choose the safest compatible approach.
+16. Never make unrelated changes simply to improve code style.
+17. Keep changes small enough to review and test.
+18. Preserve existing API contracts unless a change is necessary and backward compatibility is handled.
+19. If a required external service is unavailable, implement only what can be completed safely and document the missing configuration.
+20. If the scope is too large for one pass, prioritize foundational correctness and complete features in dependency order instead of leaving many half-implemented features.
+
+---
+
+## 16. Final Definition of Done
+
+The task is complete only when:
+
+- The original application remains functional.
+- The requested features have been implemented according to the actual architecture.
+- Chat messages have reliable timestamps and date separators.
+- Conversation requests and acceptance rules are enforced on the backend.
+- Users can manage their own conversation lists safely.
+- Courses, notes, and files are easy to navigate and correctly associated.
+- Authentication and password reset have appropriate security controls.
+- The notification system works within the configured infrastructure.
+- Students and teachers can manage their personal to-do lists.
+- Database changes preserve data integrity.
+- The UI is professional, compact, responsive, and user-friendly.
+- Relevant automated tests have been executed.
+- Build and runtime errors have been investigated and fixed where possible.
+- Unverified functionality and remaining external dependencies are clearly documented.
+- good morning,noon,evening will be shown based on their exact time
+
+## Final Instruction
+
+Start by inspecting the actual repository and producing the audit.
+
+Then implement the highest-priority changes in dependency order, testing each stage before moving forward.
+
+Do not stop after writing a plan if implementation is possible. Continue through implementation, integration, verification, and bug fixing.
+
+**Think like an engineer responsible for a real production application: correctness, security, data integrity, maintainability, and user experience are more important than making superficial changes quickly.**

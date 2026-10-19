@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
+import '../../models/cloud_profile.dart';
 import '../../models/note.dart';
 import '../../models/note_bundle.dart';
 import '../../models/note_share.dart';
@@ -10,7 +11,7 @@ import '../../widgets/nest_mark_tile.dart';
 import '../../widgets/nest_empty_state.dart';
 import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
-import '../chat/chat_page.dart';
+import '../chat/message_request.dart';
 import '../chat/safety_actions.dart';
 import '../share/import_page.dart';
 import '../share/request_note_sheet.dart';
@@ -327,23 +328,18 @@ class _PendingTileState extends State<_PendingTile> {
   }
 
   Future<void> _message() async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final chatId =
-          await CloudService.instance.openDirectChat(widget.share.fromUid);
-      if (!mounted) return;
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            chatId: chatId,
-            title: widget.share.fromLabel,
+    final person =
+        await CloudService.instance.profileFor(widget.share.fromUid);
+    if (!mounted) return;
+    await startConversation(
+      context,
+      person ??
+          CloudProfile(
+            uid: widget.share.fromUid,
+            name: widget.share.fromLabel,
+            email: '',
           ),
-        ),
-      );
-    } on CloudException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    );
   }
 
   Future<void> _decline() async {

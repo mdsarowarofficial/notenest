@@ -297,11 +297,11 @@ class _CountPill extends StatelessWidget {
               ),
             )
           else
-            const Padding(
-              padding: EdgeInsets.only(left: 5),
+            Padding(
+              padding: const EdgeInsets.only(left: 5),
               child: Text(
-                'notes',
-                style: TextStyle(
+                total == 1 ? 'note' : 'notes',
+                style: const TextStyle(
                   fontFamily: NestFont.body,
                   fontSize: 11.5,
                   height: 1,

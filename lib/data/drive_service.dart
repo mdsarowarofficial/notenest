@@ -165,7 +165,7 @@ class DriveService {
           'Library → Google Drive API) and try again.';
     }
     if (res.statusCode == 403 && reason.toLowerCase().contains('quota')) {
-      return 'Your Google Drive is full. Free some space and try again.';
+      return fullMessage;
     }
     if (res.statusCode == 404) {
       return 'That file is no longer in Google Drive.';
@@ -173,11 +173,42 @@ class DriveService {
     return 'Google Drive refused that (${res.statusCode}). $reason'.trim();
   }
 
+  static const fullMessage =
+      'Your Google Drive has no space left. Free some space in Drive '
+      '(delete files or empty the bin), then try again.';
+
+  /// Throws [fullMessage] when [bytes] more would not fit in the student's
+  /// Drive. Drive reports no limit for unlimited (Workspace) accounts, which
+  /// always pass. A failed lookup passes too: the upload itself still reports
+  /// a full Drive, so this check only saves a wasted upload.
+  Future<void> ensureSpace(int bytes, {bool prompt = true}) async {
+    int? limit, used;
+    try {
+      final res = await _send(
+        (h) => http.get(
+          Uri.parse('$_api/about').replace(
+            queryParameters: {'fields': 'storageQuota'},
+          ),
+          headers: h,
+        ),
+        prompt: prompt,
+      );
+      final q = jsonDecode(res.body)['storageQuota'];
+      limit = int.tryParse('${q?['limit'] ?? ''}');
+      used = int.tryParse('${q?['usage'] ?? ''}');
+    } on DriveException {
+      // No access or no network is not "full"; the upload says what's wrong.
+      return;
+    }
+    if (limit == null || used == null) return;
+    if (used + bytes > limit) throw const DriveException(fullMessage);
+  }
+
   // --------------------------------------------------------------- folders
 
   /// Finds or makes a folder by path under the NoteNest folder, such as
   /// `['Classes', 'CSE 112']`. Results are remembered for the session.
-  Future<String> folder(List<String> path) async {
+  Future<String> folder(List<String> path, {bool prompt = true}) async {
     var parent = 'root';
     final names = [rootFolderName, ...path];
     for (var i = 0; i < names.length; i++) {
@@ -197,7 +228,7 @@ class DriveService {
               'pageSize': '1',
             }),
             headers: h,
-          ));
+          ), prompt: prompt);
       final files = (jsonDecode(found.body)['files'] as List?) ?? const [];
       String id;
       if (files.isNotEmpty) {
@@ -211,7 +242,7 @@ class DriveService {
                 'mimeType': 'application/vnd.google-apps.folder',
                 'parents': [parent],
               }),
-            ));
+            ), prompt: prompt);
         id = jsonDecode(made.body)['id'] as String;
       }
       _folderIds[key] = id;
@@ -236,7 +267,7 @@ class DriveService {
     Map<String, String> appProperties = const {},
     bool prompt = true,
   }) async {
-    final parent = await folder(folderPath);
+    final parent = await folder(folderPath, prompt: prompt);
     final start = await _send(
       (h) => http.post(
         Uri.parse('$_upload/files?uploadType=resumable&fields=$_fields'),

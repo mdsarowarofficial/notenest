@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
 import 'data/auth_repository.dart';
 import 'data/cloud_service.dart';
 import 'data/note_repository.dart';
+import 'data/reminder_service.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/setup/setup_flow.dart';
 import 'screens/shell/home_shell.dart';
@@ -24,6 +27,11 @@ Future<void> main() async {
   // start, this returns having recorded why and the app carries on exactly as
   // it did before there was a cloud at all.
   await CloudService.instance.start();
+
+  // Local reminders. Rebuilt from the plan whenever tasks or exams change; a
+  // no-op on the web and for anyone who has not switched them on.
+  ReminderService.instance.attach(NoteRepository.instance);
+  unawaited(ReminderService.instance.sync());
 
   runApp(const NoteNestApp());
 }

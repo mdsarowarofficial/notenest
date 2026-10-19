@@ -48,17 +48,35 @@ class CoverCanvas extends StatelessWidget {
             if (mark != null && spec.showWatermark)
               Positioned.fill(child: _Watermark(logo: mark)),
             Positioned.fill(
-              child: switch (spec.template) {
-                CoverTemplate.framed =>
-                  _Framed(spec: spec, accent: accent, logo: mark),
-                CoverTemplate.classic =>
-                  _Classic(spec: spec, accent: accent, logo: mark),
-                CoverTemplate.ruled => _Ruled(spec: spec, accent: accent),
-                CoverTemplate.crest =>
-                  _Crest(spec: spec, accent: accent, logo: mark),
-                CoverTemplate.minimal =>
-                  _Minimal(spec: spec, accent: accent, logo: mark),
-              },
+              child: Column(
+                children: [
+                  Expanded(
+                    child: switch (spec.template) {
+                      CoverTemplate.framed =>
+                        _Framed(spec: spec, accent: accent, logo: mark),
+                      CoverTemplate.classic =>
+                        _Classic(spec: spec, accent: accent, logo: mark),
+                      CoverTemplate.ruled => _Ruled(spec: spec, accent: accent),
+                      CoverTemplate.crest =>
+                        _Crest(spec: spec, accent: accent, logo: mark),
+                      CoverTemplate.minimal =>
+                        _Minimal(spec: spec, accent: accent, logo: mark),
+                    },
+                  ),
+                  // A small, quiet credit at the foot of the page. It has its own
+                  // row, so it can never sit on top of the layout above it.
+                  const SizedBox(height: 6),
+                  const Text(
+                    'NoteNest',
+                    style: TextStyle(
+                      fontSize: 7,
+                      height: 1,
+                      letterSpacing: 0.8,
+                      color: Color(0xFF8A8A8A),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -282,15 +300,19 @@ class _Classic extends StatelessWidget {
         const SizedBox(height: 3),
         Container(width: double.infinity, height: 0.8, color: accent),
         const SizedBox(height: 18),
-        Text(spec.kind.heading, style: _kindHeading, textAlign: TextAlign.center),
+        Text(spec.kind.heading,
+            style: _kindHeading, textAlign: TextAlign.center),
         if (spec.serialLine != null) ...[
           const SizedBox(height: 8),
           Text(spec.serialLine!, style: _course, textAlign: TextAlign.center),
         ],
         if (spec.title.trim().isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(spec.title.trim(), style: _title, textAlign: TextAlign.center,
-              maxLines: 4, overflow: TextOverflow.ellipsis),
+          Text(spec.title.trim(),
+              style: _title,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis),
         ],
         const SizedBox(height: 18),
         Container(width: 90, height: 0.8, color: const Color(0xFF9A9A9A)),
@@ -383,8 +405,10 @@ class _Ruled extends StatelessWidget {
                 ],
                 if (spec.title.trim().isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  Text(spec.title.trim(), style: _title,
-                      maxLines: 4, overflow: TextOverflow.ellipsis),
+                  Text(spec.title.trim(),
+                      style: _title,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis),
                 ],
                 const Spacer(flex: 3),
                 Row(
@@ -480,29 +504,30 @@ class _Crest extends StatelessWidget {
             child: Image.memory(logo!, fit: BoxFit.contain),
           )
         else
-        SizedBox(
-          width: 86,
-          height: 86,
-          child: CustomPaint(
-            painter: _SealPainter(accent: accent),
-            child: Center(
-              child: Text(
-                _initials,
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                  color: accent,
-                  decoration: TextDecoration.none,
+          SizedBox(
+            width: 86,
+            height: 86,
+            child: CustomPaint(
+              painter: _SealPainter(accent: accent),
+              child: Center(
+                child: Text(
+                  _initials,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: accent,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         const SizedBox(height: 18),
         _Masthead(spec: spec),
         const Spacer(flex: 2),
-        Text(spec.kind.heading, style: _kindHeading, textAlign: TextAlign.center),
+        Text(spec.kind.heading,
+            style: _kindHeading, textAlign: TextAlign.center),
         const SizedBox(height: 10),
         Container(width: 54, height: 2, color: accent),
         if (spec.serialLine != null) ...[
@@ -511,8 +536,11 @@ class _Crest extends StatelessWidget {
         ],
         if (spec.title.trim().isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(spec.title.trim(), style: _title, textAlign: TextAlign.center,
-              maxLines: 4, overflow: TextOverflow.ellipsis),
+          Text(spec.title.trim(),
+              style: _title,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis),
         ],
         const Spacer(flex: 3),
         _PersonBlock(
@@ -800,8 +828,7 @@ class _Framed extends StatelessWidget {
                             alignLeft: true,
                           ),
                         if (spec.title.trim().isNotEmpty) ...[
-                          if (spec.serialLine != null)
-                            SizedBox(height: 4 * g),
+                          if (spec.serialLine != null) SizedBox(height: 4 * g),
                           _Line(
                             spec.kind.titleLabel,
                             spec.title.trim(),

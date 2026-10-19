@@ -9,6 +9,12 @@
          offline language pack is installed, so it needs the network. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Task and exam reminders ring through the system notification shade.
+         Android 13+ asks the person the first time they switch reminders on,
+         and scheduled ones are restored after the phone restarts. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <!-- A microphone is not required to install the app: a device without one
          can still use every other part of NoteNest. -->
     <uses-feature
@@ -42,6 +48,17 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

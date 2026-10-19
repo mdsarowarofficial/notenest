@@ -6,7 +6,7 @@ import '../../models/cloud_profile.dart';
 import '../../models/note.dart';
 import '../../models/note_share.dart';
 import '../../theme/nest_theme.dart';
-import '../chat/chat_page.dart';
+import '../chat/message_request.dart';
 
 /// Sending a note to somebody inside NoteNest, rather than out through a file.
 ///
@@ -395,25 +395,8 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
 
   Future<void> _messageInstead(CloudProfile person) async {
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _busy = true);
-    try {
-      final chatId = await _cloud.openDirectChat(person.uid);
-      if (!mounted) return;
-      navigator.pop();
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            chatId: chatId,
-            title: person.name.trim().isEmpty ? person.email : person.name,
-          ),
-        ),
-      );
-    } on CloudException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    navigator.pop();
+    await startConversation(navigator.context, person);
   }
 }
 

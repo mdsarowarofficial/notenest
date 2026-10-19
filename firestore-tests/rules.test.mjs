@@ -58,6 +58,17 @@ const message = (from, extra = {}) => ({
   createdAt: now(), ...extra,
 });
 
+// Seeds an accepted message request, bypassing rules, as the precondition for
+// opening a direct chat between these two.
+async function seedAccepted(from, to) {
+  const id = from < to ? 'dm_' + from + '_' + to : 'dm_' + to + '_' + from;
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'dmRequests', id), {
+      fromUid: from, toUid: to, text: 'hi', state: 'accepted', createdAt: now(),
+    });
+  });
+}
+
 async function createGroup(db, owner, groupId, code) {
   const b = writeBatch(db);
   b.set(doc(db, 'groups', groupId), group(owner, code));
@@ -225,6 +236,7 @@ test('group chat: first write cannot point the thread at another group', async (
 });
 
 test('direct chat: open, message, outsider locked out', async () => {
+  await seedAccepted('alice', 'bob');
   const a = as('alice', 'alice@uni.edu');
   await assertSucceeds(setDoc(doc(a, 'chats/dm_alice_bob'),
     { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true }));
@@ -239,6 +251,7 @@ test('direct chat: open, message, outsider locked out', async () => {
 });
 
 test('blobs: payload only', async () => {
+  await seedAccepted('alice', 'bob');
   const a = as('alice', 'alice@uni.edu');
   await setDoc(doc(a, 'chats/dm_alice_bob'), { kind: 'direct', memberUids: ['alice', 'bob'] });
   await assertSucceeds(setDoc(doc(a, 'chats/dm_alice_bob/blobs/b1'),
@@ -250,6 +263,7 @@ test('blobs: payload only', async () => {
 // ------------------------------------------------------- blocks, reports
 
 async function openDm(db) {
+  await seedAccepted('alice', 'bob');
   await setDoc(doc(db, 'chats/dm_alice_bob'),
     { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true });
 }
@@ -450,4 +464,134 @@ test('submissions: only on an assignment, not a material', async () => {
   await assertFails(setDoc(
     doc(as('sam', 'sam@uni.edu'), 'groups/c1/posts/m1/submissions/sam'),
     work('sam')));
+});
+
+// ------------------------------------------------------- message requests
+
+// message requests are created together with the daily counter, as the app does
+async function seedReq(id, data) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'dmRequests', id), data);
+  });
+}
+async function reqBatch(db, uid, id, data) {
+  const b = writeBatch(db);
+  b.set(doc(db, 'dmQuota', uid), { day: Math.floor(Date.now() / 86400000), count: 1 });
+  b.set(doc(db, 'dmRequests', id), data);
+  return b.commit();
+}
+
+const dmReq = (from, to, extra = {}) => ({
+  fromUid: from, toUid: to, text: 'Hi, can we talk?', state: 'pending',
+  createdAt: now(), ...extra,
+});
+
+test('requests: cannot open a new chat without an accepted request', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertFails(setDoc(doc(a, 'chats/dm_alice_bob'),
+    { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true }));
+  await assertSucceeds(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob')));
+  // Still pending: still no chat, for either side.
+  await assertFails(setDoc(doc(a, 'chats/dm_alice_bob'),
+    { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true }));
+  const b = as('bob', 'bob@uni.edu');
+  await assertFails(setDoc(doc(b, 'chats/dm_alice_bob'),
+    { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true }));
+  await assertSucceeds(updateDoc(doc(b, 'dmRequests/dm_alice_bob'),
+    { state: 'accepted', respondedAt: now() }));
+  await assertSucceeds(setDoc(doc(b, 'chats/dm_alice_bob'),
+    { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true }));
+  await assertSucceeds(setDoc(doc(a, 'chats/dm_alice_bob/messages/m1'), message('alice')));
+});
+
+test('requests: create as yourself, right id, pending, bounded text', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('bob', 'alice')));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_carol', dmReq('alice', 'bob')));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob', { state: 'accepted' })));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob', { text: 'x'.repeat(501) })));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob', { text: '' })));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob', { extra: 1 })));
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_alice', dmReq('alice', 'alice')));
+  await assertSucceeds(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob')));
+});
+
+test('requests: only the recipient answers; sender cannot accept or reset', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  const b = as('bob', 'bob@uni.edu');
+  await seedReq('dm_alice_bob', dmReq('alice', 'bob'));
+  await assertFails(updateDoc(doc(a, 'dmRequests/dm_alice_bob'), { state: 'accepted' }));
+  await assertFails(reqBatch(as('carol', 'c@uni.edu'), 'carol', 'dm_alice_bob', dmReq('alice', 'bob', { state: 'accepted' })));
+  await assertFails(updateDoc(doc(b, 'dmRequests/dm_alice_bob'), { text: 'edited' }));
+  await assertFails(updateDoc(doc(b, 'dmRequests/dm_alice_bob'), { state: 'pending' }));
+  await assertSucceeds(updateDoc(doc(b, 'dmRequests/dm_alice_bob'), { state: 'declined', respondedAt: now() }));
+  // After a decline the sender can neither re-send, reset, nor delete it.
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob')));
+  await assertFails(updateDoc(doc(a, 'dmRequests/dm_alice_bob'), { state: 'pending' }));
+  await assertFails(deleteDoc(doc(a, 'dmRequests/dm_alice_bob')));
+  // Bob can change his mind.
+  await assertSucceeds(updateDoc(doc(b, 'dmRequests/dm_alice_bob'), { state: 'accepted', respondedAt: now() }));
+});
+
+test('requests: the other direction cannot create a second request', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  const b = as('bob', 'bob@uni.edu');
+  await seedReq('dm_alice_bob', dmReq('alice', 'bob'));
+  await assertFails(reqBatch(b, 'bob', 'dm_alice_bob', dmReq('bob', 'alice')));
+});
+
+test('requests: outsiders cannot read; missing request reads as absent', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await seedReq('dm_alice_bob', dmReq('alice', 'bob'));
+  await assertFails(getDoc(doc(as('carol', 'c@uni.edu'), 'dmRequests/dm_alice_bob')));
+  await assertSucceeds(getDoc(doc(as('bob', 'bob@uni.edu'), 'dmRequests/dm_alice_bob')));
+  const miss = await assertSucceeds(getDoc(doc(a, 'dmRequests/dm_alice_zed')));
+  if (miss.exists()) throw new Error('should be absent');
+  await assertSucceeds(getDocs(query(collection(as('bob', 'bob@uni.edu'), 'dmRequests'),
+    where('toUid', '==', 'bob'))));
+  await assertFails(getDocs(query(collection(as('carol', 'c@uni.edu'), 'dmRequests'),
+    where('toUid', '==', 'bob'))));
+});
+
+test('requests: blocked sender cannot ask; sender may withdraw a pending one', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  const b = as('bob', 'bob@uni.edu');
+  await setDoc(doc(b, 'blocks/bob'), { uids: ['alice'], updatedAt: now() });
+  await assertFails(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob')));
+  await setDoc(doc(b, 'blocks/bob'), { uids: [], updatedAt: now() });
+  await assertSucceeds(reqBatch(a, 'alice', 'dm_alice_bob', dmReq('alice', 'bob')));
+  await assertSucceeds(deleteDoc(doc(a, 'dmRequests/dm_alice_bob')));
+});
+
+// ---------------------------------------------------- request daily quota
+
+const day = () => Math.floor(Date.now() / 86400000);
+
+async function sendRequest(db, from, to, count = 1, extra = {}) {
+  const b = writeBatch(db);
+  b.set(doc(db, 'dmQuota', from), { day: day(), count });
+  b.set(doc(db, 'dmRequests', from < to ? `dm_${from}_${to}` : `dm_${to}_${from}`),
+    dmReq(from, to, extra));
+  return b.commit();
+}
+
+test('quota: a request needs its counter bumped in the same batch', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  // Bare request, no counter: refused.
+  await assertFails(setDoc(doc(a, 'dmRequests/dm_alice_bob'), dmReq('alice', 'bob')));
+  await assertSucceeds(sendRequest(a, 'alice', 'bob', 1));
+});
+
+test('quota: counter only goes up by one, caps at 20, resets next day', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertSucceeds(setDoc(doc(a, 'dmQuota/alice'), { day: day(), count: 1 }));
+  await assertFails(setDoc(doc(a, 'dmQuota/alice'), { day: day(), count: 5 }));
+  await assertFails(setDoc(doc(a, 'dmQuota/alice'), { day: day(), count: 1 }));
+  await assertSucceeds(setDoc(doc(a, 'dmQuota/alice'), { day: day(), count: 2 }));
+  await assertFails(setDoc(doc(a, 'dmQuota/alice'), { day: day() - 1, count: 3 }));
+  // Somebody else's counter is not yours to touch or read.
+  await assertFails(setDoc(doc(as('bob', 'b@uni.edu'), 'dmQuota/alice'), { day: day(), count: 3 }));
+  await assertFails(getDoc(doc(as('bob', 'b@uni.edu'), 'dmQuota/alice')));
+  await assertFails(deleteDoc(doc(a, 'dmQuota/alice')));
+  await assertFails(setDoc(doc(a, 'dmQuota/alice'), { day: day(), count: 21 }));
 });

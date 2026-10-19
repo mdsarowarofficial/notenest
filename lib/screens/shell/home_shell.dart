@@ -590,6 +590,10 @@ class _HomeShellState extends State<HomeShell> {
             onCapture: _teacher ? _openTeacherCapture : _openCapture,
             onOpenExams: () => setState(() => _tab = 3),
             onOpenClasses: () => setState(() => _tab = 2),
+            onOpenCourse: (code) => setState(() {
+              _drawerSelection = code;
+              _tab = 1;
+            }),
           ),
           NotesPage(
             subjectCode: _drawerSelection,

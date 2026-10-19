@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:notenest/data/auth_repository.dart';
+import 'package:notenest/data/cloud_service.dart' show RequestRequired, RequestKind;
 import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
 import 'package:notenest/models/classwork.dart';
@@ -12,6 +13,11 @@ import 'package:notenest/models/cloud_profile.dart';
 import 'package:notenest/models/cover_spec.dart';
 import 'package:notenest/models/doc_text.dart';
 import 'package:notenest/models/exam.dart';
+import 'package:notenest/models/task.dart';
+import 'package:notenest/models/reminder_plan.dart';
+import 'package:notenest/models/course_file.dart';
+import 'package:notenest/models/app_notice.dart';
+import 'package:notenest/screens/home/today_page.dart' show greetingFor;
 import 'package:notenest/models/university.dart';
 import 'package:notenest/models/note.dart';
 import 'package:notenest/models/note_bundle.dart';
@@ -2188,6 +2194,274 @@ void main() {
       final withPhoto = bare.copyWith(photo: 'abc');
       expect(withPhoto.toMap()['photo'], 'abc');
       expect(CloudProfile.fromMap('u', withPhoto.toMap()).photo, 'abc');
+    });
+  });
+
+  group('tasks', () {
+    Task task(String title,
+            {DateTime? due, DateTime? done, TaskPriority p = TaskPriority.normal}) =>
+        Task(
+          userId: 1,
+          title: title,
+          dueAt: due,
+          doneAt: done,
+          priority: p,
+          createdAt: DateTime(2026, 1, 1),
+        );
+    final now = DateTime(2026, 10, 19, 12);
+
+    test('overdue is computed from due time and completion', () {
+      expect(task('a', due: DateTime(2026, 10, 19, 9)).isOverdue(now: now), true);
+      expect(task('a', due: DateTime(2026, 10, 19, 18)).isOverdue(now: now), false);
+      expect(task('a').isOverdue(now: now), false);
+      expect(
+        task('a', due: DateTime(2026, 10, 1), done: now).isOverdue(now: now),
+        false,
+      );
+    });
+
+    test('due today ignores finished and undated tasks', () {
+      expect(task('a', due: DateTime(2026, 10, 19, 23)).isDueToday(now: now), true);
+      expect(task('a', due: DateTime(2026, 10, 20)).isDueToday(now: now), false);
+      expect(
+        task('a', due: DateTime(2026, 10, 19, 23), done: now).isDueToday(now: now),
+        false,
+      );
+    });
+
+    test('map round trip keeps every field', () {
+      final t = task('Mark scripts',
+          due: DateTime(2026, 11, 2, 17, 30), p: TaskPriority.high);
+      final back = Task.fromMap({...t.toMap(), 'id': 5});
+      expect(back.title, 'Mark scripts');
+      expect(back.dueAt, DateTime(2026, 11, 2, 17, 30));
+      expect(back.priority, TaskPriority.high);
+      expect(back.isDone, false);
+    });
+
+    test('ordering: open before done, soonest first, undated last', () {
+      final list = [
+        task('done', done: DateTime(2026, 10, 18)),
+        task('none'),
+        task('later', due: DateTime(2026, 10, 25)),
+        task('soon', due: DateTime(2026, 10, 20)),
+      ]..sort(compareTasks);
+      expect(list.map((t) => t.title), ['soon', 'later', 'none', 'done']);
+    });
+  });
+
+  group('chat day headings and greeting', () {
+    final now = DateTime(2026, 10, 19, 20, 35);
+    test('headings', () {
+      expect(dayHeading(DateTime(2026, 10, 19, 1), now: now), 'Today');
+      expect(dayHeading(DateTime(2026, 10, 18, 23), now: now), 'Yesterday');
+      expect(dayHeading(DateTime(2026, 10, 3), now: now), '3 Oct');
+      expect(dayHeading(DateTime(2025, 12, 31), now: now), '31 Dec 2025');
+    });
+    test('new day and 12-hour clock', () {
+      expect(isNewDay(DateTime(2026, 10, 19, 23), DateTime(2026, 10, 20, 1)), true);
+      expect(isNewDay(DateTime(2026, 10, 19, 1), DateTime(2026, 10, 19, 23)), false);
+      expect(clockLabel12(DateTime(2026, 1, 1, 20, 35)), '8:35 PM');
+      expect(clockLabel12(DateTime(2026, 1, 1, 0, 5)), '12:05 AM');
+      expect(clockLabel12(DateTime(2026, 1, 1, 12, 0)), '12:00 PM');
+    });
+    test('greeting follows the hour', () {
+      String g(int h) => greetingFor(DateTime(2026, 1, 1, h));
+      expect(g(6), 'Good morning');
+      expect(g(12), 'Good afternoon');
+      expect(g(17), 'Good evening');
+      expect(g(21), 'Good night');
+    });
+  });
+
+  group('message requests', () {
+    test('map round trip and unknown state grants nothing', () {
+      final r = MessageRequest(
+        id: 'dm_a_b',
+        fromUid: 'a',
+        toUid: 'b',
+        text: 'Hi',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(1000),
+      );
+      final back = MessageRequest.fromMap('dm_a_b', r.toMap());
+      expect(back.fromUid, 'a');
+      expect(back.state, RequestState.pending);
+      expect(back.otherUid('a'), 'b');
+      expect(back.otherUid('b'), 'a');
+      expect(
+        MessageRequest.fromMap('x', {...r.toMap(), 'state': 'weird'}).state,
+        RequestState.pending,
+      );
+      expect(
+        MessageRequest.fromMap('x', {...r.toMap(), 'state': 'accepted'}).state,
+        RequestState.accepted,
+      );
+    });
+
+    test('RequestRequired reports where the request stands', () {
+      MessageRequest req(String from, RequestState s) => MessageRequest(
+          id: 'dm_a_b', fromUid: from, toUid: from == 'a' ? 'b' : 'a', state: s);
+      expect(RequestRequired(null, 'a').kind, RequestKind.none);
+      expect(RequestRequired(req('a', RequestState.pending), 'a').kind,
+          RequestKind.waiting);
+      expect(RequestRequired(req('b', RequestState.pending), 'a').kind,
+          RequestKind.toAnswer);
+      expect(RequestRequired(req('a', RequestState.declined), 'a').kind,
+          RequestKind.declinedByThem);
+      expect(RequestRequired(req('b', RequestState.declined), 'a').kind,
+          RequestKind.declinedByMe);
+    });
+  });
+
+  group('notifications', () {
+    AppNotice n(String id, NoticeKind k, DateTime at) =>
+        AppNotice(id: id, kind: k, title: id, body: '', at: at);
+    final t0 = DateTime(2026, 10, 19, 10);
+
+    test('unread means newer than the last time the centre was emptied', () {
+      final list = [
+        n('a', NoticeKind.request, t0),
+        n('b', NoticeKind.share, t0.add(const Duration(hours: 2))),
+      ];
+      expect(unreadCount(list, null), 2);
+      expect(unreadCount(list, t0.add(const Duration(hours: 1))), 1);
+      expect(unreadCount(list, t0.add(const Duration(hours: 3))), 0);
+    });
+
+    test('switched-off groups are hidden; the rest are newest first', () {
+      final list = [
+        n('old', NoticeKind.taskToday, t0),
+        n('new', NoticeKind.request, t0.add(const Duration(hours: 1))),
+        n('exam', NoticeKind.exam, t0.add(const Duration(hours: 2))),
+      ];
+      final shown = visibleNotices(list, disabledGroups: {'exams'});
+      expect(shown.map((x) => x.id), ['new', 'old']);
+      expect(visibleNotices(list, disabledGroups: {}).length, 3);
+    });
+
+    test('overdue and due-today share one preference group', () {
+      expect(NoticeKind.taskOverdue.group, 'tasks');
+      expect(NoticeKind.taskToday.group, 'tasks');
+    });
+  });
+
+  group('course files', () {
+    Uint8List b(List<int> v) => Uint8List.fromList(v);
+    test('accepts real files of allowed types', () {
+      expect(checkCourseFile('a.pdf', b([0x25, 0x50, 0x44, 0x46, 1])), isNull);
+      expect(checkCourseFile('a.DOCX', b([0x50, 0x4B, 3, 4])), isNull);
+      expect(checkCourseFile('a.doc', b([0xD0, 0xCF, 0x11, 0xE0])), isNull);
+      expect(checkCourseFile('a.txt', b([104, 105])), isNull);
+    });
+    test('refuses wrong types, disguised files, empty and oversized', () {
+      expect(checkCourseFile('run.exe', b([0x4D, 0x5A])), isNotNull);
+      expect(checkCourseFile('x.sh', b([35, 33])), isNotNull);
+      expect(checkCourseFile('fake.pdf', b([0x4D, 0x5A, 0, 0])), isNotNull);
+      expect(checkCourseFile('a.pdf', b([])), isNotNull);
+      expect(checkCourseFile('a.txt', b([104, 0, 105])), isNotNull);
+      expect(
+        checkCourseFile('a.pdf',
+            Uint8List(maxCourseFileBytes + 1)..setAll(0, [0x25, 0x50, 0x44, 0x46])),
+        isNotNull,
+      );
+    });
+    test('map round trip', () {
+      final f = CourseFile(
+        userId: 1, subjectId: 2, fileName: 'x.pdf', storedName: 'a_1.pdf',
+        sizeBytes: 9, createdAt: DateTime.fromMillisecondsSinceEpoch(5),
+      );
+      final back = CourseFile.fromMap({...f.toMap(), 'id': 3});
+      expect(back.fileName, 'x.pdf');
+      expect(back.isPdf, true);
+      expect(back.subjectId, 2);
+    });
+    test('task in-progress survives the database map', () {
+      final t = Task(
+          userId: 1, title: 't', inProgress: true, createdAt: DateTime(2026));
+      expect(Task.fromMap({...t.toMap(), 'id': 1}).inProgress, true);
+    });
+  });
+
+  group('reminder plan', () {
+    final now = DateTime(2026, 10, 19, 12);
+    Task t(int id, DateTime? due, {bool done = false}) => Task(
+          id: id,
+          userId: 1,
+          title: 'Task $id',
+          dueAt: due,
+          doneAt: done ? now : null,
+          createdAt: now,
+        );
+
+    test('quiet hours push night reminders to 7 am', () {
+      expect(adjustForQuietHours(DateTime(2026, 10, 19, 23, 30)),
+          DateTime(2026, 10, 20, 7));
+      expect(adjustForQuietHours(DateTime(2026, 10, 19, 3)),
+          DateTime(2026, 10, 19, 7));
+      expect(adjustForQuietHours(DateTime(2026, 10, 19, 15)),
+          DateTime(2026, 10, 19, 15));
+    });
+
+    test('task: an hour before, or at the due time when that has passed', () {
+      final plan = planReminders(
+        tasks: [
+          t(1, DateTime(2026, 10, 19, 17)),
+          t(2, DateTime(2026, 10, 19, 12, 30)),
+          t(3, DateTime(2026, 10, 18, 9)),
+          t(4, null),
+          t(5, DateTime(2026, 10, 19, 18), done: true),
+        ],
+        exams: const [],
+        now: now,
+        disabledGroups: {},
+      );
+      final byId = {for (final r in plan) r.id: r};
+      expect(byId[1000001]!.at, DateTime(2026, 10, 19, 16));
+      expect(byId[1000002]!.at, DateTime(2026, 10, 19, 12, 30));
+      expect(byId.length, 2);
+    });
+
+    test('switched-off groups schedule nothing', () {
+      final plan = planReminders(
+        tasks: [t(1, DateTime(2026, 10, 20, 12))],
+        exams: const [],
+        now: now,
+        disabledGroups: {'tasks'},
+      );
+      expect(plan, isEmpty);
+    });
+
+    test('exams: lead reminder and the day itself, both at 8 am', () {
+      final exam = Exam(
+        id: 7,
+        userId: 1,
+        title: 'Algorithms',
+        date: DateTime(2026, 10, 25),
+        remindDays: 3,
+        createdAt: now,
+      );
+      final plan = planReminders(
+        tasks: const [],
+        exams: [exam],
+        now: now,
+        disabledGroups: {},
+      );
+      expect(plan.map((r) => r.at), [
+        DateTime(2026, 10, 22, 8),
+        DateTime(2026, 10, 25, 8),
+      ]);
+    });
+
+    test('idle nudge is one reminder three days out at 6 pm', () {
+      final plan = planReminders(
+        tasks: const [],
+        exams: const [],
+        now: now,
+        disabledGroups: {},
+        idleNudge: true,
+      );
+      expect(plan.single.id, idleId);
+      expect(plan.single.at, DateTime(2026, 10, 22, 18));
     });
   });
 }

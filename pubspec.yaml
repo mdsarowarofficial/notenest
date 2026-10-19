@@ -77,6 +77,9 @@ dependencies:
   google_sign_in: ^7.2.0
   http: ^1.6.0
   url_launcher: ^6.3.3
+  flutter_local_notifications: ^22.3.2
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
 
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.

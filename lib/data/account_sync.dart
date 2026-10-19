@@ -35,4 +35,5 @@ Future<void> syncAccountOnOpen() async {
   await syncCloudRole();
   await syncProfilePhoto();
   await DriveBackup.runDailyIfDue();
+  await NoteRepository.instance.uploadPendingCourseFiles();
 }

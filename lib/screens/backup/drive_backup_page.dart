@@ -249,11 +249,16 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
             Text('What is saved', style: t.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'Every subject, note, exam date and setting on this account, '
-              'and every attached file — PDFs, photographed pages and '
-              'recordings. It goes in one file in your own Google Drive, in '
-              'the NoteNest → Backups folder, so it is still there if this '
-              'phone is lost.\n\n'
+              'Every subject, note, task, exam date and setting on this '
+              'account, and every file attached to a note — PDFs, '
+              'photographed pages and recordings. It goes in one file in your '
+              'own Google Drive, in the NoteNest → Backups folder, so it is '
+              'still there if this phone is lost.\n\n'
+              'Files you add to a course are saved to your Drive too, each in '
+              'NoteNest → Courses → the course code, and come back with a '
+              'restore. It all counts against your own Drive storage: if '
+              'Drive is full, NoteNest tells you and waits until you free '
+              'some space.\n\n'
               'On a new phone, sign in with the same account and tap Restore '
               'from Drive. NoteNest can only see the files it saved itself — '
               'never the rest of your Drive.',

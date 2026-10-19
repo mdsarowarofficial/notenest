@@ -5,6 +5,8 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/attachment.dart';
 import '../models/exam.dart';
+import '../models/task.dart';
+import '../models/course_file.dart';
 import '../models/note.dart';
 import '../models/semester.dart';
 import '../models/note_bundle.dart';
@@ -15,6 +17,7 @@ import 'app_database.dart';
 import 'attachment_store.dart';
 import 'brand_store.dart';
 import 'auth_repository.dart';
+import 'drive_service.dart';
 
 /// SQLite treats `%` and `_` inside LIKE as wildcards, so a student searching
 /// for "50%" would otherwise match every note. Each needle escapes them with a
@@ -50,6 +53,11 @@ class NoteRepository extends ChangeNotifier {
   static const _kImportedShares = 'imported_shares';
   static const _kPhoto = 'profile_photo';
   static const _kTourDone = 'tour_done';
+  static const _kHiddenChats = 'hidden_chats';
+  static const _kNoticeSeen = 'notice_seen';
+  static const _kRemindOn = 'remind_on';
+  static const _kRemindIdle = 'remind_idle';
+  static const _kNoticeOff = 'notice_off';
   static const _kCourse = 'teaching_course';
   static const _kBackupAt = 'drive_backup_at';
   static const _kBackupAuto = 'drive_backup_auto';
@@ -173,6 +181,14 @@ class NoteRepository extends ChangeNotifier {
     _importedShares = _splitSearches(map[_kImportedShares]).toSet();
     profilePhoto = BrandStore.decode(map[_kPhoto]);
     tourDone = map[_kTourDone] == '1';
+    _hiddenChats = _parseHidden(map[_kHiddenChats]);
+    noticeSeenAt = _readDate(map[_kNoticeSeen]);
+    remindersOn = map[_kRemindOn] == '1';
+    idleReminder = map[_kRemindIdle] == '1';
+    noticeOff = (map[_kNoticeOff] ?? '')
+        .split(',')
+        .where((g) => g.isNotEmpty)
+        .toSet();
     teachingCourse = map[_kCourse];
     lastBackupAt = _readDate(map[_kBackupAt]);
     autoBackup = map[_kBackupAuto] == '1';
@@ -180,6 +196,7 @@ class NoteRepository extends ChangeNotifier {
     await _reloadSubjects();
     await _reloadNotes();
     await _reloadExams();
+    await _reloadTasks();
     notifyListeners();
   }
 
@@ -189,6 +206,12 @@ class NoteRepository extends ChangeNotifier {
     _allSubjects = const [];
     _notes = const [];
     _exams = const [];
+    _tasks = const [];
+    _hiddenChats = const {};
+    noticeSeenAt = null;
+    remindersOn = false;
+    idleReminder = false;
+    noticeOff = const {};
     _recentSearches = const [];
     _importedShares = {};
     semesterLabel = null;
@@ -427,6 +450,78 @@ class NoteRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --------------------------------------------------------- notifications
+
+  /// When the notification centre was last emptied; anything newer is unread.
+  DateTime? noticeSeenAt;
+
+  /// Notification groups this account switched off.
+  Set<String> noticeOff = const {};
+
+  /// Local reminders (tasks, exams) ringing while the app is closed. Off
+  /// until the person turns it on, which is also when permission is asked.
+  bool remindersOn = false;
+
+  /// One gentle nudge after a few days away. Needs [remindersOn].
+  bool idleReminder = false;
+
+  Future<void> setReminders({bool? on, bool? idle}) async {
+    if (on != null) {
+      remindersOn = on;
+      await _setSetting(_kRemindOn, on ? '1' : null);
+    }
+    if (idle != null) {
+      idleReminder = idle;
+      await _setSetting(_kRemindIdle, idle ? '1' : null);
+    }
+    notifyListeners();
+  }
+
+  Future<void> markNoticesSeen() async {
+    noticeSeenAt = DateTime.now();
+    await _setSetting(_kNoticeSeen, noticeSeenAt!.millisecondsSinceEpoch.toString());
+    notifyListeners();
+  }
+
+  Future<void> setNoticeGroup(String group, {required bool enabled}) async {
+    noticeOff = enabled ? ({...noticeOff}..remove(group)) : {...noticeOff, group};
+    await _setSetting(_kNoticeOff, noticeOff.join(','));
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------ hidden chats
+
+  /// Conversations this account has removed from its own list, with the
+  /// moment it did. Local to this device and account: the conversation, and
+  /// the other person's copy of it, are untouched.
+  Map<String, int> _hiddenChats = const {};
+
+  static Map<String, int> _parseHidden(String? raw) {
+    final out = <String, int>{};
+    for (final part in (raw ?? '').split(',')) {
+      final i = part.lastIndexOf(':');
+      if (i <= 0) continue;
+      final at = int.tryParse(part.substring(i + 1));
+      if (at != null) out[part.substring(0, i)] = at;
+    }
+    return out;
+  }
+
+  /// True when [chatId] was removed and nothing newer has arrived since. A
+  /// new message brings the conversation back on its own.
+  bool isChatHidden(String chatId, DateTime? lastAt) {
+    final at = _hiddenChats[chatId];
+    if (at == null) return false;
+    return lastAt == null || lastAt.millisecondsSinceEpoch <= at;
+  }
+
+  Future<void> hideChat(String chatId) async {
+    _hiddenChats = {..._hiddenChats, chatId: DateTime.now().millisecondsSinceEpoch};
+    await _setSetting(_kHiddenChats,
+        _hiddenChats.entries.map((e) => '${e.key}:${e.value}').join(','));
+    notifyListeners();
+  }
+
   Future<void> saveTourDone(bool done) async {
     tourDone = done;
     await _setSetting(_kTourDone, done ? '1' : null);
@@ -532,6 +627,22 @@ class NoteRepository extends ChangeNotifier {
     await _reloadSubjects();
     notifyListeners();
   }
+
+  /// Brings an archived course back. Nothing was removed when it was archived,
+  /// so there is nothing to rebuild.
+  Future<void> unarchiveSubject(int id) async {
+    await _db.db.update(
+      'subjects',
+      {'archived': 0},
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [id, _auth.requireUserId],
+    );
+    await _reloadSubjects();
+    notifyListeners();
+  }
+
+  /// Every course including archived ones, for the course manager.
+  List<Subject> allSubjects() => List.unmodifiable(_allSubjects);
 
   /// True when another subject in this account already uses the code.
   bool codeExists(String code, {int? ignoreId}) {
@@ -1111,6 +1222,245 @@ class NoteRepository extends ChangeNotifier {
       where: 'id = ? AND user_id = ?',
       whereArgs: [note.id, _auth.requireUserId],
     );
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------- course files
+
+  Future<List<CourseFile>> courseFilesFor(int subjectId) async {
+    final rows = await _db.db.query(
+      'course_files',
+      where: 'user_id = ? AND subject_id = ?',
+      whereArgs: [_auth.requireUserId, subjectId],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(CourseFile.fromMap).toList();
+  }
+
+  /// Stores a file under a course. Throws a message-ready [String] when the
+  /// file is refused (type, size, content, duplicate) or the course is not
+  /// this account's.
+  Future<CourseFile> addCourseFile({
+    required int subjectId,
+    required String name,
+    required Uint8List bytes,
+  }) async {
+    if (!AttachmentStore.isSupported) {
+      throw 'Files need the phone app.';
+    }
+    final owned = subjectById(subjectId) ??
+        _allSubjects.where((s) => s.id == subjectId).firstOrNull;
+    if (owned == null) throw 'That course was not found.';
+    final problem = checkCourseFile(name, bytes);
+    if (problem != null) throw problem;
+    final clean = name.split(RegExp(r'[\\/]')).last.trim();
+    final dupe = await _db.db.query(
+      'course_files',
+      where: 'user_id = ? AND subject_id = ? AND LOWER(file_name) = ? '
+          'AND size_bytes = ?',
+      whereArgs: [
+        _auth.requireUserId,
+        subjectId,
+        clean.toLowerCase(),
+        bytes.length,
+      ],
+      limit: 1,
+    );
+    if (dupe.isNotEmpty) throw 'This file is already in the course.';
+
+    // Drive first: the student's Drive is where the file is kept safe, so a
+    // full Drive stops the upload here, before anything is saved, and says so.
+    // Any other Drive trouble (no network, access not given) keeps the file on
+    // the phone and it is uploaded later by [uploadPendingCourseFiles].
+    String? driveId;
+    final drive = DriveService.instance;
+    if (drive.isSupported) {
+      try {
+        await drive.ensureSpace(bytes.length);
+        driveId = await _uploadToDrive(owned, clean, bytes);
+      } on DriveException catch (e) {
+        if (e.message == DriveService.fullMessage) throw e.message;
+      }
+    }
+
+    final stored =
+        await AttachmentStore.saveBytes(bytes, extensionOf(clean));
+    final file = CourseFile(
+      userId: _auth.requireUserId,
+      subjectId: subjectId,
+      fileName: clean,
+      storedName: stored,
+      sizeBytes: bytes.length,
+      createdAt: DateTime.now(),
+      driveId: driveId,
+    );
+    try {
+      final id = await _db.db.insert('course_files', file.toMap());
+      notifyListeners();
+      return CourseFile.fromMap({...file.toMap(), 'id': id});
+    } catch (_) {
+      await AttachmentStore.delete(stored);
+      if (driveId != null) await _dropFromDrive(driveId);
+      rethrow;
+    }
+  }
+
+  /// Puts [bytes] in `NoteNest/Courses/<code>` in the student's Drive.
+  Future<String> _uploadToDrive(
+    Subject course,
+    String name,
+    Uint8List bytes, {
+    bool prompt = true,
+  }) async {
+    final up = await DriveService.instance.upload(
+      bytes: bytes,
+      name: name,
+      mimeType: mimeTypeFor(name),
+      folderPath: ['Courses', course.code],
+      appProperties: {'notenestCourseFile': '1'},
+      prompt: prompt,
+    );
+    return up.id;
+  }
+
+  Future<void> _dropFromDrive(String driveId) async {
+    try {
+      await DriveService.instance.delete(driveId);
+    } catch (_) {
+      // Already gone or Drive unreachable; the phone copy is what matters here.
+    }
+  }
+
+  /// Uploads course files that never reached Drive (it was offline or access
+  /// was not given). Silent; stops at the first failure and retries next time.
+  Future<void> uploadPendingCourseFiles() async {
+    if (!DriveService.instance.isSupported || !AttachmentStore.isSupported) {
+      return;
+    }
+    final rows = await _db.db.query(
+      'course_files',
+      where: 'user_id = ? AND drive_id IS NULL',
+      whereArgs: [_auth.requireUserId],
+    );
+    for (final f in rows.map(CourseFile.fromMap)) {
+      final course = _allSubjects.where((s) => s.id == f.subjectId).firstOrNull;
+      if (course == null || f.id == null) continue;
+      try {
+        final bytes = await AttachmentStore.readBytes(f.storedName);
+        if (bytes == null) continue;
+        await DriveService.instance.ensureSpace(bytes.length, prompt: false);
+        final id = await _uploadToDrive(
+          course,
+          f.fileName,
+          bytes,
+          prompt: false,
+        );
+        await _db.db.update(
+          'course_files',
+          {'drive_id': id},
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [f.id, _auth.requireUserId],
+        );
+      } catch (_) {
+        return;
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> removeCourseFile(CourseFile file) async {
+    if (file.id == null) return;
+    final removed = await _db.db.delete(
+      'course_files',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [file.id, _auth.requireUserId],
+    );
+    if (removed > 0) {
+      await AttachmentStore.delete(file.storedName);
+      final id = file.driveId;
+      if (id != null) await _dropFromDrive(id);
+    }
+    notifyListeners();
+  }
+
+  // -------------------------------------------------------------- tasks
+
+  List<Task> _tasks = const [];
+
+  /// Every task of this account in [compareTasks] order. Private by
+  /// construction: each query below is scoped to the signed-in user id.
+  List<Task> tasks() => List.unmodifiable(_tasks);
+
+  List<Task> get openTasks => _tasks.where((t) => !t.isDone).toList();
+
+  List<Task> get overdueTasks => _tasks.where((t) => t.isOverdue()).toList();
+
+  List<Task> get tasksDueToday =>
+      _tasks.where((t) => t.isDueToday() && !t.isOverdue()).toList();
+
+  Future<void> _reloadTasks() async {
+    final rows = await _db.db.query(
+      'tasks',
+      where: 'user_id = ?',
+      whereArgs: [_auth.requireUserId],
+    );
+    _tasks = rows.map(Task.fromMap).toList()..sort(compareTasks);
+  }
+
+  Future<Task> addTask({
+    required String title,
+    String? description,
+    DateTime? dueAt,
+    TaskPriority priority = TaskPriority.normal,
+    int? subjectId,
+    bool inProgress = false,
+  }) async {
+    final clean = title.trim();
+    if (clean.isEmpty) throw ArgumentError('A task needs a title.');
+    final desc = description?.trim();
+    final task = Task(
+      userId: _auth.requireUserId,
+      subjectId: subjectId,
+      title: clean,
+      description: desc == null || desc.isEmpty ? null : desc,
+      dueAt: dueAt,
+      priority: priority,
+      inProgress: inProgress,
+      createdAt: DateTime.now(),
+    );
+    final id = await _db.db.insert('tasks', task.toMap());
+    await _reloadTasks();
+    notifyListeners();
+    return task.copyWith(id: id);
+  }
+
+  Future<void> updateTask(Task task) async {
+    if (task.id == null || task.title.trim().isEmpty) return;
+    await _db.db.update(
+      'tasks',
+      task.toMap(),
+      // The user id in the WHERE is the ownership check.
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [task.id, _auth.requireUserId],
+    );
+    await _reloadTasks();
+    notifyListeners();
+  }
+
+  Future<void> setTaskDone(Task task, bool done) => updateTask(
+        done
+            ? task.copyWith(doneAt: DateTime.now())
+            : task.copyWith(clearDone: true),
+      );
+
+  Future<void> deleteTask(Task task) async {
+    if (task.id == null) return;
+    await _db.db.delete(
+      'tasks',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [task.id, _auth.requireUserId],
+    );
+    await _reloadTasks();
     notifyListeners();
   }
 

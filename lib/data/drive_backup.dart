@@ -9,6 +9,7 @@ import 'attachment_store.dart';
 import 'auth_repository.dart';
 import 'drive_service.dart';
 import 'note_repository.dart';
+import '../models/course_file.dart' show extensionOf;
 
 /// What a restore brought back.
 class RestoreReport {
@@ -97,6 +98,12 @@ class DriveBackup {
         await drive.findByProperty(_ownerKey, owner, prompt: prompt);
     final mine = existing.where((f) => f.appProperties[_propKey] == '1');
 
+    // An overwrite only needs room for the growth; a first backup needs it all.
+    final replaced = mine.isNotEmpty ? mine.first.size : 0;
+    if (bytes.length > replaced) {
+      await drive.ensureSpace(bytes.length - replaced, prompt: prompt);
+    }
+
     if (mine.isNotEmpty) {
       await drive.overwrite(
         fileId: mine.first.id,
@@ -163,6 +170,15 @@ class DriveBackup {
         await _db.db.query('exams', where: 'user_id = ?', whereArgs: [userId]);
     final settings = await _db.db
         .query('user_settings', where: 'user_id = ?', whereArgs: [userId]);
+    final tasks =
+        await _db.db.query('tasks', where: 'user_id = ?', whereArgs: [userId]);
+    // Course files are not packed: each already sits in its own course folder
+    // in Drive, so the backup only records which file belongs to which course.
+    final courseFiles = await _db.db.query(
+      'course_files',
+      where: 'user_id = ? AND drive_id IS NOT NULL',
+      whereArgs: [userId],
+    );
     final attachments = await _db.db.rawQuery(
       'SELECT * FROM attachments '
       'WHERE note_id IN (SELECT id FROM notes WHERE user_id = ?)',
@@ -192,6 +208,8 @@ class DriveBackup {
       'notes': notes,
       'exams': exams,
       'attachments': kept,
+      'tasks': tasks,
+      'courseFiles': courseFiles,
       'settings': [
         for (final s in settings)
           if (!_localOnlySettings.contains(s['key'])) s,
@@ -338,6 +356,23 @@ class DriveBackup {
         examsAdded++;
       }
 
+      for (final t in rows('tasks')) {
+        final existing = await txn.query(
+          'tasks',
+          columns: ['id'],
+          where: 'user_id = ? AND title = ? AND created_at = ?',
+          whereArgs: [userId, t['title'], t['created_at']],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) continue;
+        final subject = t['subject_id'] as int?;
+        await txn.insert('tasks', {
+          ..._withoutId(t),
+          'user_id': userId,
+          'subject_id': subject == null ? null : subjectIds[subject],
+        });
+      }
+
       // Only settings this phone does not have yet: what the student chose
       // here, after the backup, wins.
       for (final s in rows('settings')) {
@@ -354,6 +389,41 @@ class DriveBackup {
     // Files written for notes that turned out to be here already.
     for (final name in storedNames.values) {
       if (!usedFiles.contains(name)) await AttachmentStore.delete(name);
+    }
+
+    // Course files come back one by one from their Drive folders. One that is
+    // gone from Drive is skipped; the rest still restore.
+    if (AttachmentStore.isSupported) {
+      for (final f in rows('courseFiles')) {
+        final driveId = f['drive_id'] as String?;
+        final oldSubject = f['subject_id'] as int?;
+        final subject = oldSubject == null ? null : subjectIds[oldSubject];
+        final name = f['file_name'] as String? ?? '';
+        if (driveId == null || subject == null || name.isEmpty) continue;
+        final same = await _db.db.query(
+          'course_files',
+          columns: ['id'],
+          where: 'user_id = ? AND subject_id = ? AND LOWER(file_name) = ? '
+              'AND size_bytes = ?',
+          whereArgs: [userId, subject, name.toLowerCase(), f['size_bytes']],
+          limit: 1,
+        );
+        if (same.isNotEmpty) continue;
+        try {
+          final data = await DriveService.instance.downloadOwn(driveId);
+          final stored =
+              await AttachmentStore.saveBytes(data, extensionOf(name));
+          await _db.db.insert('course_files', {
+            ..._withoutId(f),
+            'user_id': userId,
+            'subject_id': subject,
+            'stored_name': stored,
+          });
+          filesAdded++;
+        } catch (_) {
+          continue;
+        }
+      }
     }
 
     return RestoreReport(

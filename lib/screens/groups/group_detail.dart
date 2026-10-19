@@ -6,7 +6,7 @@ import '../../data/cloud_service.dart';
 import '../../models/cloud_profile.dart';
 import '../../models/study_group.dart';
 import '../../theme/nest_theme.dart';
-import '../chat/chat_page.dart';
+import '../chat/message_request.dart';
 
 /// One group: who is in it, the code that lets one more person in, and the way
 /// out.
@@ -364,26 +364,10 @@ class _MemberRow extends StatelessWidget {
   /// Opens a one-to-one conversation with this member.
   ///
   /// This is the whole of NoteNest's "add a friend": being in a group together
-  /// is the connection. There is no request to send and none to accept, and
-  /// somebody you share no group with cannot reach you here at all, because
-  /// they never appear in a list you can tap.
-  static Future<void> _message(BuildContext context, CloudProfile person) async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final chatId = await CloudService.instance.openDirectChat(person.uid);
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            chatId: chatId,
-            title: person.name.trim().isEmpty ? person.email : person.name,
-          ),
-        ),
-      );
-    } on CloudException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
+  /// is how you find each other. Talking one to one still needs a message
+  /// request that the other person accepts, like anybody else.
+  static Future<void> _message(BuildContext context, CloudProfile person) =>
+      startConversation(context, person);
 
   @override
   Widget build(BuildContext context) {

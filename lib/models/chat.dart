@@ -365,6 +365,36 @@ String clockLabel(DateTime at) {
   return '$h:$m';
 }
 
+/// The heading above a run of messages from one day: "Today", "Yesterday", or
+/// a date such as "12 Oct" (with the year once it is not this year).
+String dayHeading(DateTime at, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  // Compared in UTC so a daylight-saving change cannot make two calendar days
+  // look like 23 hours apart.
+  final days = DateTime.utc(today.year, today.month, today.day)
+      .difference(DateTime.utc(at.year, at.month, at.day))
+      .inDays;
+  if (days == 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final base = '${at.day} ${months[at.month - 1]}';
+  return at.year == today.year ? base : '$base ${at.year}';
+}
+
+/// True when two moments fall on different calendar days.
+bool isNewDay(DateTime a, DateTime b) =>
+    a.year != b.year || a.month != b.month || a.day != b.day;
+
+/// A message time as people say it: `8:35 PM`.
+String clockLabel12(DateTime at) {
+  final h = at.hour % 12 == 0 ? 12 : at.hour % 12;
+  final m = at.minute.toString().padLeft(2, '0');
+  return '$h:$m ${at.hour < 12 ? 'AM' : 'PM'}';
+}
+
 /// When a conversation last had something in it, for the list.
 ///
 /// Deliberately coarse. "11:42" is what you want for today and useless for
@@ -401,4 +431,69 @@ String? typingLabel(List<String> names) {
     return '${people.first} and ${people[1]} are typing…';
   }
   return '${people.first} and ${people.length - 1} others are typing…';
+}
+
+// ------------------------------------------------------ message requests
+
+/// Where a message request stands.
+enum RequestState { pending, accepted, declined }
+
+extension RequestStateData on RequestState {
+  String get key => name;
+
+  /// Anything unrecognised is treated as pending, the state that grants
+  /// nothing: an unknown value can never open a conversation.
+  static RequestState fromKey(String? key) {
+    switch (key) {
+      case 'accepted':
+        return RequestState.accepted;
+      case 'declined':
+        return RequestState.declined;
+      default:
+        return RequestState.pending;
+    }
+  }
+}
+
+/// A request to start a one-to-one conversation. Its id is the conversation's
+/// address, so there is at most one per pair of people.
+class MessageRequest {
+  const MessageRequest({
+    required this.id,
+    required this.fromUid,
+    required this.toUid,
+    this.text = '',
+    this.state = RequestState.pending,
+    this.createdAt,
+  });
+
+  final String id;
+  final String fromUid;
+  final String toUid;
+  final String text;
+  final RequestState state;
+  final DateTime? createdAt;
+
+  String otherUid(String me) => fromUid == me ? toUid : fromUid;
+
+  Map<String, Object?> toMap() => {
+        'fromUid': fromUid,
+        'toUid': toUid,
+        'text': text,
+        'state': state.key,
+        'createdAt': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
+      };
+
+  factory MessageRequest.fromMap(String id, Map<String, Object?> m) {
+    String s(String k) => m[k] is String ? m[k] as String : '';
+    final at = m['createdAt'];
+    return MessageRequest(
+      id: id,
+      fromUid: s('fromUid'),
+      toUid: s('toUid'),
+      text: s('text'),
+      state: RequestStateData.fromKey(m['state'] as String?),
+      createdAt: at is int ? DateTime.fromMillisecondsSinceEpoch(at) : null,
+    );
+  }
 }

@@ -16,6 +16,10 @@ import '../cover/cover_page.dart';
 import '../notes/note_detail.dart';
 import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
+import '../tasks/tasks_page.dart';
+import '../courses/course_page.dart';
+import '../courses/courses_page.dart';
+import '../notifications/notifications_page.dart';
 
 /// The landing screen.
 ///
@@ -33,6 +37,7 @@ class TodayPage extends StatelessWidget {
     required this.onCapture,
     required this.onOpenExams,
     this.onOpenClasses,
+    this.onOpenCourse,
     this.avatarKey,
   });
 
@@ -40,6 +45,10 @@ class TodayPage extends StatelessWidget {
   final VoidCallback onCapture;
   final VoidCallback onOpenExams;
   final VoidCallback? onOpenClasses;
+
+  /// Opens Notes filtered to one course (by code). The shell owns the active
+  /// course, so the cards set the same value the drawer and chips do.
+  final ValueChanged<String>? onOpenCourse;
 
   /// Lets the first-run tour point at the profile picture.
   final GlobalKey? avatarKey;
@@ -83,6 +92,13 @@ class TodayPage extends StatelessWidget {
               _ReminderStrip(exam: exam, onTap: onOpenExams),
               const SizedBox(height: 12),
             ],
+
+            if (repo.hasSubjects && onOpenCourse != null) ...[
+              _CourseCards(onOpen: onOpenCourse!),
+              const SizedBox(height: 14),
+            ],
+            const TasksCard(),
+            const SizedBox(height: 14),
 
             if (!repo.hasSubjects)
               _StartCard(
@@ -160,6 +176,16 @@ class TodayPage extends StatelessWidget {
 
 // ------------------------------------------------------------------- header
 
+/// The greeting for a moment: morning until noon, afternoon until 5 pm,
+/// evening until 9 pm, and night after that.
+String greetingFor(DateTime at) {
+  final hour = at.hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+  return 'Good night';
+}
+
 class _Greeting extends StatelessWidget {
   const _Greeting({required this.name, this.avatarKey});
 
@@ -179,10 +205,7 @@ class _Greeting extends StatelessWidget {
   }
 
   String get _timeOfDay {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    return greetingFor(DateTime.now());
   }
 
   @override
@@ -206,6 +229,7 @@ class _Greeting extends StatelessWidget {
             ],
           ),
         ),
+        const NoticeBell(),
         const SizedBox(width: 12),
         Semantics(
           key: avatarKey,
@@ -321,10 +345,13 @@ class _RevisionCard extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 5),
                         child: Text(
                           done
-                              ? 'notes mastered.\nNothing waiting.'
+                              ? '${allNotes == 1 ? 'note' : 'notes'} '
+                                  'mastered.\nNothing waiting.'
                               : subject == null
-                                  ? 'notes not yet\nmastered'
-                                  : 'notes left\nfor $subject',
+                                  ? '${total == 1 ? 'note' : 'notes'} not '
+                                      'yet\nmastered'
+                                  : '${total == 1 ? 'note' : 'notes'} left\n'
+                                      'for $subject',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -686,6 +713,8 @@ class _TeacherToday extends StatelessWidget {
       children: [
         greeting,
         const SizedBox(height: 20),
+        const TasksCard(),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -825,5 +854,113 @@ class _QuickAction extends StatelessWidget {
             icon: Icon(icon, size: 20),
             label: Text(label),
           );
+  }
+}
+
+// ------------------------------------------------------------ course cards
+
+/// The student's courses for the active semester, one tap from their notes.
+class _CourseCards extends StatelessWidget {
+  const _CourseCards({required this.onOpen});
+
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = NoteRepository.instance;
+    final t = Theme.of(context).textTheme;
+    final subjects = repo.subjects();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Your courses', style: t.titleMedium)),
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CoursesPage(onSeeNotes: onOpen),
+                ),
+              ),
+              child: const Text('All courses'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          // Room for a two-line course name plus the count line, with the
+          // text sizes people actually use.
+          height: 132,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: subjects.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final s = subjects[i];
+              final open = repo
+                  .tasks()
+                  .where((task) => !task.isDone && task.subjectId == s.id)
+                  .length;
+              return Semantics(
+                button: true,
+                label: '${s.code}, ${s.name}',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CoursePage(subjectId: s.id!, onSeeNotes: onOpen),
+                    ),
+                  ),
+                  child: Container(
+                    width: 150,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: NestColor.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: NestColor.rule),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: s.color,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            s.code.toUpperCase(),
+                            style: t.labelSmall
+                                ?.copyWith(color: NestColor.ink),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          s.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.titleSmall,
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${s.noteCount} ${s.noteCount == 1 ? 'note' : 'notes'}'
+                          '${open > 0 ? ' · $open to do' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -545,8 +545,10 @@ class _Honesty extends StatelessWidget {
           Text('Worth knowing', style: t.titleSmall),
           const SizedBox(height: 8),
           Text(
-            'Your revision plan decides what the app puts in front of you — it '
-            'does not send phone notifications. Those are not built yet.',
+            'Your revision plan decides what the app puts in front of you. '
+            'Phone reminders for tasks and exams are off until you turn them '
+            'on in the notifications settings; they ring from this phone, '
+            'with no internet needed.',
             style: t.bodySmall,
           ),
           const SizedBox(height: 8),

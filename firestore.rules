@@ -581,6 +581,104 @@ service cloud.firestore {
       );
     }
 
+    // ---------------------------------------------------------- dmQuota
+    //
+    // How many message requests this account has sent today. A request can
+    // only be created in the same batch as a bump of this counter (see the
+    // dmRequests create rule), and the counter can only go up by one a time,
+    // so the daily limit is enforced here and not just in the app. There is
+    // no server to count for us; this is the free way to do it.
+
+    function today() {
+      return math.floor(request.time.toMillis() / 86400000);
+    }
+
+    match /dmQuota/{userId} {
+      allow get: if isSelf(userId);
+      allow list: if false;
+
+      allow create, update: if isSelf(userId)
+        && incoming().keys().hasOnly(['day', 'count'])
+        && incoming().day == today()
+        && incoming().count is int
+        && incoming().count >= 1
+        && incoming().count <= 20
+        // A new day starts again at one; the same day counts up by one.
+        && (resource == null || resource.data.day != today()
+              ? incoming().count == 1
+              : incoming().count == resource.data.count + 1);
+
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------- dmRequests
+    //
+    // A message request. The document NAME is the direct-chat address of the
+    // two people, so there is exactly one request per pair: two people asking
+    // each other at the same moment cannot create two, and a declined request
+    // cannot be replaced with a fresh one.
+    //
+    // A new direct conversation can only be created once this says 'accepted'
+    // (see the chats rule). Conversations that already existed are untouched.
+
+    function requestId(a, b) {
+      return a < b ? 'dm_' + a + '_' + b : 'dm_' + b + '_' + a;
+    }
+
+    match /dmRequests/{reqId} {
+
+      // `resource == null` lets the app ask "is there a request for this pair?"
+      // and be told no. Without it a get of a missing document is an error,
+      // and an error denies.
+      allow get: if signedIn()
+        && (resource == null
+            || resource.data.fromUid == request.auth.uid
+            || resource.data.toUid == request.auth.uid);
+
+      allow list: if signedIn()
+        && (resource.data.fromUid == request.auth.uid
+            || resource.data.toUid == request.auth.uid);
+
+      allow create: if signedIn()
+        && incoming().keys().hasOnly(
+             ['fromUid', 'toUid', 'text', 'state', 'createdAt'])
+        && incoming().fromUid == request.auth.uid
+        && incoming().toUid is string
+        && incoming().toUid != request.auth.uid
+        && reqId == requestId(incoming().fromUid, incoming().toUid)
+        && incoming().state == 'pending'
+        && incoming().text is string
+        && incoming().text.size() > 0
+        && incoming().text.size() <= 500
+        && incoming().createdAt is int
+        // At most 20 a day: the counter is bumped in the same batch.
+        && existsAfter(/databases/$(database)/documents/dmQuota/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/dmQuota/$(request.auth.uid))
+             .data.day == today()
+        && getAfter(/databases/$(database)/documents/dmQuota/$(request.auth.uid))
+             .data.count <= 20
+        // Somebody who has blocked you cannot be asked.
+        && !blockedBy(incoming().toUid);
+
+      // Only the person asked answers, and answering is all an update may do.
+      // The sender cannot touch a request once sent: not to accept it for the
+      // recipient, not to reset a declined one to pending. A decline can be
+      // changed to accept later by the recipient, never by the sender.
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && resource.data.state in ['pending', 'declined']
+        && changedKeys().hasOnly(['state', 'respondedAt'])
+        && incoming().state in ['accepted', 'declined'];
+
+      // The recipient may clear any request. The sender may withdraw one that
+      // has not been declined — a declined request must stay, or deleting and
+      // re-sending would make a decline meaningless.
+      allow delete: if signedIn()
+        && (resource.data.toUid == request.auth.uid
+            || (resource.data.fromUid == request.auth.uid
+                && resource.data.state != 'declined'));
+    }
+
     match /chats/{chatId} {
 
       allow get: if canUseThread(chatId);
@@ -631,7 +729,12 @@ service cloud.firestore {
         && request.auth.uid in incoming().memberUids
         && incoming().memberUids[0] < incoming().memberUids[1]
         && chatId == 'dm_' + incoming().memberUids[0]
-                   + '_' + incoming().memberUids[1];
+                   + '_' + incoming().memberUids[1]
+        // A new conversation needs an accepted message request first. Chats
+        // that already exist are updated, not created, so they keep working.
+        && exists(/databases/$(database)/documents/dmRequests/$(chatId))
+        && get(/databases/$(database)/documents/dmRequests/$(chatId))
+             .data.state == 'accepted';
 
       // Sending a message updates what the list shows; opening the thread
       // writes a read receipt; typing writes a flag. All three land here, and

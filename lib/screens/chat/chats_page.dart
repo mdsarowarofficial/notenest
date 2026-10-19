@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/cloud_service.dart';
+import '../../data/note_repository.dart';
 import '../../models/chat.dart';
 import '../../models/cloud_profile.dart';
 import '../../models/study_group.dart';
@@ -9,6 +10,7 @@ import '../../widgets/nest_empty_state.dart';
 import '../cloud/cloud_page.dart';
 import '../groups/groups_page.dart';
 import 'chat_page.dart';
+import 'message_request.dart';
 
 /// Every conversation, in two sections.
 ///
@@ -94,7 +96,7 @@ class _ThreadsState extends State<_Threads> {
     // page's rebuild does not reach it, and a block made in a conversation
     // must still take that conversation off this list.
     return ListenableBuilder(
-      listenable: cloud,
+      listenable: Listenable.merge([cloud, NoteRepository.instance]),
       builder: (context, _) => _lists(context, cloud),
     );
   }
@@ -109,7 +111,9 @@ class _ThreadsState extends State<_Threads> {
             final groups = groupSnap.data ?? const <StudyGroup>[];
             final me = cloud.uid ?? '';
             final direct = (directSnap.data ?? const <ChatThread>[])
-                .where((t) => !cloud.isBlocked(t.otherMember(me)))
+                .where((t) =>
+                    !cloud.isBlocked(t.otherMember(me)) &&
+                    !NoteRepository.instance.isChatHidden(t.id, t.lastAt))
                 .toList();
 
             if (!groupSnap.hasData && !directSnap.hasData) {
@@ -117,10 +121,12 @@ class _ThreadsState extends State<_Threads> {
             }
 
             if (groups.isEmpty && direct.isEmpty) {
-              return Padding(
+              return ListView(
                 padding: const EdgeInsets.all(22),
-                child: NestEmptyState(
-                  icon: Icons.forum_outlined,
+                children: [
+                  const _RequestsBanner(),
+                  NestEmptyState(
+                    icon: Icons.forum_outlined,
                   title: 'No conversations yet',
                   message: 'Every group has a conversation of its own. Make a '
                       'group or join one, and talking starts there — or '
@@ -129,13 +135,15 @@ class _ThreadsState extends State<_Threads> {
                   onAction: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const GroupsPage()),
                   ),
-                ),
+                  ),
+                ],
               );
             }
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(22, 14, 22, 40),
               children: [
+                const _RequestsBanner(),
                 if (groups.isNotEmpty) ...[
                   const Text('GROUPS', style: nestEyebrow),
                   const SizedBox(height: 8),
@@ -158,6 +166,43 @@ class _ThreadsState extends State<_Threads> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// "Message requests (2)" at the top of the list. Always shown when there is
+/// anything waiting; otherwise a quiet link so sent requests stay reachable.
+class _RequestsBanner extends StatelessWidget {
+  const _RequestsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final cloud = CloudService.instance;
+    return StreamBuilder<List<MessageRequest>>(
+      stream: cloud.watchIncomingRequests(),
+      builder: (context, snap) {
+        final waiting = (snap.data ?? const <MessageRequest>[])
+            .where((r) =>
+                r.state == RequestState.pending && !cloud.isBlocked(r.fromUid))
+            .length;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: ListTile(
+            tileColor: waiting > 0 ? NestColor.o(NestColor.pen, 0.08) : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            leading: const Icon(Icons.mark_email_unread_outlined),
+            title: Text(waiting > 0
+                ? 'Message requests ($waiting)'
+                : 'Message requests'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MessageRequestsPage()),
+            ),
+          ),
         );
       },
     );
@@ -209,6 +254,30 @@ class _DirectRow extends StatelessWidget {
 
   final ChatThread thread;
 
+  Future<void> _confirmRemove(BuildContext context, String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: NestColor.card,
+        title: const Text('Remove from your list?'),
+        content: Text('The conversation with $name disappears from your list '
+            'only. Their copy and the messages are not deleted, and it comes '
+            'back if either of you writes again.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await NoteRepository.instance.hideChat(thread.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cloud = CloudService.instance;
@@ -237,6 +306,7 @@ class _DirectRow extends StatelessWidget {
                   : thread.lastText),
           when: thread.lastAt,
           unread: thread.isUnreadFor(me),
+          onLongPress: () => _confirmRemove(context, name),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => ChatPage(chatId: thread.id, title: name),
@@ -256,6 +326,7 @@ class _Row extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.when,
+    this.onLongPress,
     this.unread = false,
   });
 
@@ -264,6 +335,7 @@ class _Row extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final DateTime? when;
   final bool unread;
 
@@ -285,6 +357,7 @@ class _Row extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(NestRadius.tile),
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(13),
             child: Row(
@@ -429,28 +502,8 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
 
   Future<void> _open(CloudProfile person) async {
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _busy = true);
-    try {
-      final chatId = await CloudService.instance.openDirectChat(person.uid);
-      if (!mounted) return;
-      navigator.pop();
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            chatId: chatId,
-            title: person.name.trim().isEmpty ? person.email : person.name,
-          ),
-        ),
-      );
-    } on CloudException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = e.message;
-      });
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    navigator.pop();
+    await startConversation(navigator.context, person);
   }
 
   @override

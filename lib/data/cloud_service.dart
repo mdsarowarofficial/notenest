@@ -688,6 +688,22 @@ class CloudService extends ChangeNotifier {
       }
     }
 
+    for (final field in const ['fromUid', 'toUid']) {
+      try {
+        final reqs = await _dmRequests.where(field, isEqualTo: me).get();
+        for (final d in reqs.docs) {
+          try {
+            await d.reference.delete();
+          } catch (_) {
+            // A request the other person declined cannot be removed by the
+            // sender; it stays, and says nothing but the two ids.
+          }
+        }
+      } catch (_) {
+        // Next query.
+      }
+    }
+
     try {
       await _blockDoc(me).delete();
     } catch (_) {
@@ -1318,6 +1334,128 @@ class CloudService extends ChangeNotifier {
             snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
   }
 
+  // ------------------------------------------------- message requests
+
+  CollectionReference<Map<String, dynamic>> get _dmRequests =>
+      _store.collection('dmRequests');
+
+  /// Requests other people have sent this account, live.
+  Stream<List<MessageRequest>> watchIncomingRequests() => _watchRequests('toUid');
+
+  /// Requests this account has sent, live.
+  Stream<List<MessageRequest>> watchSentRequests() => _watchRequests('fromUid');
+
+  Stream<List<MessageRequest>> _watchRequests(String field) {
+    final id = uid;
+    if (!_ready || id == null) return Stream.value(const []);
+    return _dmRequests.where(field, isEqualTo: id).snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => MessageRequest.fromMap(d.id, d.data()))
+          .toList();
+      list.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
+      return list;
+    });
+  }
+
+  /// The request between this account and [otherUid], or null when there is
+  /// none.
+  Future<MessageRequest?> requestWith(String otherUid) async {
+    final me = uid;
+    if (me == null) return null;
+    final id = directChatId(me, otherUid);
+    try {
+      final d = await _dmRequests.doc(id).get();
+      final data = d.data();
+      return data == null ? null : MessageRequest.fromMap(d.id, data);
+    } on FirebaseException catch (e) {
+      throw CloudException(describeStoreError(e.code));
+    }
+  }
+
+  /// Asks [otherUid] for permission to message them. The words go with the
+  /// request so the recipient knows who is asking and why.
+  Future<void> sendMessageRequest(String otherUid, String text) async {
+    _requireReady();
+    final me = uid;
+    if (me == null) {
+      throw const CloudException('You are not connected to the cloud.');
+    }
+    if (otherUid == me) throw const CloudException('That is you.');
+    final words = text.trim();
+    if (words.isEmpty) {
+      throw const CloudException('Write a line saying who you are.');
+    }
+    if (words.length > 500) {
+      throw const CloudException('Keep it under 500 characters.');
+    }
+    if (isBlocked(otherUid)) {
+      throw const CloudException('You have blocked this person. Unblock '
+          'them first.');
+    }
+    try {
+      final existing = await requestWith(otherUid);
+      if (existing != null) throw RequestRequired(existing, me);
+
+      // The daily counter and the request are written together; the rules
+      // refuse a request whose counter did not move up by exactly one.
+      final quotaRef = _store.collection('dmQuota').doc(me);
+      final day = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 86400000;
+      final quota = (await quotaRef.get()).data();
+      final used = quota != null && quota['day'] == day
+          ? (quota['count'] as int? ?? 0)
+          : 0;
+      if (used >= dmRequestsPerDay) {
+        throw const CloudException(
+          'You have reached today\'s limit of $dmRequestsPerDay message '
+          'requests for today. Try again tomorrow.',
+        );
+      }
+      final batch = _store.batch();
+      batch.set(quotaRef, {'day': day, 'count': used + 1});
+      batch.set(
+        _dmRequests.doc(directChatId(me, otherUid)),
+        MessageRequest(
+          id: '',
+          fromUid: me,
+          toUid: otherUid,
+          text: words,
+          createdAt: DateTime.now(),
+        ).toMap(),
+      );
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      // A blocked sender is refused by the rules with no reason given, and
+      // the app does not say "you were blocked" either.
+      throw CloudException(describeStoreError(e.code));
+    }
+  }
+
+  /// Accepts or declines a request sent to this account.
+  Future<void> respondToRequest(MessageRequest request,
+      {required bool accept}) async {
+    _requireReady();
+    try {
+      await _dmRequests.doc(request.id).update({
+        'state': accept ? 'accepted' : 'declined',
+        'respondedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+      if (accept) await openDirectChat(request.fromUid);
+    } on FirebaseException catch (e) {
+      throw CloudException(describeStoreError(e.code));
+    }
+  }
+
+  /// Withdraws a request this account sent that has not been declined.
+  Future<void> withdrawRequest(MessageRequest request) async {
+    _requireReady();
+    try {
+      await _dmRequests.doc(request.id).delete();
+    } on FirebaseException catch (e) {
+      throw CloudException(describeStoreError(e.code));
+    }
+  }
+
   /// Makes sure the conversation between this account and [otherUid] exists,
   /// and returns its address.
   Future<String> openDirectChat(String otherUid) async {
@@ -1331,6 +1469,24 @@ class CloudService extends ChangeNotifier {
     }
 
     final chatId = directChatId(me, otherUid);
+
+    // A conversation that already exists is always openable, whatever its
+    // request says: people who were talking before requests existed keep
+    // talking. Reading a thread that does not exist is refused by the rules,
+    // so a refusal here just means "no conversation yet".
+    try {
+      if ((await _chat(chatId).get()).exists) return chatId;
+    } on FirebaseException {
+      // Fall through to the request check.
+    }
+
+    // A new conversation needs a request the other person has accepted. The
+    // rules enforce this too; checking here only gives a useful message.
+    final request = await requestWith(otherUid);
+    if (request == null || request.state != RequestState.accepted) {
+      throw RequestRequired(request, me);
+    }
+
     try {
       // `set` with merge rather than a read-then-create. Both people may well
       // open the thread at the same moment, and a merge from each of them is
@@ -1523,6 +1679,56 @@ class CloudService extends ChangeNotifier {
 }
 
 /// A cloud failure with a message already written for the screen.
+/// Thrown when a conversation cannot be opened because no message request has
+/// been accepted yet. The screens use [kind] to decide what to offer.
+/// Message requests one account may send per day. Also enforced in the rules.
+const dmRequestsPerDay = 20;
+
+class RequestRequired extends CloudException {
+  RequestRequired(this.request, String me)
+      : kind = _kindOf(request, me),
+        super(_messageOf(_kindOf(request, me)));
+
+  final MessageRequest? request;
+  final RequestKind kind;
+
+  static RequestKind _kindOf(MessageRequest? r, String me) {
+    if (r == null) return RequestKind.none;
+    if (r.state == RequestState.accepted) return RequestKind.accepted;
+    final mine = r.fromUid == me;
+    if (r.state == RequestState.declined) {
+      return mine ? RequestKind.declinedByThem : RequestKind.declinedByMe;
+    }
+    return mine ? RequestKind.waiting : RequestKind.toAnswer;
+  }
+
+  static String _messageOf(RequestKind k) {
+    switch (k) {
+      case RequestKind.none:
+        return 'Send a message request first.';
+      case RequestKind.waiting:
+        return 'Your request is waiting for them to accept.';
+      case RequestKind.toAnswer:
+        return 'They have sent you a request. Accept it to start talking.';
+      case RequestKind.declinedByThem:
+        return 'This person is not taking messages from you.';
+      case RequestKind.declinedByMe:
+        return 'You declined their request. Accept it to start talking.';
+      case RequestKind.accepted:
+        return 'Try again.';
+    }
+  }
+}
+
+enum RequestKind {
+  none,
+  waiting,
+  toAnswer,
+  declinedByThem,
+  declinedByMe,
+  accepted,
+}
+
 class CloudException implements Exception {
   const CloudException(this.message);
 
