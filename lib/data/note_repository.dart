@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/attachment.dart';
 import '../models/exam.dart';
+import '../models/day_plan.dart';
 import '../models/task.dart';
 import '../models/course_file.dart';
 import '../models/note.dart';
@@ -197,6 +198,7 @@ class NoteRepository extends ChangeNotifier {
     await _reloadNotes();
     await _reloadExams();
     await _reloadTasks();
+    await _reloadDayPlan();
     notifyListeners();
   }
 
@@ -207,6 +209,8 @@ class NoteRepository extends ChangeNotifier {
     _notes = const [];
     _exams = const [];
     _tasks = const [];
+    _goals = const [];
+    _dayLogs = const {};
     _hiddenChats = const {};
     noticeSeenAt = null;
     remindersOn = false;
@@ -1462,6 +1466,131 @@ class NoteRepository extends ChangeNotifier {
     );
     await _reloadTasks();
     notifyListeners();
+  }
+
+  // -------------------------------------------------- goals and day notes
+
+  List<Goal> _goals = const [];
+  Map<String, DayLog> _dayLogs = const {};
+
+  /// Open goals first, then reached ones, each in the order they were added.
+  List<Goal> goals() => List.unmodifiable(_goals);
+
+  /// What was written and rated for [day]; empty when nothing was.
+  DayLog dayLog(DateTime day) =>
+      _dayLogs[dayKey(day)] ??
+      DayLog(userId: _auth.requireUserId, day: dayKey(day));
+
+  Future<void> _reloadDayPlan() async {
+    final uid = _auth.requireUserId;
+    final goals = await _db.db.query(
+      'goals',
+      where: 'user_id = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at ASC',
+    );
+    _goals = goals.map(Goal.fromMap).toList()
+      ..sort((a, b) => a.isDone == b.isDone ? 0 : (a.isDone ? 1 : -1));
+    final logs = await _db.db
+        .query('day_logs', where: 'user_id = ?', whereArgs: [uid]);
+    _dayLogs = {
+      for (final m in logs) (m['day'] as String? ?? ''): DayLog.fromMap(m),
+    };
+  }
+
+  /// Adds a goal. Returns false when the list already holds [maxGoals] open
+  /// goals or the title is empty.
+  Future<bool> addGoal(String title) async {
+    final clean = title.trim();
+    if (clean.isEmpty) return false;
+    if (_goals.where((g) => !g.isDone).length >= maxGoals) return false;
+    await _db.db.insert(
+      'goals',
+      Goal(
+        userId: _auth.requireUserId,
+        title: clean,
+        createdAt: DateTime.now(),
+      ).toMap(),
+    );
+    await _reloadDayPlan();
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> updateGoal(Goal goal) async {
+    if (goal.id == null || goal.title.trim().isEmpty) return;
+    await _db.db.update(
+      'goals',
+      goal.toMap(),
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [goal.id, _auth.requireUserId],
+    );
+    await _reloadDayPlan();
+    notifyListeners();
+  }
+
+  Future<void> setGoalDone(Goal goal, bool done) => updateGoal(
+        done
+            ? goal.copyWith(doneAt: DateTime.now())
+            : goal.copyWith(clearDone: true),
+      );
+
+  Future<void> deleteGoal(Goal goal) async {
+    if (goal.id == null) return;
+    await _db.db.delete(
+      'goals',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [goal.id, _auth.requireUserId],
+    );
+    await _reloadDayPlan();
+    notifyListeners();
+  }
+
+  /// Saves the note and star rating for [day]. An empty log removes the row.
+  Future<void> saveDayLog(DateTime day, {String? thoughts, int? rating}) async {
+    final next = dayLog(day).copyWith(
+      thoughts: thoughts?.trim(),
+      rating: rating?.clamp(0, 5),
+    );
+    if (next.isEmpty) {
+      await _db.db.delete(
+        'day_logs',
+        where: 'user_id = ? AND day = ?',
+        whereArgs: [next.userId, next.day],
+      );
+    } else {
+      await _db.db.insert(
+        'day_logs',
+        next.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await _reloadDayPlan();
+    notifyListeners();
+  }
+
+  /// Moves every open task due before today to the end of [day]. Returns how
+  /// many moved.
+  Future<int> moveOverdueTo(DateTime day) async {
+    final n = DateTime.now();
+    final start = DateTime(n.year, n.month, n.day);
+    final late = _tasks
+        .where((t) => !t.isDone && t.dueAt != null && t.dueAt!.isBefore(start))
+        .toList();
+    final target = DateTime(day.year, day.month, day.day, 23, 59);
+    for (final t in late) {
+      await _db.db.update(
+        'tasks',
+        t.copyWith(dueAt: target).toMap(),
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [t.id, _auth.requireUserId],
+      );
+    }
+    if (late.isNotEmpty) {
+      await _reloadTasks();
+      notifyListeners();
+    }
+    return late.length;
   }
 
   // -------------------------------------------------------------- exams

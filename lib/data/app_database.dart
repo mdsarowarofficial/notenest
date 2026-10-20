@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 10;
+  static const _version = 11;
 
   Database? _db;
 
@@ -112,6 +112,35 @@ class AppDatabase {
     await _createExams(db);
     await _createTasks(db);
     await _createCourseFiles(db);
+    await _createDayPlan(db);
+  }
+
+  /// Version 11: goals, and a note and star rating for each day of the to-do
+  /// list. Private to the account, and removed with it.
+  Future<void> _createDayPlan(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS goals (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        title      TEXT    NOT NULL,
+        done_at    INTEGER,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_goals_user ON goals (user_id, done_at)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS day_logs (
+        user_id  INTEGER NOT NULL,
+        day      TEXT    NOT NULL,
+        thoughts TEXT    NOT NULL DEFAULT '',
+        rating   INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   /// Version 9: files kept under a course. Rows go with the course; the bytes
@@ -294,6 +323,10 @@ class AppDatabase {
       // Only installs that already had the v9 table lack the column; newer
       // tables are created with it.
       await db.execute('ALTER TABLE course_files ADD COLUMN drive_id TEXT');
+    }
+    if (from < 11) {
+      // Two new tables; nothing existing is touched.
+      await _createDayPlan(db);
     }
     if (from < 8) {
       // A new table only; nothing existing is touched. A fresh install gets it

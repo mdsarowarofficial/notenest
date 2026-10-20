@@ -172,6 +172,10 @@ class DriveBackup {
         .query('user_settings', where: 'user_id = ?', whereArgs: [userId]);
     final tasks =
         await _db.db.query('tasks', where: 'user_id = ?', whereArgs: [userId]);
+    final goals =
+        await _db.db.query('goals', where: 'user_id = ?', whereArgs: [userId]);
+    final dayLogs = await _db.db
+        .query('day_logs', where: 'user_id = ?', whereArgs: [userId]);
     // Course files are not packed: each already sits in its own course folder
     // in Drive, so the backup only records which file belongs to which course.
     final courseFiles = await _db.db.query(
@@ -209,6 +213,8 @@ class DriveBackup {
       'exams': exams,
       'attachments': kept,
       'tasks': tasks,
+      'goals': goals,
+      'dayLogs': dayLogs,
       'courseFiles': courseFiles,
       'settings': [
         for (final s in settings)
@@ -371,6 +377,27 @@ class DriveBackup {
           'user_id': userId,
           'subject_id': subject == null ? null : subjectIds[subject],
         });
+      }
+
+      for (final g in rows('goals')) {
+        final existing = await txn.query(
+          'goals',
+          columns: ['id'],
+          where: 'user_id = ? AND title = ? AND created_at = ?',
+          whereArgs: [userId, g['title'], g['created_at']],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) continue;
+        await txn.insert('goals', {..._withoutId(g), 'user_id': userId});
+      }
+
+      // A day already written here keeps what this phone has.
+      for (final d in rows('dayLogs')) {
+        await txn.insert(
+          'day_logs',
+          {...d, 'user_id': userId},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
       }
 
       // Only settings this phone does not have yet: what the student chose

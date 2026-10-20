@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:notenest/data/auth_repository.dart';
+import 'package:notenest/models/day_plan.dart';
 import 'package:notenest/data/cloud_service.dart' show RequestRequired, RequestKind;
 import 'package:notenest/data/doc_paginator.dart';
 import 'package:notenest/models/attachment.dart';
@@ -2462,6 +2463,46 @@ void main() {
       );
       expect(plan.single.id, idleId);
       expect(plan.single.at, DateTime(2026, 10, 22, 18));
+    });
+  });
+  group('day plan', () {
+    test('a week runs Monday to Sunday and holds the day given', () {
+      final week = weekOf(DateTime(2026, 10, 20)); // a Tuesday
+      expect(week.first, DateTime(2026, 10, 19));
+      expect(week.last, DateTime(2026, 10, 25));
+      expect(week.length, 7);
+      expect(weekOf(DateTime(2026, 10, 25)).first, DateTime(2026, 10, 19));
+      expect(weekOf(DateTime(2026, 10, 26)).first, DateTime(2026, 10, 26));
+    });
+
+    test('a week crosses a month end by calendar date', () {
+      final week = weekOf(DateTime(2026, 10, 29));
+      expect(week.last, DateTime(2026, 11, 1));
+    });
+
+    test('day keys are the calendar date', () {
+      expect(dayKey(DateTime(2026, 3, 4, 23, 59)), '2026-03-04');
+    });
+
+    test('a goal and a day log survive the database map', () {
+      final g = Goal(
+        id: 3,
+        userId: 1,
+        title: 'Finish thesis outline',
+        doneAt: DateTime.fromMillisecondsSinceEpoch(1000),
+        createdAt: DateTime.fromMillisecondsSinceEpoch(500),
+      );
+      final back = Goal.fromMap(g.toMap());
+      expect(back.title, g.title);
+      expect(back.isDone, true);
+      const log = DayLog(userId: 1, day: '2026-10-20', thoughts: 'hi', rating: 9);
+      expect(DayLog.fromMap(log.toMap()).rating, 5);
+      expect(const DayLog(userId: 1, day: 'x').isEmpty, true);
+    });
+
+    test('11:59 PM means no particular time of day', () {
+      expect(hasRealClock(DateTime(2026, 10, 20, 23, 59)), false);
+      expect(hasRealClock(DateTime(2026, 10, 20, 17, 30)), true);
     });
   });
 }
