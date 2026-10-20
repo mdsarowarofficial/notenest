@@ -2249,6 +2249,29 @@ void main() {
       ]..sort(compareTasks);
       expect(list.map((t) => t.title), ['soon', 'later', 'none', 'done']);
     });
+
+    test('streak counts clear days and ignores a day still in progress', () {
+      final today = DateTime(2026, 10, 20);
+      final fin = DateTime(2026, 10, 19);
+      final tasks = [
+        task('a', due: DateTime(2026, 10, 19, 23, 59), done: fin),
+        task('b', due: DateTime(2026, 10, 18, 9), done: fin),
+        task('c', due: DateTime(2026, 10, 20, 9)), // today, still open
+      ];
+      expect(doneStreak(tasks, today), 2);
+      // Finishing today adds it; a gap day ends the run.
+      expect(
+        doneStreak([...tasks, task('d', due: DateTime(2026, 10, 16), done: fin)],
+            today),
+        2,
+      );
+      expect(doneStreak(const [], today), 0);
+      expect(
+        doneStreak([task('e', due: DateTime(2026, 10, 19), p: TaskPriority.low)],
+            today),
+        0,
+      );
+    });
   });
 
   group('chat day headings and greeting', () {

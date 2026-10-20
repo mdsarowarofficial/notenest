@@ -64,12 +64,50 @@ String taskDueLabel(DateTime at, {DateTime? now}) {
 
 DateTime _endOfDay(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59);
 
-/// The to-do page: a week strip, goals, the chosen day's tasks and the next
-/// day's, a place for loose thoughts, and a star rating for the day. Personal
-/// and private: every read and write in the repository is scoped to the
-/// signed-in account.
+/// Ink for the ruled lines: darker than [NestColor.rule], so a blank line is
+/// still plainly a line to write on.
+const _lineColor = Color(0xFFD3D7E4);
+const _rowHeight = 46.0;
+
+/// The small spaced-out headings of the planner sheet.
+const _sheetHeading = TextStyle(
+  fontFamily: NestFont.body,
+  fontSize: 12,
+  fontWeight: FontWeight.w700,
+  letterSpacing: 2,
+  color: NestColor.inkSoft,
+);
+
+/// "TODAY’S URGENT TASKS", "TOMORROW’S URGENT TASKS", or for a day further
+/// off "TASKS · WED 21 OCT".
+String _taskHeading(DateTime d) {
+  final word = dayWord(d).toUpperCase();
+  const named = {'TODAY', 'TOMORROW', 'YESTERDAY'};
+  return named.contains(word) ? '$word’S URGENT TASKS' : 'TASKS · $word';
+}
+
+/// The to-do page, laid out like a printed planner sheet: the week's seven
+/// day boxes, a title, the goals, the day's tasks and the next day's, a ruled
+/// place for loose thoughts and a star rating for the day.
+///
+/// Every line of the sheet is real. A blank line is a place to type: tap it,
+/// write, press Enter. A day with nothing on it shows the empty sheet, not an
+/// apology. Each day keeps its own tasks (a task belongs to the day it is due),
+/// so paging through the days reads back what was planned on each one.
+///
+/// Personal and private: every read and write in the repository is scoped to
+/// the signed-in account.
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key});
+  const TasksPage({super.key, this.embedded = false, this.onBack});
+
+  /// True when this is a tab of the home shell, which supplies the app bar and
+  /// the navigation bar. False when pushed on its own (from a notification),
+  /// where the page brings its own app bar.
+  final bool embedded;
+
+  /// Shown as a back arrow on the embedded page, since no tab of the bar leads
+  /// back from it.
+  final VoidCallback? onBack;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -124,6 +162,16 @@ class _TasksPageState extends State<TasksPage> {
     });
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _day,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) _goTo(picked);
+  }
+
   List<Task> _scoped(Iterable<Task> list) => list
       .where((t) => _subjectId == null || t.subjectId == _subjectId)
       .toList();
@@ -142,57 +190,87 @@ class _TasksPageState extends State<TasksPage> {
         (t.description ?? '').toLowerCase().contains(q)));
   }
 
+  /// Open tasks due on a day before today.
+  List<Task> _late() {
+    final n = DateTime.now();
+    final start = DateTime(n.year, n.month, n.day);
+    return _scoped(_repo.tasks().where(
+        (t) => !t.isDone && t.dueAt != null && t.dueAt!.isBefore(start)));
+  }
+
+  Widget _searchField() => TextField(
+        controller: _search,
+        autofocus: true,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(
+          hintText: 'Search tasks',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+        ),
+      );
+
+  List<Widget> _actions() => [
+        IconButton(
+          tooltip: 'New task with details',
+          icon: const Icon(Icons.add_task_rounded),
+          onPressed: () => showTaskForm(context, dueOn: _day),
+        ),
+        IconButton(
+          tooltip: _searching ? 'Close search' : 'Search tasks',
+          icon: Icon(_searching ? Icons.close_rounded : Icons.search_rounded),
+          onPressed: () => setState(() {
+            _searching = !_searching;
+            _search.clear();
+          }),
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
+    final embedded = widget.embedded;
+    final body = ListenableBuilder(
+      listenable: _repo,
+      builder: (context, _) {
+        final searching = _searching && _search.text.trim().isNotEmpty;
+        return ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(16, embedded ? 0 : 4, 16, embedded ? 130 : 40),
+          children: [
+            if (embedded)
+              SizedBox(
+                height: 48,
+                child: Row(
+                  children: [
+                    if (widget.onBack != null && !_searching)
+                      TextButton.icon(
+                        onPressed: widget.onBack,
+                        icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                        label: const Text('Today'),
+                      ),
+                    if (_searching)
+                      Expanded(child: _searchField())
+                    else
+                      const Spacer(),
+                    ..._actions(),
+                  ],
+                ),
+              ),
+            _buildCourseFilter(),
+            if (searching) _buildSearch() else _buildSheet(),
+          ],
+        );
+      },
+    );
+    if (embedded) return body;
     return Scaffold(
       backgroundColor: NestColor.ground,
       appBar: AppBar(
-        title: _searching
-            ? TextField(
-                controller: _search,
-                autofocus: true,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Search tasks',
-                  border: InputBorder.none,
-                  filled: false,
-                ),
-              )
-            : const Text('To-do'),
-        actions: [
-          IconButton(
-            tooltip: 'New task with details',
-            icon: const Icon(Icons.add_task_rounded),
-            onPressed: () => showTaskForm(context, dueOn: _day),
-          ),
-          IconButton(
-            tooltip: _searching ? 'Close search' : 'Search',
-            icon: Icon(_searching ? Icons.close_rounded : Icons.search_rounded),
-            onPressed: () => setState(() {
-              _searching = !_searching;
-              _search.clear();
-            }),
-          ),
-        ],
+        title: _searching ? _searchField() : const Text('To-do'),
+        actions: _actions(),
       ),
-      body: ListenableBuilder(
-        listenable: _repo,
-        builder: (context, _) {
-          final searching = _searching && _search.text.trim().isNotEmpty;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-            children: [
-              if (!searching) ...[
-                _WeekStrip(day: _day, repo: _repo, onPick: _goTo),
-                const SizedBox(height: 14),
-                _buildProgress(),
-              ],
-              _buildCourseFilter(),
-              if (searching) ..._buildSearch() else ..._buildSections(),
-            ],
-          );
-        },
-      ),
+      body: body,
     );
   }
 
@@ -224,272 +302,506 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  Widget _buildProgress() {
-    final tasks = _onDay(_day);
-    final done = tasks.where((t) => t.isDone).length;
-    final t = Theme.of(context).textTheme;
-    final word = dayWord(_day);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final late = _late();
-    final String line;
-    if (tasks.isEmpty) {
-      line = 'Nothing planned for this day.';
-    } else if (done == tasks.length) {
-      line = 'All $done done. Nice work.';
-    } else {
-      line = '$done of ${tasks.length} done';
-    }
+  Widget _buildSearch() {
+    final results = _searchResults();
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.tile),
-        boxShadow: NestShadow.resting,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            sameDay(_day, today)
-                ? '${_weekdays[_day.weekday - 1]}, ${_day.day} '
-                    '${_months[_day.month - 1]}'
-                : '$word · ${_weekdays[_day.weekday - 1]}',
-            style: t.titleMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(line, style: t.bodySmall),
-          if (tasks.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(NestRadius.pill),
-              child: LinearProgressIndicator(
-                value: done / tasks.length,
-                minHeight: 8,
-                backgroundColor: NestColor.paper,
-                color: NestColor.mint,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: _sheetDecoration,
+      child: results.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No tasks match.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
+            )
+          : Column(
+              children: [
+                for (final t in results)
+                  TaskTile(key: ValueKey('hit-${t.id}'), task: t, ruled: true),
+              ],
             ),
-          ],
-          if (late.isNotEmpty && !_day.isBefore(today)) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-              decoration: BoxDecoration(
-                color: NestColor.tintRed,
-                borderRadius: BorderRadius.circular(NestRadius.chip),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${late.length} overdue',
-                      style: t.bodySmall?.copyWith(
-                        color: NestColor.redDeep,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final n = await _repo.moveOverdueTo(_day);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(
-                            'Moved $n ${n == 1 ? 'task' : 'tasks'} to ${dayWord(_day).toLowerCase()}.'),
-                      ));
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: NestColor.redDeep,
-                    ),
-                    child: Text('Move to ${dayWord(_day).toLowerCase()}'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
-  /// Open tasks due on a day before today.
-  List<Task> _late() {
-    final n = DateTime.now();
-    final start = DateTime(n.year, n.month, n.day);
-    return _scoped(_repo.tasks().where(
-        (t) => !t.isDone && t.dueAt != null && t.dueAt!.isBefore(start)));
-  }
+  static final _sheetDecoration = BoxDecoration(
+    color: NestColor.card,
+    borderRadius: BorderRadius.circular(NestRadius.card),
+    boxShadow: NestShadow.resting,
+  );
 
-  List<Widget> _buildSearch() {
-    final results = _searchResults();
-    if (results.isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            'No tasks match.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-      ];
-    }
-    return [for (final t in results) TaskTile(task: t)];
-  }
-
-  List<Widget> _buildSections() {
+  Widget _buildSheet() {
     final next = DateTime(_day.year, _day.month, _day.day + 1);
-    final late = _late()..sort(compareTasks);
+    final overdue = _late()..sort(compareTasks);
     final later = _scoped(_repo.tasks().where((t) {
       if (t.isDone) return false;
       final d = t.dueAt;
       return d == null || DateTime(d.year, d.month, d.day).isAfter(next);
     }))
       ..sort(compareTasks);
-    return [
-      _GoalsCard(repo: _repo),
-      const SizedBox(height: 14),
-      if (late.isNotEmpty) ...[
-        _Section(
-          title: 'OVERDUE',
-          count: late.length,
-          accent: NestColor.redPen,
-          children: [for (final t in late) TaskTile(task: t)],
-        ),
-        const SizedBox(height: 14),
-      ],
-      _Section(
-        title: '${dayWord(_day).toUpperCase()}’S TASKS',
-        count: _onDay(_day).length,
-        emptyText: 'Nothing planned. Add the first task below.',
-        quickAdd: _QuickAdd(
-          hint: 'Add a task for ${dayWord(_day).toLowerCase()}',
-          onAdd: (title) => _repo.addTask(title: title, dueAt: _endOfDay(_day)),
-        ),
-        children: [for (final t in _onDay(_day)) TaskTile(task: t)],
-      ),
-      const SizedBox(height: 14),
-      _Section(
-        title: '${dayWord(next).toUpperCase()}’S TASKS',
-        count: _onDay(next).length,
-        emptyText: 'Nothing planned yet.',
-        quickAdd: _QuickAdd(
-          hint: 'Add a task for ${dayWord(next).toLowerCase()}',
-          onAdd: (title) => _repo.addTask(title: title, dueAt: _endOfDay(next)),
-        ),
-        children: [for (final t in _onDay(next)) TaskTile(task: t)],
-      ),
-      const SizedBox(height: 14),
-      _Section(
-        title: 'LATER & NO DATE',
-        count: later.length,
-        emptyText: 'Ideas and far-off tasks go here.',
-        quickAdd: _QuickAdd(
-          hint: 'Add a task with no date',
-          onAdd: (title) => _repo.addTask(title: title),
-        ),
-        children: [for (final t in later) TaskTile(task: t)],
-      ),
-      const SizedBox(height: 14),
-      _buildThoughts(),
-      const SizedBox(height: 14),
-      _buildRating(),
-    ];
-  }
+    final goals = _repo.goals();
+    final openGoals = goals.where((g) => !g.isDone).length;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-  Widget _buildThoughts() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.tile),
-        boxShadow: NestShadow.resting,
-      ),
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
+      decoration: _sheetDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('RANDOM THOUGHTS · ${dayWord(_day).toUpperCase()}',
-              style: nestEyebrow),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _thoughts,
-            minLines: 4,
-            maxLines: 10,
-            maxLength: 2000,
-            buildCounter: (_,
-                    {required currentLength, required isFocused, maxLength}) =>
-                null,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: (_) {
-              _saveTimer?.cancel();
-              _saveTimer = Timer(const Duration(milliseconds: 700), () {
-                _flushThoughts();
-              });
+          _WeekBoxes(day: _day, repo: _repo, onPick: _goTo),
+          const SizedBox(height: 18),
+          _buildHeader(today),
+          if (overdue.isNotEmpty && !_day.isBefore(today)) ...[
+            const SizedBox(height: 14),
+            _overdueBanner(overdue.length),
+          ],
+          if (overdue.isNotEmpty) ...[
+            _heading('OVERDUE', count: overdue.length, accent: NestColor.redPen),
+            for (final t in overdue)
+              TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
+          ],
+          _heading(_taskHeading(_day), count: _onDay(_day).length),
+          _Lines(
+            rows: [
+              for (final t in _onDay(_day))
+                TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
+            ],
+            minLines: 6,
+            hint: 'Add a task',
+            onAdd: (title) =>
+                _repo.addTask(title: title, dueAt: _endOfDay(_day)),
+          ),
+          _heading('MY TOP 7 GOALS', trailing: '$openGoals / $maxGoals open'),
+          _Lines(
+            rows: [
+              for (var i = 0; i < goals.length; i++)
+                _GoalRow(
+                  key: ValueKey('goal-${goals[i].id}'),
+                  goal: goals[i],
+                  number: i + 1,
+                  repo: _repo,
+                ),
+            ],
+            minLines: maxGoals,
+            numbered: true,
+            canAdd: openGoals < maxGoals,
+            hint: 'Add a goal',
+            onAdd: (title) async {
+              await _repo.addGoal(title);
             },
-            decoration: const InputDecoration(
-              hintText: 'Ideas, worries, things to remember…',
-            ),
+          ),
+          _heading(_taskHeading(next), count: _onDay(next).length),
+          _Lines(
+            rows: [
+              for (final t in _onDay(next))
+                TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
+            ],
+            minLines: 4,
+            hint: 'Plan ahead',
+            onAdd: (title) =>
+                _repo.addTask(title: title, dueAt: _endOfDay(next)),
+          ),
+          _heading('RANDOM THOUGHTS · ${dayWord(_day).toUpperCase()}'),
+          _buildThoughts(),
+          _heading('PRODUCTIVITY'),
+          _buildRating(),
+          _heading('SOMEDAY · NO DATE', count: later.length),
+          _Lines(
+            rows: [
+              for (final t in later)
+                TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
+            ],
+            minLines: 3,
+            hint: 'Ideas and far-off tasks',
+            onAdd: (title) => _repo.addTask(title: title),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRating() {
-    final rating = _repo.dayLog(_day).rating;
-    const words = ['Tap a star', 'Rough', 'Meh', 'Okay', 'Good', 'Great'];
+  /// A spaced-out heading with an optional count badge and a note at the end.
+  Widget _heading(String title,
+      {int count = 0, Color? accent, String? trailing}) {
     final t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.tile),
-        boxShadow: NestShadow.resting,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.only(top: 26, bottom: 2),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Text('PRODUCTIVITY', style: nestEyebrow),
-              const Spacer(),
-              Text(words[rating], style: t.bodySmall),
-            ],
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _sheetHeading.copyWith(color: accent),
+            ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              decoration: BoxDecoration(
+                color: accent == null ? NestColor.tintPen : NestColor.tintRed,
+                borderRadius: BorderRadius.circular(NestRadius.pill),
+              ),
+              child: Text(
+                '$count',
+                style: t.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: accent == null ? NestColor.penDeep : NestColor.redDeep,
+                ),
+              ),
+            ),
+          ],
+          if (trailing != null) ...[
+            const Spacer(),
+            Text(trailing, style: t.bodySmall),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The title, the date (tap it to jump to any day) and how the day is going.
+  /// Swiping sideways here moves a day at a time.
+  Widget _buildHeader(DateTime today) {
+    final t = Theme.of(context).textTheme;
+    final isToday = sameDay(_day, today);
+    final tasks = _onDay(_day);
+    final done = tasks.where((x) => x.isDone).length;
+    final week = weekOf(_day);
+    final weekTasks = _scoped(_repo.tasks().where(
+        (x) => x.dueAt != null && week.any((d) => sameDay(d, x.dueAt!))));
+    final weekDone = weekTasks.where((x) => x.isDone).length;
+    final streak = doneStreak(_repo.tasks(), today);
+    final String line;
+    if (tasks.isEmpty) {
+      line = 'A clear page. Tap a line to add the first task.';
+    } else if (done == tasks.length) {
+      line = 'All $done done. Nice work.';
+    } else {
+      line = '$done of ${tasks.length} done';
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (v.abs() < 250) return;
+        _goTo(DateTime(_day.year, _day.month, _day.day + (v < 0 ? 1 : -1)));
+      },
+      child: Column(
+        children: [
+          const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'TO DO LIST',
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: NestFont.display,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 6,
+                color: NestColor.ink,
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              for (var i = 1; i <= 5; i++)
-                IconButton(
-                  tooltip: '$i star${i == 1 ? '' : 's'}',
-                  iconSize: 38,
-                  onPressed: () {
-                    HapticFeedback.selectionClick();
-                    // Tapping the current rating again clears it.
-                    _repo.saveDayLog(_day, rating: rating == i ? 0 : i);
-                  },
-                  icon: Icon(
-                    i <= rating
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    color:
-                        i <= rating ? NestColor.highlight : NestColor.inkFaint,
+              IconButton(
+                tooltip: 'Previous day',
+                onPressed: () =>
+                    _goTo(DateTime(_day.year, _day.month, _day.day - 1)),
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+              Expanded(
+                child: Center(
+                  child: InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(NestRadius.chip),
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Date', style: t.bodySmall),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                      color: NestColor.ink, width: 1),
+                                ),
+                              ),
+                              child: Text(
+                                '${_weekdays[_day.weekday - 1].substring(0, 3)}, '
+                                '${_day.day} ${_months[_day.month - 1]} '
+                                '${_day.year}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: t.titleSmall,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.edit_calendar_rounded,
+                              size: 18, color: NestColor.pen),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Next day',
+                onPressed: () =>
+                    _goTo(DateTime(_day.year, _day.month, _day.day + 1)),
+                icon: const Icon(Icons.chevron_right_rounded),
+              ),
+            ],
+          ),
+          if (!isToday)
+            TextButton.icon(
+              onPressed: () => _goTo(today),
+              icon: const Icon(Icons.today_rounded, size: 18),
+              label: const Text('Back to today'),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Text(line, style: t.bodySmall)),
+              if (streak > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: NestColor.tintWarm,
+                    borderRadius: BorderRadius.circular(NestRadius.pill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.local_fire_department_rounded,
+                          size: 15, color: NestColor.warmDeep),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$streak-day streak',
+                        style: t.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: NestColor.warmDeep,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
+          if (tasks.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(NestRadius.pill),
+              child: LinearProgressIndicator(
+                value: done / tasks.length,
+                minHeight: 7,
+                backgroundColor: NestColor.paper,
+                color: NestColor.mint,
+              ),
+            ),
+          ],
+          if (weekTasks.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'This week: $weekDone of ${weekTasks.length} done',
+                style: t.bodySmall,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Widget _overdueBanner(int count) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: NestColor.tintRed,
+        borderRadius: BorderRadius.circular(NestRadius.chip),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$count overdue',
+              style: t.bodySmall?.copyWith(
+                color: NestColor.redDeep,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              final n = await _repo.moveOverdueTo(_day);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Moved $n ${n == 1 ? 'task' : 'tasks'} to '
+                    '${dayWord(_day).toLowerCase()}.'),
+              ));
+            },
+            style: TextButton.styleFrom(foregroundColor: NestColor.redDeep),
+            child: Text('Move to ${dayWord(_day).toLowerCase()}'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ruled writing space: the lines are drawn behind the text, one text line
+  /// per rule.
+  Widget _buildThoughts() {
+    const lineHeight = 34.0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: CustomPaint(
+        painter: const _RulePainter(lineHeight: lineHeight),
+        child: TextField(
+          controller: _thoughts,
+          minLines: 6,
+          maxLines: null,
+          maxLength: 2000,
+          buildCounter: (_,
+                  {required currentLength, required isFocused, maxLength}) =>
+              null,
+          textCapitalization: TextCapitalization.sentences,
+          strutStyle: const StrutStyle(
+            fontSize: 15,
+            height: lineHeight / 15,
+            forceStrutHeight: true,
+          ),
+          style: const TextStyle(
+            fontFamily: NestFont.body,
+            fontSize: 15,
+            color: NestColor.ink,
+          ),
+          onChanged: (_) {
+            _saveTimer?.cancel();
+            _saveTimer = Timer(const Duration(milliseconds: 700), () {
+              _flushThoughts();
+            });
+          },
+          decoration: const InputDecoration(
+            hintText: 'Ideas, worries, things to remember…',
+            isDense: true,
+            filled: false,
+            contentPadding: EdgeInsets.zero,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Five circled stars, as on the printed sheet. Tapping the current rating
+  /// again clears it.
+  Widget _buildRating() {
+    final rating = _repo.dayLog(_day).rating;
+    const words = ['Tap a star', 'Rough', 'Meh', 'Okay', 'Good', 'Great'];
+    final t = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (var i = 1; i <= 5; i++)
+              Semantics(
+                button: true,
+                selected: i <= rating,
+                label: '$i star${i == 1 ? '' : 's'}',
+                child: InkResponse(
+                  radius: 30,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _repo.saveDayLog(_day, rating: rating == i ? 0 : i);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i <= rating ? NestColor.tintWarm : Colors.transparent,
+                      border: Border.all(
+                        color:
+                            i <= rating ? NestColor.warmDeep : NestColor.inkFaint,
+                        width: 1.6,
+                      ),
+                    ),
+                    child: Icon(
+                      i <= rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 26,
+                      color: i <= rating
+                          ? const Color(0xFFF2B600)
+                          : NestColor.inkFaint,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Center(child: Text(words[rating], style: t.bodySmall)),
+      ],
+    );
+  }
 }
 
-/// Monday to Sunday of the chosen week. A dot marks a day with tasks: indigo
-/// while something is open, green once all of it is done.
-class _WeekStrip extends StatelessWidget {
-  const _WeekStrip(
+/// Horizontal rules every [lineHeight] pixels, ending each text line.
+class _RulePainter extends CustomPainter {
+  const _RulePainter({required this.lineHeight});
+
+  final double lineHeight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _lineColor
+      ..strokeWidth = 1;
+    for (var y = lineHeight - 6; y <= size.height; y += lineHeight) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RulePainter old) => old.lineHeight != lineHeight;
+}
+
+/// Monday to Sunday of the chosen week as seven small boxes, like the tabs at
+/// the top of a printed planner. A dot marks a day with tasks: indigo while
+/// something is open, green once all of it is done; a grey dot means only a
+/// note or a rating.
+class _WeekBoxes extends StatelessWidget {
+  const _WeekBoxes(
       {required this.day, required this.repo, required this.onPick});
 
   final DateTime day;
@@ -502,373 +814,413 @@ class _WeekStrip extends StatelessWidget {
     final now = DateTime.now();
     final tasks = repo.tasks();
     final t = Theme.of(context).textTheme;
-    final isToday = sameDay(day, now);
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous week',
-              onPressed: () =>
-                  onPick(DateTime(day.year, day.month, day.day - 7)),
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
-            Expanded(
-              child: Text(
-                '${_months[week.first.month - 1]} ${week.first.day} – '
-                '${_months[week.last.month - 1]} ${week.last.day}',
-                textAlign: TextAlign.center,
-                style: t.titleSmall,
-              ),
-            ),
-            if (!isToday)
-              TextButton(
-                  onPressed: () => onPick(now), child: const Text('Today')),
-            IconButton(
-              tooltip: 'Next week',
-              onPressed: () =>
-                  onPick(DateTime(day.year, day.month, day.day + 7)),
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            for (var i = 0; i < 7; i++)
-              Expanded(
-                child: Builder(builder: (context) {
-                  final d = week[i];
-                  final selected = sameDay(d, day);
-                  final today = sameDay(d, now);
-                  final mine = tasks
-                      .where((x) => x.dueAt != null && sameDay(x.dueAt!, d))
-                      .toList();
-                  final open = mine.any((x) => !x.isDone);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Semantics(
-                      button: true,
-                      selected: selected,
-                      label: '${_weekdays[i]} ${d.day}',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(NestRadius.chip),
-                        onTap: () => onPick(d),
-                        child: Container(
-                          height: 66,
-                          decoration: BoxDecoration(
-                            color: selected ? NestColor.pen : NestColor.card,
-                            borderRadius:
-                                BorderRadius.circular(NestRadius.chip),
-                            border: today && !selected
-                                ? Border.all(color: NestColor.pen, width: 1.5)
-                                : null,
-                            boxShadow: selected
-                                ? NestShadow.glow(NestColor.pen)
-                                : null,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _weekLetters[i],
-                                style: t.bodySmall?.copyWith(
-                                  color: selected
-                                      ? NestColor.penPale
-                                      : NestColor.inkMeta,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${d.day}',
-                                style: t.titleSmall?.copyWith(
-                                  color: selected ? Colors.white : null,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: mine.isEmpty
-                                      ? Colors.transparent
-                                      : open
-                                          ? (selected
-                                              ? NestColor.highlight
-                                              : NestColor.pen)
-                                          : NestColor.mint,
-                                ),
-                              ),
-                            ],
-                          ),
+        for (var i = 0; i < 7; i++)
+          Expanded(
+            child: Builder(builder: (context) {
+              final d = week[i];
+              final selected = sameDay(d, day);
+              final today = sameDay(d, now);
+              final mine = tasks
+                  .where((x) => x.dueAt != null && sameDay(x.dueAt!, d))
+                  .toList();
+              final open = mine.any((x) => !x.isDone);
+              final noted = mine.isEmpty && !repo.dayLog(d).isEmpty;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                child: Semantics(
+                  button: true,
+                  selected: selected,
+                  label: '${_weekdays[i]} ${d.day}',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => onPick(d),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: selected ? NestColor.pen : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? NestColor.pen
+                              : today
+                                  ? NestColor.pen
+                                  : const Color(0xFFB9BECE),
+                          width: today && !selected ? 1.8 : 1.2,
                         ),
                       ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _weekLetters[i],
+                            style: t.bodySmall?.copyWith(
+                              color: selected
+                                  ? NestColor.penPale
+                                  : NestColor.inkMeta,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                            ),
+                          ),
+                          Text(
+                            '${d.day}',
+                            style: t.titleSmall?.copyWith(
+                              color: selected ? Colors.white : null,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: mine.isEmpty
+                                  ? (noted
+                                      ? NestColor.inkFaint
+                                      : Colors.transparent)
+                                  : open
+                                      ? (selected
+                                          ? NestColor.highlight
+                                          : NestColor.pen)
+                                      : NestColor.mint,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }),
+                  ),
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+}
+
+/// One ruled line of the sheet: a mark at the start, then the content, over a
+/// hairline.
+class _RuledRow extends StatelessWidget {
+  const _RuledRow({required this.leading, required this.child, this.onTap});
+
+  final Widget leading;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: _lineColor)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: _rowHeight),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                leading,
+                const SizedBox(width: 12),
+                Expanded(child: child),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The filled rows of a section, then a live line to type on, then empty lines
+/// up to [minLines] so a quiet day still looks like a page. Tapping any empty
+/// line focuses the live one.
+class _Lines extends StatefulWidget {
+  const _Lines({
+    required this.rows,
+    required this.minLines,
+    required this.hint,
+    required this.onAdd,
+    this.canAdd = true,
+    this.numbered = false,
+  });
+
+  final List<Widget> rows;
+  final int minLines;
+  final String hint;
+  final Future<void> Function(String title) onAdd;
+  final bool canAdd;
+
+  /// Empty lines carry a number (goals) rather than an empty tick box.
+  final bool numbered;
+
+  @override
+  State<_Lines> createState() => _LinesState();
+}
+
+class _LinesState extends State<_Lines> {
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Widget _mark(int index) => widget.numbered
+      ? Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: _lineColor, width: 2),
+          ),
+          child: Text(
+            '${index + 1}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: NestColor.inkFaint,
+            ),
+          ),
+        )
+      : Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _lineColor, width: 1.8),
+          ),
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = widget.rows.length;
+    final used = filled + (widget.canAdd ? 1 : 0);
+    final blanks = widget.minLines > used ? widget.minLines - used : 0;
+    return Column(
+      children: [
+        ...widget.rows,
+        if (widget.canAdd)
+          _LineInput(
+            key: const ValueKey('line-input'),
+            focus: _focus,
+            hint: widget.hint,
+            onAdd: widget.onAdd,
+            mark: _mark(filled),
+          ),
+        for (var i = 0; i < blanks; i++)
+          GestureDetector(
+            key: ValueKey('blank-$i'),
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.canAdd ? _focus.requestFocus : null,
+            child: _RuledRow(
+              leading: _mark(used + i),
+              child: const SizedBox.shrink(),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The live line: type, press Enter, and the next task can follow at once.
+/// Text left in the line when focus moves away is added rather than lost.
+class _LineInput extends StatefulWidget {
+  const _LineInput({
+    super.key,
+    required this.focus,
+    required this.hint,
+    required this.onAdd,
+    required this.mark,
+  });
+
+  final FocusNode focus;
+  final String hint;
+  final Future<void> Function(String title) onAdd;
+  final Widget mark;
+
+  @override
+  State<_LineInput> createState() => _LineInputState();
+}
+
+class _LineInputState extends State<_LineInput> {
+  final _c = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focus.addListener(_onFocus);
+    _c.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    widget.focus.removeListener(_onFocus);
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (!widget.focus.hasFocus && _c.text.trim().isNotEmpty) {
+      _submit(keepFocus: false);
+    }
+  }
+
+  Future<void> _submit({bool keepFocus = true}) async {
+    final text = _c.text.trim();
+    if (text.isEmpty) return;
+    _c.clear();
+    await widget.onAdd(text);
+    if (keepFocus && mounted) widget.focus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return _RuledRow(
+      leading: widget.mark,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _c,
+              focusNode: widget.focus,
+              maxLength: 120,
+              buildCounter: (_,
+                      {required currentLength, required isFocused, maxLength}) =>
+                  null,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              onEditingComplete: _submit,
+              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                hintStyle: t.bodyMedium?.copyWith(color: NestColor.inkFaint),
+                isDense: true,
+                filled: false,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
-          ],
+            ),
+          ),
+          if (_c.text.trim().isNotEmpty)
+            IconButton(
+              tooltip: 'Add',
+              visualDensity: VisualDensity.compact,
+              onPressed: _submit,
+              icon: const Icon(Icons.arrow_upward_rounded,
+                  color: NestColor.pen),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _editGoal(
+    BuildContext context, NoteRepository repo, Goal g) async {
+  final result = await showDialog<(String, String)>(
+    context: context,
+    builder: (_) => _GoalDialog(initial: g.title),
+  );
+  if (result == null) return;
+  final (action, text) = result;
+  if (action == 'delete') {
+    await repo.deleteGoal(g);
+  } else if (action == 'save' && text.trim().isNotEmpty) {
+    await repo.updateGoal(g.copyWith(title: text.trim()));
+  }
+}
+
+/// The edit-goal dialog. It owns its controller: disposing one from the
+/// caller as soon as the dialog closes happens while the dialog is still
+/// animating out and its field is still being built.
+class _GoalDialog extends StatefulWidget {
+  const _GoalDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_GoalDialog> createState() => _GoalDialogState();
+}
+
+class _GoalDialogState extends State<_GoalDialog> {
+  late final _c = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: NestColor.card,
+      title: const Text('Edit goal'),
+      content: TextField(
+        controller: _c,
+        autofocus: true,
+        maxLength: 80,
+        textCapitalization: TextCapitalization.sentences,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, ('delete', _c.text)),
+          style: TextButton.styleFrom(foregroundColor: NestColor.redPen),
+          child: const Text('Delete'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, ('save', _c.text)),
+          child: const Text('Save'),
         ),
       ],
     );
   }
 }
 
-/// A titled white card holding task rows and, optionally, a quick-add field.
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.count,
-    required this.children,
-    this.emptyText,
-    this.quickAdd,
-    this.accent,
+/// A goal on its numbered line: tap the circle when it is reached, tap the
+/// line to rename or remove it.
+class _GoalRow extends StatelessWidget {
+  const _GoalRow({
+    super.key,
+    required this.goal,
+    required this.number,
+    required this.repo,
   });
 
-  final String title;
-  final int count;
-  final List<Widget> children;
-  final String? emptyText;
-  final Widget? quickAdd;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.tile),
-        boxShadow: NestShadow.resting,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Row(
-              children: [
-                Text(
-                  title,
-                  style: nestEyebrow.copyWith(color: accent),
-                ),
-                const SizedBox(width: 8),
-                if (count > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: accent == null
-                          ? NestColor.tintPen
-                          : NestColor.tintRed,
-                      borderRadius: BorderRadius.circular(NestRadius.pill),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: t.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: accent == null
-                            ? NestColor.penDeep
-                            : NestColor.redDeep,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (children.isEmpty && emptyText != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text(emptyText!, style: t.bodySmall),
-            )
-          else
-            ...children,
-          if (quickAdd != null) quickAdd!,
-        ],
-      ),
-    );
-  }
-}
-
-/// One line that adds a task on Enter and stays focused for the next one.
-class _QuickAdd extends StatefulWidget {
-  const _QuickAdd({required this.hint, required this.onAdd});
-
-  final String hint;
-  final Future<void> Function(String title) onAdd;
-
-  @override
-  State<_QuickAdd> createState() => _QuickAddState();
-}
-
-class _QuickAddState extends State<_QuickAdd> {
-  final _c = TextEditingController();
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final text = _c.text.trim();
-    if (text.isEmpty) return;
-    _c.clear();
-    await widget.onAdd(text);
-    if (mounted) _focus.requestFocus();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4),
-      child: TextField(
-        controller: _c,
-        focusNode: _focus,
-        maxLength: 120,
-        buildCounter: (_,
-                {required currentLength, required isFocused, maxLength}) =>
-            null,
-        textCapitalization: TextCapitalization.sentences,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _submit(),
-        decoration: InputDecoration(
-          hintText: widget.hint,
-          isDense: true,
-          prefixIcon: const Icon(Icons.add_rounded),
-          suffixIcon: IconButton(
-            tooltip: 'Add',
-            onPressed: _submit,
-            icon: const Icon(Icons.arrow_upward_rounded),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Up to seven goals, each ticked off when reached.
-class _GoalsCard extends StatefulWidget {
-  const _GoalsCard({required this.repo});
-
+  final Goal goal;
+  final int number;
   final NoteRepository repo;
 
   @override
-  State<_GoalsCard> createState() => _GoalsCardState();
-}
-
-class _GoalsCardState extends State<_GoalsCard> {
-  Future<void> _edit(Goal g) async {
-    final c = TextEditingController(text: g.title);
-    final action = await showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        backgroundColor: NestColor.card,
-        title: const Text('Edit goal'),
-        content: TextField(
-          controller: c,
-          autofocus: true,
-          maxLength: 80,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(d, 'delete'),
-            style: TextButton.styleFrom(foregroundColor: NestColor.redPen),
-            child: const Text('Delete'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(d, 'save'),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    final text = c.text;
-    c.dispose();
-    if (action == 'delete') {
-      await widget.repo.deleteGoal(g);
-    } else if (action == 'save' && text.trim().isNotEmpty) {
-      await widget.repo.updateGoal(g.copyWith(title: text.trim()));
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final goals = widget.repo.goals();
-    final open = goals.where((g) => !g.isDone).length;
     final t = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-      decoration: BoxDecoration(
-        color: NestColor.card,
-        borderRadius: BorderRadius.circular(NestRadius.tile),
-        boxShadow: NestShadow.resting,
+    return _RuledRow(
+      onTap: () => _editGoal(context, repo, goal),
+      leading: _TickCircle(
+        done: goal.isDone,
+        color: NestColor.pen,
+        label: '$number',
+        onTap: () {
+          HapticFeedback.selectionClick();
+          repo.setGoalDone(goal, !goal.isDone);
+        },
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Row(
-              children: [
-                const Text('MY TOP 7 GOALS', style: nestEyebrow),
-                const Spacer(),
-                Text('$open / $maxGoals', style: t.bodySmall),
-              ],
-            ),
-          ),
-          if (goals.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text(
-                'What matters most this term? Add up to seven.',
-                style: t.bodySmall,
-              ),
-            ),
-          for (var i = 0; i < goals.length; i++)
-            ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-              leading: _TickCircle(
-                done: goals[i].isDone,
-                color: NestColor.pen,
-                label: '${i + 1}',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  widget.repo.setGoalDone(goals[i], !goals[i].isDone);
-                },
-              ),
-              title: Text(
-                goals[i].title,
-                style: t.titleSmall?.copyWith(
-                  decoration:
-                      goals[i].isDone ? TextDecoration.lineThrough : null,
-                  color: goals[i].isDone ? NestColor.inkFaint : null,
-                ),
-              ),
-              onTap: () => _edit(goals[i]),
-            ),
-          if (open < maxGoals)
-            _QuickAdd(
-              hint: 'Add a goal',
-              onAdd: (title) async {
-                await widget.repo.addGoal(title);
-              },
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-              child: Text(
-                'Seven open goals. Finish one to add another.',
-                style: t.bodySmall,
-              ),
-            ),
-        ],
+      child: Text(
+        goal.title,
+        style: t.titleSmall?.copyWith(
+          decoration: goal.isDone ? TextDecoration.lineThrough : null,
+          color: goal.isDone ? NestColor.inkFaint : null,
+        ),
       ),
     );
   }
@@ -927,12 +1279,91 @@ class _TickCircle extends StatelessWidget {
   }
 }
 
+/// A square tick for the ruled planner lines: an outline until done, then
+/// green with a check. The outline takes the task's priority colour.
+class _TickBox extends StatelessWidget {
+  const _TickBox({required this.done, required this.color, required this.onTap});
+
+  final bool done;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      checked: done,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            color: done ? NestColor.mint : Colors.transparent,
+            border: Border.all(color: done ? NestColor.mint : color, width: 1.8),
+          ),
+          child: done
+              ? const Icon(Icons.check_rounded, size: 17, color: Colors.white)
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+/// Deletes a task and offers Undo.
+Future<void> _deleteWithUndo(BuildContext context, Task task) async {
+  final repo = NoteRepository.instance;
+  final messenger = ScaffoldMessenger.of(context);
+  await repo.deleteTask(task);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(SnackBar(
+    content: const Text('Task deleted'),
+    action: SnackBarAction(
+      label: 'Undo',
+      onPressed: () async {
+        final back = await repo.addTask(
+          title: task.title,
+          description: task.description,
+          dueAt: task.dueAt,
+          priority: task.priority,
+          subjectId: task.subjectId,
+          inProgress: task.inProgress,
+        );
+        if (task.isDone) await repo.setTaskDone(back, true);
+      },
+    ),
+  ));
+}
+
+/// Moves an open task to the day after the one it is on; an overdue one comes
+/// to today instead, since a day after a missed day is still missed.
+Future<void> _pushToNextDay(Task task) {
+  final now = DateTime.now();
+  final due = task.dueAt;
+  final DateTime to;
+  if (due == null || task.isOverdue()) {
+    to = DateTime(now.year, now.month, now.day, 23, 59);
+  } else {
+    to = DateTime(due.year, due.month, due.day + 1, due.hour, due.minute);
+  }
+  return NoteRepository.instance.updateTask(task.copyWith(dueAt: to));
+}
+
 /// One task row: tap the circle to complete, tap the row to edit, swipe right
 /// to complete or left to delete (with Undo).
+///
+/// [ruled] draws it as a line of the planner sheet — a square tick, a hairline
+/// underneath and a menu to push it a day — instead of the soft card used on
+/// the Today page.
 class TaskTile extends StatelessWidget {
-  const TaskTile({super.key, required this.task});
+  const TaskTile({super.key, required this.task, this.ruled = false});
 
   final Task task;
+  final bool ruled;
 
   @override
   Widget build(BuildContext context) {
@@ -978,12 +1409,38 @@ class TaskTile extends StatelessWidget {
         chip('High', NestColor.tintRed, NestColor.redDeep),
     ];
 
+    final gap = ruled ? 0.0 : 6.0;
+
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          task.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: t.titleSmall?.copyWith(
+            decoration: task.isDone ? TextDecoration.lineThrough : null,
+            color: task.isDone ? NestColor.inkFaint : null,
+          ),
+        ),
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 4, children: chips),
+        ],
+      ],
+    );
+
+    void toggle() {
+      HapticFeedback.selectionClick();
+      repo.setTaskDone(task, !task.isDone);
+    }
+
     return Dismissible(
       key: ValueKey('task-${task.id}'),
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
-        margin: const EdgeInsets.only(bottom: 6),
+        margin: EdgeInsets.only(bottom: gap),
         decoration: BoxDecoration(
           color: NestColor.tintMint,
           borderRadius: BorderRadius.circular(NestRadius.chip),
@@ -996,7 +1453,7 @@ class TaskTile extends StatelessWidget {
       secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 6),
+        margin: EdgeInsets.only(bottom: gap),
         decoration: BoxDecoration(
           color: NestColor.tintRed,
           borderRadius: BorderRadius.circular(NestRadius.chip),
@@ -1009,80 +1466,80 @@ class TaskTile extends StatelessWidget {
           await repo.setTaskDone(task, !task.isDone);
           return false;
         }
-        final messenger = ScaffoldMessenger.of(context);
-        await repo.deleteTask(task);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(SnackBar(
-          content: const Text('Task deleted'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              final back = await repo.addTask(
-                title: task.title,
-                description: task.description,
-                dueAt: task.dueAt,
-                priority: task.priority,
-                subjectId: task.subjectId,
-                inProgress: task.inProgress,
-              );
-              if (task.isDone) await repo.setTaskDone(back, true);
-            },
-          ),
-        ));
+        await _deleteWithUndo(context, task);
         return false;
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          color: NestColor.ground,
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(NestRadius.chip),
-          onTap: () => showTaskForm(context, existing: task),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: _TickCircle(
-                    done: task.isDone,
-                    color: ringColor,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      repo.setTaskDone(task, !task.isDone);
+      child: ruled
+          ? _RuledRow(
+              onTap: () => showTaskForm(context, existing: task),
+              leading: _TickBox(
+                done: task.isDone,
+                color: ringColor,
+                onTap: toggle,
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: title),
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    icon: const Icon(Icons.more_horiz_rounded,
+                        color: NestColor.inkFaint),
+                    padding: EdgeInsets.zero,
+                    onSelected: (v) {
+                      switch (v) {
+                        case 'push':
+                          _pushToNextDay(task);
+                        case 'edit':
+                          showTaskForm(context, existing: task);
+                        case 'delete':
+                          _deleteWithUndo(context, task);
+                      }
                     },
+                    itemBuilder: (_) => [
+                      if (!task.isDone)
+                        PopupMenuItem(
+                          value: 'push',
+                          child: Text(overdue || task.dueAt == null
+                              ? 'Move to today'
+                              : 'Push to next day'),
+                        ),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      const PopupMenuItem(
+                          value: 'delete', child: Text('Delete')),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+                ],
+              ),
+            )
+          : Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                color: NestColor.ground,
+                borderRadius: BorderRadius.circular(NestRadius.chip),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(NestRadius.chip),
+                onTap: () => showTaskForm(context, existing: task),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.titleSmall?.copyWith(
-                          decoration:
-                              task.isDone ? TextDecoration.lineThrough : null,
-                          color: task.isDone ? NestColor.inkFaint : null,
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: _TickCircle(
+                          done: task.isDone,
+                          color: ringColor,
+                          onTap: toggle,
                         ),
                       ),
-                      if (chips.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(spacing: 6, runSpacing: 4, children: chips),
-                      ],
+                      const SizedBox(width: 12),
+                      Expanded(child: title),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1379,7 +1836,10 @@ class _TaskFormState extends State<_TaskForm> {
 /// The Today dashboard section: overdue and today's open tasks, a quick add,
 /// and a way into the full list. Hidden detail stays on the tasks page.
 class TasksCard extends StatelessWidget {
-  const TasksCard({super.key});
+  const TasksCard({super.key, this.onSeeAll});
+
+  /// Switches to the To-do tab. Without it the page is pushed on its own.
+  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
@@ -1408,9 +1868,10 @@ class TasksCard extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const TasksPage()),
-                ),
+                onPressed: onSeeAll ??
+                    () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const TasksPage()),
+                        ),
                 child: const Text('See all'),
               ),
             ],

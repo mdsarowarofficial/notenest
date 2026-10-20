@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/account_sync.dart';
 import '../../data/classroom_service.dart';
@@ -21,6 +22,7 @@ import '../cover/cover_page.dart';
 import '../exam/exam_page.dart';
 import '../home/today_page.dart';
 import '../notes/notes_page.dart';
+import '../notifications/notifications_page.dart' show NoticeBell;
 import '../people/people_page.dart';
 import '../semester/semester_page.dart';
 import '../settings/settings_page.dart';
@@ -30,6 +32,7 @@ import '../capture/media_capture.dart';
 import '../notes/note_editor.dart';
 import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
+import '../tasks/tasks_page.dart';
 import '../trash/trash_page.dart';
 
 /// Holds the drawer, the navigation bar and the four destinations.
@@ -38,6 +41,13 @@ import '../trash/trash_page.dart';
 /// in the app redraws the drawer and the pages without being told.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
+
+  /// Asks the shell to show a tab (-1 when nothing is asked), so a page pushed
+  /// on top of it can send the person back to a tab, bar and all.
+  static final _tabRequest = ValueNotifier<int>(-1);
+
+  /// Switches to the To-do tab once the shell is back on top.
+  static void openTodo() => _tabRequest.value = _HomeShellState._todoTab;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -48,20 +58,38 @@ class _HomeShellState extends State<HomeShell> {
 
   int _tab = 0;
   String _drawerSelection = '';
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _drawerOpen = false;
 
   /// Handles the first-run tour points at.
   final _tabKeys = List.generate(4, (_) => GlobalKey());
   final _captureKey = GlobalKey();
+  final _todoKey = GlobalKey();
   final _menuKey = GlobalKey();
   final _searchKey = GlobalKey();
   final _avatarKey = GlobalKey();
+
   /// App-wide, not per screen: a tour already on screen must not be joined by
   /// a second one from another copy of this page.
   static bool _touring = false;
 
+  void _onTabRequest() {
+    final i = HomeShell._tabRequest.value;
+    if (i < 0) return;
+    HomeShell._tabRequest.value = -1;
+    if (mounted) setState(() => _tab = i);
+  }
+
+  @override
+  void dispose() {
+    HomeShell._tabRequest.removeListener(_onTabRequest);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    HomeShell._tabRequest.addListener(_onTabRequest);
     // After the first frame, so nothing here delays the notebook appearing.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       syncAccountOnOpen();
@@ -69,6 +97,18 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   bool get _teacher => _repo.isTeacher;
+
+  /// Tab positions. The bar holds four of them; To-do is a fifth page with no
+  /// place on the bar, opened from the floating To-do button, so the bar never
+  /// disappears behind it.
+  /// A student's People (with Classes) or a teacher's Classes.
+  static const _peopleTab = 2;
+  static const _examTab = 3;
+  static const _todoTab = 4;
+
+  /// On these tabs the page brings its own floating button (new chat, new
+  /// group), so the To-do button steps aside rather than sit on top of it.
+  bool get _tabHasOwnButton => _teacher ? _tab == 3 : _tab == 2;
 
   /// A teacher's four: no Exam countdown (that is a student's question), and
   /// Classes gets a tab of its own because it is most of what they do here.
@@ -157,6 +197,14 @@ class _HomeShellState extends State<HomeShell> {
           body: 'Your own notes, lecture plans and PDFs, filed by course.',
         ),
         TourStep(
+          target: _todoKey,
+          title: 'To-do',
+          icon: Icons.checklist_rtl_rounded,
+          body: 'Your planner: a page for every day with goals, today\'s and '
+              'tomorrow\'s tasks, loose thoughts and a star rating. This '
+              'button is on most screens.',
+        ),
+        TourStep(
           target: _tabKeys[3],
           title: 'People',
           icon: Icons.people_rounded,
@@ -207,6 +255,14 @@ class _HomeShellState extends State<HomeShell> {
         icon: Icons.auto_stories_rounded,
         body: 'Everything you have written, by subject. Mark notes as read, '
             'review or mastered to track your revision.',
+      ),
+      TourStep(
+        target: _todoKey,
+        title: 'To-do',
+        icon: Icons.checklist_rtl_rounded,
+        body: 'Your planner: a page for every day with goals, today\'s and '
+            'tomorrow\'s tasks, loose thoughts and a star rating. This '
+            'button is on most screens.',
       ),
       TourStep(
         target: _tabKeys[2],
@@ -283,7 +339,7 @@ class _HomeShellState extends State<HomeShell> {
     }
     final cloud = CloudService.instance;
     if (!cloud.isSignedIn) {
-      setState(() => _tab = 2);
+      setState(() => _tab = _peopleTab);
       _toast('Connect a cloud account to post to a class');
       return;
     }
@@ -297,7 +353,7 @@ class _HomeShellState extends State<HomeShell> {
     }
     if (!mounted) return;
     if (mine.isEmpty) {
-      setState(() => _tab = 2);
+      setState(() => _tab = _peopleTab);
       _toast('Make a class first, then post to it');
       return;
     }
@@ -480,8 +536,125 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// The floating To-do button: a small yellow pill at the right, above the
+  /// bar, that pops in and out. Yellow is the app's "do this next" colour. It
+  /// carries a count of what is overdue or due today.
+  Widget _todoButton() {
+    return Builder(builder: (context) {
+      final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+      final show = _tab != _todoTab && !_tabHasOwnButton && !typing;
+      final due = _repo.overdueTasks.length + _repo.tasksDueToday.length;
+      final t = Theme.of(context).textTheme;
+      // The button slot hands its child tight constraints; Align lets the pill
+      // be just as big as its contents instead of filling the slot.
+      return Align(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: IgnorePointer(
+          ignoring: !show,
+          child: AnimatedScale(
+            scale: show ? 1 : 0,
+            alignment: Alignment.bottomRight,
+            duration: const Duration(milliseconds: 260),
+            curve: show ? Curves.easeOutBack : Curves.easeIn,
+            child: AnimatedOpacity(
+              opacity: show ? 1 : 0,
+              duration: const Duration(milliseconds: 160),
+              child: Semantics(
+                key: _todoKey,
+                button: true,
+                label: due > 0 ? 'To-do, $due due' : 'To-do',
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(NestRadius.pill),
+                    boxShadow: NestShadow.lifted,
+                  ),
+                  child: Material(
+                    color: NestColor.highlight,
+                    borderRadius: BorderRadius.circular(NestRadius.pill),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(NestRadius.pill),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _tab = _todoTab);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 18, 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.checklist_rounded,
+                                size: 22, color: NestColor.ink),
+                            const SizedBox(width: 8),
+                            Text(
+                              'To-do',
+                              style: t.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            if (due > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                constraints: const BoxConstraints(
+                                    minWidth: 20, minHeight: 20),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                // No `alignment` here: a Container with one
+                                // fills all the height it is offered, which
+                                // stretched the whole pill to the screen.
+                                decoration: BoxDecoration(
+                                  color: NestColor.redPen,
+                                  borderRadius:
+                                      BorderRadius.circular(NestRadius.pill),
+                                ),
+                                child: Text(
+                                  '$due',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
   Widget _scaffold(BuildContext context) {
+    // Back closes the drawer first, then returns to Today, and only then
+    // leaves the app. Without this, Android 16's predictive back sent a Back
+    // pressed with the drawer open straight out of the app.
+    return PopScope(
+      canPop: !_drawerOpen && _tab == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_drawerOpen) {
+          _scaffoldKey.currentState?.closeDrawer();
+        } else {
+          setState(() => _tab = 0);
+        }
+      },
+      child: _shellScaffold(context),
+    );
+  }
+
+  Widget _shellScaffold(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      onDrawerChanged: (open) => setState(() => _drawerOpen = open),
       extendBody: true,
       drawer: NestDrawer(
         userName: _repo.userName,
@@ -578,6 +751,7 @@ class _HomeShellState extends State<HomeShell> {
             icon: const Icon(Icons.search_rounded),
             tooltip: 'Search notes',
           ),
+          const NoticeBell(),
           const SizedBox(width: 6),
         ],
       ),
@@ -588,8 +762,9 @@ class _HomeShellState extends State<HomeShell> {
             avatarKey: _avatarKey,
             onOpenNotes: () => setState(() => _tab = 1),
             onCapture: _teacher ? _openTeacherCapture : _openCapture,
-            onOpenExams: () => setState(() => _tab = 3),
-            onOpenClasses: () => setState(() => _tab = 2),
+            onOpenExams: () => setState(() => _tab = _examTab),
+            onOpenClasses: () => setState(() => _tab = _peopleTab),
+            onOpenTasks: () => setState(() => _tab = _todoTab),
             onOpenCourse: (code) => setState(() {
               _drawerSelection = code;
               _tab = 1;
@@ -610,15 +785,30 @@ class _HomeShellState extends State<HomeShell> {
             PeoplePage(showClasses: true),
             ExamPage(),
           ],
+          // The fifth page: no place on the bar, reached from the floating
+          // button.
+          TasksPage(
+            embedded: true,
+            onBack: () => setState(() => _tab = 0),
+          ),
         ],
       ),
-      bottomNavigationBar: NestNavBar(
-        items: _teacher ? _teacherItems : _items,
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        onCapture: _teacher ? _openTeacherCapture : _openCapture,
-        itemKeys: _tabKeys,
-        captureKey: _captureKey,
+      floatingActionButton: _todoButton(),
+      // The planner is typed into line by line; with the keyboard up the bar
+      // would take a fifth of what is left, so it steps aside there.
+      bottomNavigationBar: Builder(
+        builder: (barContext) =>
+            _tab == _todoTab && MediaQuery.viewInsetsOf(barContext).bottom > 0
+                ? const SizedBox.shrink()
+                : NestNavBar(
+                    items: _teacher ? _teacherItems : _items,
+                    // None of the four while the To-do page is up.
+                    currentIndex: _tab == _todoTab ? -1 : _tab,
+                    onTap: (i) => setState(() => _tab = i),
+                    onCapture: _teacher ? _openTeacherCapture : _openCapture,
+                    itemKeys: _tabKeys,
+                    captureKey: _captureKey,
+                  ),
       ),
     );
   }

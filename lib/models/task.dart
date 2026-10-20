@@ -136,6 +136,30 @@ class Task {
   }
 }
 
+/// How many days in a row, ending today, had tasks and every one done.
+///
+/// Today still being in progress does not break the run: if today is not yet
+/// clear, counting starts from yesterday. A day with no tasks breaks it.
+int doneStreak(Iterable<Task> tasks, DateTime today) {
+  final open = <int, bool>{}; // day -> has an open task
+  int key(DateTime d) => d.year * 10000 + d.month * 100 + d.day;
+  for (final t in tasks) {
+    final d = t.dueAt;
+    if (d == null) continue;
+    open[key(d)] = (open[key(d)] ?? false) || !t.isDone;
+  }
+  bool clear(DateTime d) => open[key(d)] == false;
+
+  var day = DateTime(today.year, today.month, today.day);
+  if (!clear(day)) day = DateTime(day.year, day.month, day.day - 1);
+  var n = 0;
+  while (clear(day) && n < 400) {
+    n++;
+    day = DateTime(day.year, day.month, day.day - 1);
+  }
+  return n;
+}
+
 /// Open tasks first (overdue, then by due time, undated last), then done ones,
 /// most recently finished first. Higher priority breaks ties.
 int compareTasks(Task a, Task b) {

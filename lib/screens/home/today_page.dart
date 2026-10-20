@@ -19,7 +19,6 @@ import '../subjects/subject_form.dart';
 import '../tasks/tasks_page.dart';
 import '../courses/course_page.dart';
 import '../courses/courses_page.dart';
-import '../notifications/notifications_page.dart';
 
 /// The landing screen.
 ///
@@ -37,6 +36,7 @@ class TodayPage extends StatelessWidget {
     required this.onCapture,
     required this.onOpenExams,
     this.onOpenClasses,
+    this.onOpenTasks,
     this.onOpenCourse,
     this.avatarKey,
   });
@@ -45,6 +45,9 @@ class TodayPage extends StatelessWidget {
   final VoidCallback onCapture;
   final VoidCallback onOpenExams;
   final VoidCallback? onOpenClasses;
+
+  /// Switches to the To-do tab, so "See all" keeps the navigation bar.
+  final VoidCallback? onOpenTasks;
 
   /// Opens Notes filtered to one course (by code). The shell owns the active
   /// course, so the cards set the same value the drawer and chips do.
@@ -67,6 +70,7 @@ class TodayPage extends StatelessWidget {
             greeting: _Greeting(name: repo.userName, avatarKey: avatarKey),
             onPost: onCapture,
             onOpenClasses: onOpenClasses,
+            onOpenTasks: onOpenTasks,
           );
         }
 
@@ -97,7 +101,7 @@ class TodayPage extends StatelessWidget {
               _CourseCards(onOpen: onOpenCourse!),
               const SizedBox(height: 14),
             ],
-            const TasksCard(),
+            TasksCard(onSeeAll: onOpenTasks),
             const SizedBox(height: 14),
 
             if (!repo.hasSubjects)
@@ -229,8 +233,8 @@ class _Greeting extends StatelessWidget {
             ],
           ),
         ),
-        const NoticeBell(),
-        const SizedBox(width: 12),
+        // The bell lives in the app bar, beside search, so it is one tap from
+        // every tab and not only from this screen.
         Semantics(
           key: avatarKey,
           button: true,
@@ -697,11 +701,13 @@ class _TeacherToday extends StatelessWidget {
     required this.greeting,
     required this.onPost,
     this.onOpenClasses,
+    this.onOpenTasks,
   });
 
   final Widget greeting;
   final VoidCallback onPost;
   final VoidCallback? onOpenClasses;
+  final VoidCallback? onOpenTasks;
 
   @override
   Widget build(BuildContext context) {
@@ -713,7 +719,7 @@ class _TeacherToday extends StatelessWidget {
       children: [
         greeting,
         const SizedBox(height: 20),
-        const TasksCard(),
+        TasksCard(onSeeAll: onOpenTasks),
         const SizedBox(height: 14),
         Row(
           children: [

@@ -11,7 +11,7 @@ import '../../theme/nest_theme.dart';
 import '../chat/message_request.dart';
 import '../exam/exam_page.dart';
 import '../shared/shared_page.dart';
-import '../tasks/tasks_page.dart';
+import '../shell/home_shell.dart';
 
 /// Everything that needs the person's attention, worked out from what exists
 /// right now. Nothing here is a copy that could go stale.
@@ -136,6 +136,12 @@ class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
 
   void _open(BuildContext context, AppNotice n) {
+    // Tasks live in a tab of the home shell, so go there and keep the bar.
+    if (n.kind == NoticeKind.taskOverdue || n.kind == NoticeKind.taskToday) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      HomeShell.openTodo();
+      return;
+    }
     final Widget page;
     switch (n.kind) {
       case NoticeKind.request:
@@ -147,7 +153,7 @@ class NotificationsPage extends StatelessWidget {
           body: const SharedPage(),
         );
       case NoticeKind.taskOverdue || NoticeKind.taskToday:
-        page = const TasksPage();
+        return; // handled above
       case NoticeKind.exam:
         page = const ExamPage();
     }
