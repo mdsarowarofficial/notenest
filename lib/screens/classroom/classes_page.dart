@@ -9,6 +9,7 @@ import '../../widgets/nest_empty_state.dart';
 import '../cloud/cloud_page.dart';
 import '../groups/groups_page.dart' show showJoinGroupSheet;
 import 'classroom_page.dart';
+import '../../l10n/strings.dart';
 
 /// Every class this account teaches or sits in.
 ///
@@ -64,7 +65,7 @@ class _ClassesPageState extends State<ClassesPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        teacher ? 'Your classes' : 'Classes',
+                        teacher ? tr('Your classes') : tr('Classes'),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ),
@@ -72,13 +73,13 @@ class _ClassesPageState extends State<ClassesPage> {
                       FilledButton.icon(
                         onPressed: () => showCreateClassSheet(context),
                         icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('New class'),
+                        label: Text(tr('New class')),
                       )
                     else
                       FilledButton.icon(
                         onPressed: () => showJoinGroupSheet(context, asClass: true),
                         icon: const Icon(Icons.login_rounded, size: 18),
-                        label: const Text('Join a class'),
+                        label: Text(tr('Join a class')),
                       ),
                   ],
                 ),
@@ -86,8 +87,8 @@ class _ClassesPageState extends State<ClassesPage> {
                 if (snap.hasError)
                   NestEmptyState(
                     icon: Icons.error_outline_rounded,
-                    title: 'Could not load your classes',
-                    message: '${snap.error}',
+                    title: tr('Could not load your classes'),
+                    message: trp('{0}', [snap.error]),
                   )
                 else if (waiting)
                   const Padding(
@@ -97,16 +98,16 @@ class _ClassesPageState extends State<ClassesPage> {
                 else if (classes.isEmpty)
                   NestEmptyState(
                     icon: Icons.co_present_rounded,
-                    title: teacher ? 'No classes yet' : 'Not in a class yet',
+                    title: teacher ? tr('No classes yet') : tr('Not in a class yet'),
                     message: teacher
-                        ? 'Make a class, then give your students its six-letter '
+                        ? tr('Make a class, then give your students its six-letter '
                             'code. You can post slides and PDFs, set '
                             'assignments with a deadline, and grade what comes '
-                            'back.'
-                        : 'Ask your teacher for the class code and join. '
+                            'back.')
+                        : tr('Ask your teacher for the class code and join. '
                             'Slides, PDFs and assignments appear here, and you '
-                            'hand your work in from the same place.',
-                    actionLabel: teacher ? 'New class' : 'Join a class',
+                            'hand your work in from the same place.'),
+                    actionLabel: teacher ? tr('New class') : tr('Join a class'),
                     onAction: teacher
                         ? () => showCreateClassSheet(context)
                         : () => showJoinGroupSheet(context, asClass: true),
@@ -208,8 +209,7 @@ class _ClassCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         teaching
-                            ? 'You teach · ${group.memberCount - 1} '
-                                '${group.memberCount - 1 == 1 ? 'student' : 'students'}'
+                            ? trp('You teach · {0} {1}', [group.memberCount - 1, group.memberCount - 1 == 1 ? tr('student') : tr('students')])
                             : group.ownerName.isEmpty
                                 ? group.memberLabel
                                 : group.ownerName,
@@ -226,10 +226,10 @@ class _ClassCard extends StatelessWidget {
                         ),
                         child: Text(
                           prettyJoinCode(group.joinCode),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 1,
+                            letterSpacing: ls(1),
                           ),
                         ),
                       ),
@@ -254,11 +254,11 @@ class _NeedsCloud extends StatelessWidget {
       children: [
         NestEmptyState(
           icon: Icons.cloud_queue_rounded,
-          title: 'Connect a cloud account first',
-          message: 'A class lives somewhere the teacher\'s phone and every '
+          title: tr('Connect a cloud account first'),
+          message: tr('A class lives somewhere the teacher\'s phone and every '
               'student\'s phone can see, so it needs an account. Your notes '
-              'on this phone keep working either way.',
-          actionLabel: 'Cloud account',
+              'on this phone keep working either way.'),
+          actionLabel: tr('Cloud account'),
           onAction: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const CloudPage()),
           ),
@@ -343,15 +343,15 @@ class _CreateClassSheetState extends State<_CreateClassSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('New class', style: Theme.of(context).textTheme.headlineSmall),
+          Text(tr('New class'), style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
           TextField(
             controller: _name,
             autofocus: true,
             maxLength: maxGroupName,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Class name',
+            decoration: InputDecoration(
+              labelText: tr('Class name'),
               hintText: 'Data Structures — Section B',
               counterText: '',
             ),
@@ -361,15 +361,15 @@ class _CreateClassSheetState extends State<_CreateClassSheet> {
             controller: _course,
             maxLength: maxGroupSubject,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
-              labelText: 'Course code (optional)',
+            decoration: InputDecoration(
+              labelText: tr('Course code (optional)'),
               hintText: 'CSE 211',
               counterText: '',
             ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(_error!, style: const TextStyle(color: NestColor.redPen)),
+            Text(_error!, style: TextStyle(color: NestColor.redPen)),
           ],
           const SizedBox(height: 18),
           SizedBox(
@@ -383,12 +383,12 @@ class _CreateClassSheetState extends State<_CreateClassSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Make the class'),
+                  : Text(tr('Make the class')),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Students join with the class code shown on the next screen.',
+            tr('Students join with the class code shown on the next screen.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

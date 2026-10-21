@@ -7,6 +7,7 @@ import '../classroom/classes_page.dart';
 import '../groups/groups_page.dart';
 import '../share/request_note_sheet.dart';
 import '../shared/shared_page.dart';
+import '../../l10n/strings.dart';
 
 /// Everything to do with other people, in one place.
 ///
@@ -171,7 +172,7 @@ class _Actions extends StatelessWidget {
           0 => [
               _Action(
                 icon: Icons.person_add_alt_1_rounded,
-                label: 'Message someone',
+                label: tr('Message someone'),
                 onTap: () => showFindPersonSheet(context),
                 primary: true,
               ),
@@ -179,12 +180,12 @@ class _Actions extends StatelessWidget {
           1 => [
               _Action(
                 icon: Icons.login_rounded,
-                label: 'Join',
+                label: tr('Join'),
                 onTap: () => showJoinGroupSheet(context),
               ),
               _Action(
                 icon: Icons.add_rounded,
-                label: 'Make one',
+                label: tr('Make one'),
                 onTap: () => showCreateGroupSheet(context),
                 primary: true,
               ),
@@ -192,7 +193,7 @@ class _Actions extends StatelessWidget {
           _ => [
               _Action(
                 icon: Icons.pending_actions_rounded,
-                label: 'Ask for a note',
+                label: tr('Ask for a note'),
                 onTap: () => showRequestNoteSheet(context),
                 primary: true,
               ),

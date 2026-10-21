@@ -835,6 +835,27 @@ service cloud.firestore {
     // owner can read it, so nobody can find out who has blocked them. The
     // rules above read it with get(), which is not limited by this.
 
+    // ------------------------------------------------------- pushTokens
+    //
+    // The addresses of this person's phones, which the Cloud Function reads to
+    // send a notification. Kept apart from the profile on purpose: a profile
+    // can be read by anyone signed in, and a push token is a way to message a
+    // phone. Only its owner can read or write it; the function uses the Admin
+    // SDK and is not subject to these rules.
+
+    match /pushTokens/{userId} {
+      allow read: if isSelf(userId);
+
+      allow create, update: if isSelf(userId)
+        && incoming().keys().hasOnly(['tokens', 'updatedAt'])
+        && incoming().tokens is list
+        // One person, a handful of phones. Capped so the document cannot grow.
+        && incoming().tokens.size() <= 5
+        && incoming().updatedAt is int;
+
+      allow delete: if isSelf(userId);
+    }
+
     match /blocks/{userId} {
       allow read: if isSelf(userId);
 

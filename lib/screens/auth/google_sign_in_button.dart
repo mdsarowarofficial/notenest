@@ -9,6 +9,7 @@ import '../../data/note_repository.dart';
 // CloudProfile holding the role arrives through CloudService.
 import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// The Google button, and the one piece of work behind it.
 ///
@@ -47,18 +48,18 @@ Future<GoogleResult> continueWithGoogle() async {
   final cloud = CloudService.instance;
 
   if (!GoogleAccounts.instance.isSupported) {
-    return const GoogleResult(
+    return GoogleResult(
       GoogleOutcome.failed,
-      'Signing in with Google needs the NoteNest app. In a browser, use your '
-      'email and password.',
+      tr('Signing in with Google needs the NoteNest app. In a browser, use your '
+      'email and password.'),
     );
   }
   if (!await cloud.waitUntilReady()) {
     return GoogleResult(
       GoogleOutcome.failed,
       cloud.startupError ??
-          'The cloud is not available right now, so Google sign-in cannot be '
-              'checked. Everything stored on this device still works.',
+          tr('The cloud is not available right now, so Google sign-in cannot be '
+              'checked. Everything stored on this device still works.'),
     );
   }
 
@@ -72,10 +73,10 @@ Future<GoogleResult> continueWithGoogle() async {
 
   final profile = cloud.profile;
   if (profile == null) {
-    return const GoogleResult(
+    return GoogleResult(
       GoogleOutcome.failed,
-      'Signed in with Google, but your NoteNest profile could not be read. '
-      'Check your connection and try again.',
+      tr('Signed in with Google, but your NoteNest profile could not be read. '
+      'Check your connection and try again.'),
     );
   }
 
@@ -105,9 +106,9 @@ Future<GoogleResult> continueWithGoogle() async {
 /// maintainer says so in flutter/flutter#171761. A student who changed their
 /// mind can ignore this line. A build with the wrong fingerprint would
 /// otherwise look like a button that does nothing at all, for ever.
-const String googleCancelledNotice =
-    'Google sign-in closed. If you did not close it yourself, this build of '
-    'the app may not be registered in Firebase yet.';
+String get googleCancelledNotice =>
+    tr('Google sign-in closed. If you did not close it yourself, this build of '
+    'the app may not be registered in Firebase yet.');
 
 /// "Continue with Google", drawn as a sunken tile rather than a filled button.
 ///
@@ -137,12 +138,12 @@ class GoogleSignInButton extends StatelessWidget {
 
     return Column(
       children: [
-        const Row(
+        Row(
           children: [
             Expanded(child: Divider(color: NestColor.rule, height: 1)),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('OR', style: nestEyebrow),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(tr('OR'), style: nestEyebrow),
             ),
             Expanded(child: Divider(color: NestColor.rule, height: 1)),
           ],
@@ -160,7 +161,7 @@ class GoogleSignInButton extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 child: Center(
                   child: Text(
-                    busy ? 'Asking Google...' : 'Continue with Google',
+                    busy ? tr('Asking Google...') : tr('Continue with Google'),
                     style: TextStyle(
                       fontFamily: NestFont.display,
                       fontSize: 14.5,

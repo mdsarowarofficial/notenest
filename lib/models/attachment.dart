@@ -1,3 +1,4 @@
+import '../l10n/strings.dart';
 /// What kind of file is attached to a note.
 enum AttachmentType { image, pdf, audio }
 
@@ -7,11 +8,11 @@ extension AttachmentTypeData on AttachmentType {
   String get label {
     switch (this) {
       case AttachmentType.image:
-        return 'Photo';
+        return tr('Photo');
       case AttachmentType.pdf:
         return 'PDF';
       case AttachmentType.audio:
-        return 'Recording';
+        return tr('Recording');
     }
   }
 

@@ -11,6 +11,8 @@ import '../../widgets/nest_query_bar.dart';
 import '../../widgets/nest_tags.dart';
 import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
+import '../../l10n/strings.dart';
+import '../../models/note_markup.dart';
 
 /// Search the whole notebook. Requirement 6.1.
 ///
@@ -79,6 +81,9 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
+  /// For results found through a PDF: where in it.
+  Map<int, String> _pdfHits = const {};
+
   Future<void> _run() async {
     final mine = ++_seq;
     if (!_asking) {
@@ -91,9 +96,14 @@ class _SearchPageState extends State<SearchPage> {
 
     setState(() => _running = true);
     final found = await _repo.searchNotes(_query);
+    final pdf = await _repo.pdfSnippets(
+      [for (final n in found) n.id!],
+      _query.terms,
+    );
     if (!mounted || mine != _seq) return;
     setState(() {
       _results = found;
+      _pdfHits = pdf;
       _running = false;
     });
   }
@@ -127,20 +137,20 @@ class _SearchPageState extends State<SearchPage> {
             focusNode: _focus,
             textInputAction: TextInputAction.search,
             autocorrect: false,
-            style: const TextStyle(fontSize: 16, color: NestColor.ink),
+            style: TextStyle(fontSize: 16, color: NestColor.ink),
             onChanged: (v) => _update(_query.copyWith(text: v)),
             onSubmitted: (v) {
               _repo.rememberSearch(v);
               _update(_query.copyWith(text: v), immediate: true);
             },
             decoration: InputDecoration(
-              hintText: 'Search titles, notes and tags',
+              hintText: tr('Search titles, notes and tags'),
               border: InputBorder.none,
               isDense: true,
               suffixIcon: _input.text.isEmpty
                   ? null
                   : IconButton(
-                      tooltip: 'Clear',
+                      tooltip: tr('Clear'),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       onPressed: () {
                         _input.clear();
@@ -183,12 +193,11 @@ class _SearchPageState extends State<SearchPage> {
       }
       return NestEmptyState(
         icon: Icons.search_off_rounded,
-        title: 'Nothing found',
+        title: tr('Nothing found'),
         message: _query.hasText
-            ? 'No note matches “${_query.text.trim()}”. Try a single word, or '
-                'clear the filters.'
-            : 'No note matches these filters yet.',
-        actionLabel: _query.activeFilters > 0 ? 'Clear filters' : null,
+            ? trp('No note matches “{0}”. Try a single word, or clear the filters.', [_query.text.trim()])
+            : tr('No note matches these filters yet.'),
+        actionLabel: _query.activeFilters > 0 ? tr('Clear filters') : null,
         onAction: _query.activeFilters > 0
             ? () => _update(_query.withoutFilters(), immediate: true)
             : null,
@@ -201,8 +210,7 @@ class _SearchPageState extends State<SearchPage> {
         Row(
           children: [
             Text(
-              '${_results.length} '
-              '${_results.length == 1 ? 'RESULT' : 'RESULTS'}',
+              trp('{0} {1}', [num_(_results.length), tr(_results.length == 1 ? tr('RESULT') : tr('RESULTS'))]),
               style: nestEyebrow.copyWith(color: NestColor.pen),
             ),
             const SizedBox(width: 8),
@@ -211,7 +219,12 @@ class _SearchPageState extends State<SearchPage> {
         ),
         const SizedBox(height: 4),
         for (final note in _results)
-          _ResultTile(note: note, terms: _query.terms, onTap: () => _open(note)),
+          _ResultTile(
+            note: note,
+            terms: _query.terms,
+            pdfSnippet: _pdfHits[note.id],
+            onTap: () => _open(note),
+          ),
       ],
     );
   }
@@ -223,17 +236,21 @@ class _ResultTile extends StatelessWidget {
     required this.note,
     required this.terms,
     required this.onTap,
+    this.pdfSnippet,
   });
 
   final Note note;
   final List<String> terms;
+
+  /// Set when the match is inside an attached PDF rather than the note itself.
+  final String? pdfSnippet;
   final VoidCallback onTap;
 
   /// The piece of the body the match was found in, so the student can see why
   /// the note came back without opening it.
   String? get _snippet {
-    if (terms.isEmpty || note.body.trim().isEmpty) return null;
-    final body = note.body.replaceAll('\n', ' ');
+    if (terms.isEmpty || note.body.trim().isEmpty) return pdfSnippet;
+    final body = plainText(note.body).replaceAll('\n', ' ');
     final lower = body.toLowerCase();
 
     for (final term in terms) {
@@ -244,7 +261,7 @@ class _ResultTile extends StatelessWidget {
       final cut = body.substring(from, to).trim();
       return '${from > 0 ? '… ' : ''}$cut${to < body.length ? ' …' : ''}';
     }
-    return null;
+    return pdfSnippet;
   }
 
   @override
@@ -254,7 +271,12 @@ class _ResultTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        NoteTile(note: note, onTap: onTap, showRule: snippet == null),
+        NoteTile(
+          note: note,
+          onTap: onTap,
+          showRule: snippet == null,
+          highlight: terms,
+        ),
         if (snippet != null)
           Padding(
             padding: const EdgeInsets.only(left: 19, bottom: 12),
@@ -266,19 +288,22 @@ class _ResultTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: NestColor.o(NestColor.highlight, 0.22),
                     borderRadius: BorderRadius.circular(NestRadius.chip),
-                    border: const Border(
+                    border: Border(
                       left: BorderSide(color: NestColor.highlight, width: 3),
                     ),
                   ),
-                  child: Text(
-                    snippet,
+                  child: Text.rich(
+                    highlightedText(
+                      snippet,
+                      terms,
+                      TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: NestColor.inkSoft,
+                      ),
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      height: 1.4,
-                      color: NestColor.inkSoft,
-                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -308,11 +333,11 @@ class _Browse extends StatelessWidget {
     final subjects = repo.subjects();
 
     if (!repo.hasNotes) {
-      return const NestEmptyState(
+      return NestEmptyState(
         icon: Icons.search_rounded,
-        title: 'Nothing to search',
-        message: 'Write a note first and it will be findable by its title, '
-            'its text or any tag you give it.',
+        title: tr('Nothing to search'),
+        message: tr('Write a note first and it will be findable by its title, '
+            'its text or any tag you give it.'),
       );
     }
 
@@ -322,7 +347,7 @@ class _Browse extends StatelessWidget {
         if (recent.isNotEmpty) ...[
           Row(
             children: [
-              const Text('RECENT SEARCHES', style: nestEyebrow),
+              Text(tr('RECENT SEARCHES'), style: nestEyebrow),
               const Spacer(),
               TextButton(
                 onPressed: repo.clearRecentSearches,
@@ -331,7 +356,7 @@ class _Browse extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Clear', style: TextStyle(fontSize: 12.5)),
+                child: Text(tr('Clear'), style: const TextStyle(fontSize: 12.5)),
               ),
             ],
           ),
@@ -343,7 +368,7 @@ class _Browse extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 child: Row(
                   children: [
-                    const Icon(Icons.history_rounded,
+                    Icon(Icons.history_rounded,
                         size: 17, color: NestColor.inkFaint),
                     const SizedBox(width: 12),
                     Expanded(
@@ -351,13 +376,13 @@ class _Browse extends StatelessWidget {
                         text,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           color: NestColor.ink,
                         ),
                       ),
                     ),
-                    const Icon(Icons.north_west_rounded,
+                    Icon(Icons.north_west_rounded,
                         size: 15, color: NestColor.inkFaint),
                   ],
                 ),
@@ -366,7 +391,7 @@ class _Browse extends StatelessWidget {
           const SizedBox(height: 18),
         ],
         if (tags.isNotEmpty) ...[
-          const Text('TAGS', style: nestEyebrow),
+          Text(tr('TAGS'), style: nestEyebrow),
           const SizedBox(height: 10),
           NestTagChips(
             tags: tags,
@@ -378,7 +403,7 @@ class _Browse extends StatelessWidget {
           const SizedBox(height: 22),
         ],
         if (subjects.isNotEmpty) ...[
-          const Text('SUBJECTS', style: nestEyebrow),
+          Text(tr('SUBJECTS'), style: nestEyebrow),
           const SizedBox(height: 8),
           for (final s in subjects)
             InkWell(
@@ -407,9 +432,9 @@ class _Browse extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
-                    Text('${s.noteCount}', style: nestEyebrow),
+                    Text(trp('{0}', [s.noteCount]), style: nestEyebrow),
                     const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right_rounded,
+                    Icon(Icons.chevron_right_rounded,
                         size: 18, color: NestColor.inkFaint),
                   ],
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../models/subject.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Add or edit a subject.
 ///
@@ -64,11 +65,11 @@ class _SubjectFormState extends State<_SubjectForm> {
     final code = _code.text.trim();
 
     setState(() {
-      _nameError = name.isEmpty ? 'Give the subject a name' : null;
+      _nameError = name.isEmpty ? tr('Give the subject a name') : null;
       _codeError = code.isEmpty
-          ? 'A short code keeps lists readable'
+          ? tr('A short code keeps lists readable')
           : _repo.codeExists(code, ignoreId: widget.existing?.id)
-              ? 'You already have a subject with this code'
+              ? tr('You already have a subject with this code')
               : null;
     });
     if (_nameError != null || _codeError != null) return;
@@ -113,11 +114,11 @@ class _SubjectFormState extends State<_SubjectForm> {
             ),
             const SizedBox(height: 20),
             Text(
-              editing ? 'Edit subject' : 'New subject',
+              editing ? tr('Edit subject') : tr('New subject'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
-            const Text('SUBJECT NAME', style: nestEyebrow),
+            Text(tr('SUBJECT NAME'), style: nestEyebrow),
             const SizedBox(height: 8),
             _field(
               controller: _name,
@@ -126,7 +127,7 @@ class _SubjectFormState extends State<_SubjectForm> {
               capitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 18),
-            const Text('SUBJECT CODE', style: nestEyebrow),
+            Text(tr('SUBJECT CODE'), style: nestEyebrow),
             const SizedBox(height: 8),
             _field(
               controller: _code,
@@ -135,7 +136,7 @@ class _SubjectFormState extends State<_SubjectForm> {
               capitalization: TextCapitalization.characters,
             ),
             const SizedBox(height: 18),
-            const Text('INDEX TAB COLOUR', style: nestEyebrow),
+            Text(tr('INDEX TAB COLOUR'), style: nestEyebrow),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -159,7 +160,7 @@ class _SubjectFormState extends State<_SubjectForm> {
                           ),
                         ),
                         child: i == _colorIndex
-                            ? const Icon(Icons.check_rounded,
+                            ? Icon(Icons.check_rounded,
                                 size: 20, color: NestColor.ink)
                             : null,
                       ),
@@ -174,10 +175,10 @@ class _SubjectFormState extends State<_SubjectForm> {
                 onPressed: _saving ? null : _save,
                 child: Text(
                   _saving
-                      ? 'Saving...'
+                      ? tr('Saving...')
                       : editing
-                          ? 'Save changes'
-                          : 'Add subject',
+                          ? tr('Save changes')
+                          : tr('Add subject'),
                 ),
               ),
             ),
@@ -196,7 +197,7 @@ class _SubjectFormState extends State<_SubjectForm> {
     return TextField(
       controller: controller,
       textCapitalization: capitalization,
-      style: const TextStyle(fontSize: 15, color: NestColor.ink),
+      style: TextStyle(fontSize: 15, color: NestColor.ink),
       decoration: InputDecoration(
         hintText: hint,
         errorText: error,
@@ -214,7 +215,7 @@ class _SubjectFormState extends State<_SubjectForm> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(NestRadius.tile),
-          borderSide: const BorderSide(color: NestColor.pen, width: 2),
+          borderSide: BorderSide(color: NestColor.pen, width: 2),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import '../../models/classwork.dart';
 import '../../models/study_group.dart';
 import '../../theme/nest_theme.dart';
 import 'class_files.dart';
+import '../../l10n/strings.dart';
 
 /// Writes one post to a class: an announcement, a material or an assignment.
 class PostComposerPage extends StatefulWidget {
@@ -65,7 +66,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
       initialDate: _due ?? now.add(const Duration(days: 7)),
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 730)),
-      helpText: 'Due date',
+      helpText: tr('Due date'),
     );
     if (day == null || !mounted) return;
     final time = await showTimePicker(
@@ -73,7 +74,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
       initialTime: _due == null
           ? const TimeOfDay(hour: 23, minute: 59)
           : TimeOfDay.fromDateTime(_due!),
-      helpText: 'Due time',
+      helpText: tr('Due time'),
     );
     if (!mounted) return;
     final t = time ?? const TimeOfDay(hour: 23, minute: 59);
@@ -89,7 +90,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
     if (_kind == PostKind.assignment &&
         _points.text.trim().isNotEmpty &&
         points == null) {
-      setState(() => _error = 'Points must be a whole number.');
+      setState(() => _error = tr('Points must be a whole number.'));
       return;
     }
     final problem = postProblem(
@@ -107,7 +108,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
 
     setState(() {
       _error = null;
-      _progress = _files.isEmpty ? 'Posting…' : 'Uploading to Google Drive…';
+      _progress = _files.isEmpty ? tr('Posting…') : tr('Uploading to Google Drive…');
     });
 
     final navigator = Navigator.of(context);
@@ -136,7 +137,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
       );
       navigator.pop();
       messenger.showSnackBar(
-        SnackBar(content: Text('${_kind.label} posted.')),
+        SnackBar(content: Text(trp('{0} posted.', [_kind.label]))),
       );
     } on DriveException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -149,7 +150,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
 
   static String _firstLine(String body) {
     final line = body.trim().split('\n').first.trim();
-    if (line.isEmpty) return 'Announcement';
+    if (line.isEmpty) return tr('Announcement');
     return line.length > 80 ? '${line.substring(0, 80)}…' : line;
   }
 
@@ -160,13 +161,13 @@ class _PostComposerPageState extends State<PostComposerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('New ${_kind.label.toLowerCase()}'),
+        title: Text(trp('New {0}', [_kind.label.toLowerCase()])),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton(
               onPressed: busy ? null : _post,
-              child: const Text('Post'),
+              child: Text(tr('Post')),
             ),
           ),
         ],
@@ -175,18 +176,18 @@ class _PostComposerPageState extends State<PostComposerPage> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
           SegmentedButton<PostKind>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: PostKind.announcement,
-                label: Text('Announce'),
+                label: Text(tr('Announce')),
               ),
               ButtonSegment(
                 value: PostKind.material,
-                label: Text('Material'),
+                label: Text(tr('Material')),
               ),
               ButtonSegment(
                 value: PostKind.assignment,
-                label: Text('Assignment'),
+                label: Text(tr('Assignment')),
               ),
             ],
             selected: {_kind},
@@ -205,7 +206,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
               maxLength: maxPostTitle,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                labelText: 'Title',
+                labelText: tr('Title'),
                 hintText: _kind == PostKind.assignment
                     ? 'Lab 3: Linked lists'
                     : 'Week 4 slides',
@@ -222,10 +223,10 @@ class _PostComposerPageState extends State<PostComposerPage> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               labelText: _kind == PostKind.announcement
-                  ? 'Share with your class'
+                  ? tr('Share with your class')
                   : _kind == PostKind.assignment
-                      ? 'Instructions (optional)'
-                      : 'Description (optional)',
+                      ? tr('Instructions (optional)')
+                      : tr('Description (optional)'),
               alignLabelWithHint: true,
               counterText: '',
             ),
@@ -236,16 +237,16 @@ class _PostComposerPageState extends State<PostComposerPage> {
               controller: _topic,
               maxLength: maxTopic,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Topic (optional)',
-                hintText: 'Week 4, Midterm, Lab',
+              decoration: InputDecoration(
+                labelText: tr('Topic (optional)'),
+                hintText: tr('Week 4, Midterm, Lab'),
                 counterText: '',
               ),
             ),
           ],
           if (_kind == PostKind.assignment) ...[
             const SizedBox(height: 18),
-            const Text('DEADLINE AND POINTS', style: nestEyebrow),
+            Text(tr('DEADLINE AND POINTS'), style: nestEyebrow),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -254,14 +255,14 @@ class _PostComposerPageState extends State<PostComposerPage> {
                     onPressed: busy ? null : _pickDue,
                     icon: const Icon(Icons.event_rounded, size: 18),
                     label: Text(
-                      _due == null ? 'Set a due date' : formatDue(_due!),
+                      _due == null ? tr('Set a due date') : formatDue(_due!),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
                 if (_due != null)
                   IconButton(
-                    tooltip: 'No due date',
+                    tooltip: tr('No due date'),
                     onPressed: busy ? null : () => setState(() => _due = null),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -271,9 +272,9 @@ class _PostComposerPageState extends State<PostComposerPage> {
                   child: TextField(
                     controller: _points,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Points',
-                      hintText: 'None',
+                    decoration: InputDecoration(
+                      labelText: tr('Points'),
+                      hintText: tr('None'),
                     ),
                   ),
                 ),
@@ -281,27 +282,25 @@ class _PostComposerPageState extends State<PostComposerPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Leave points empty for ungraded work. Work handed in after the '
-              'deadline is still accepted and marked late.',
+              tr('Leave points empty for ungraded work. Work handed in after the '
+              'deadline is still accepted and marked late.'),
               style: t.bodySmall,
             ),
           ],
           const SizedBox(height: 20),
           Row(
             children: [
-              const Expanded(child: Text('FILES', style: nestEyebrow)),
+              Expanded(child: Text(tr('FILES'), style: nestEyebrow)),
               TextButton.icon(
                 onPressed: busy ? null : _attach,
                 icon: const Icon(Icons.attach_file_rounded, size: 18),
-                label: const Text('Attach'),
+                label: Text(tr('Attach')),
               ),
             ],
           ),
           if (_files.isEmpty)
             Text(
-              'Slides, PDFs, Word files, pictures — up to $maxFilesPerPost. '
-              'They are saved in your Google Drive (NoteNest → Classes) and '
-              'shared by link with this class.',
+              trp('Slides, PDFs, Word files, pictures — up to {0}. They are saved in your Google Drive (NoteNest → Classes) and shared by link with this class.', [maxFilesPerPost]),
               style: t.bodySmall,
             )
           else
@@ -318,7 +317,7 @@ class _PostComposerPageState extends State<PostComposerPage> {
             ),
           if (_error != null) ...[
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: NestColor.redPen)),
+            Text(_error!, style: TextStyle(color: NestColor.redPen)),
           ],
           if (_progress != null) ...[
             const SizedBox(height: 18),

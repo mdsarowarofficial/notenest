@@ -10,6 +10,8 @@ import '../search/search_page.dart';
 import '../share/share_note_sheet.dart';
 import 'attachment_strip.dart';
 import 'note_editor.dart';
+import '../../l10n/strings.dart';
+import '../../widgets/note_body.dart';
 
 /// Read a note and change how it sits in the revision cycle. Requirement 7.
 class NoteDetailPage extends StatefulWidget {
@@ -36,19 +38,19 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Move to Trash?'),
-        content: const Text(
-          'The note stays in Trash until you delete it permanently, so you '
-          'can bring it back.',
+        title: Text(tr('Move to Trash?')),
+        content: Text(
+          tr('The note stays in Trash until you delete it permanently, so you '
+          'can bring it back.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Move to Trash'),
+            child: Text(tr('Move to Trash')),
           ),
         ],
       ),
@@ -60,12 +62,12 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Note moved to Trash'),
+        content: Text(tr('Note moved to Trash')),
         behavior: SnackBarBehavior.floating,
         // A snackbar with an action stays until dismissed unless told not to.
         persist: false,
         action: SnackBarAction(
-          label: 'Undo',
+          label: tr('Undo'),
           onPressed: () => _repo.restoreNote(note),
         ),
       ),
@@ -89,8 +91,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
       builder: (context, _) {
         final note = _repo.noteById(widget.noteId);
         if (note == null) {
-          return const Scaffold(
-            body: Center(child: Text('This note is no longer here.')),
+          return Scaffold(
+            body: Center(child: Text(tr('This note is no longer here.'))),
           );
         }
 
@@ -104,8 +106,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
             actions: [
               IconButton(
                 tooltip: note.important
-                    ? 'Remove important mark'
-                    : 'Mark as important',
+                    ? tr('Remove important mark')
+                    : tr('Mark as important'),
                 icon: Icon(
                   note.important
                       ? Icons.star_rounded
@@ -116,12 +118,12 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                 onPressed: () => _repo.toggleImportant(note),
               ),
               IconButton(
-                tooltip: 'Share with a classmate',
+                tooltip: tr('Share with a classmate'),
                 icon: const Icon(Icons.ios_share_rounded),
                 onPressed: () => showShareNoteSheet(context, note),
               ),
               IconButton(
-                tooltip: 'Edit',
+                tooltip: tr('Edit'),
                 icon: const Icon(Icons.edit_rounded),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -130,7 +132,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                 ),
               ),
               IconButton(
-                tooltip: 'Move to Trash',
+                tooltip: tr('Move to Trash'),
                 icon: const Icon(Icons.delete_outline_rounded),
                 onPressed: () => _delete(note),
               ),
@@ -176,10 +178,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                               Text(
                                 note.topic != null && note.topic!.isNotEmpty
                                     ? note.topic!
-                                    : 'No topic',
+                                    : tr('No topic'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: NestFont.body,
                                   fontSize: 12.5,
                                   color: NestColor.inkMeta,
@@ -189,7 +191,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                           ),
                         ),
                         if (note.important)
-                          const Icon(
+                          Icon(
                             Icons.star_rounded,
                             size: 20,
                             color: NestColor.redPen,
@@ -198,14 +200,13 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      note.title.trim().isEmpty ? 'Untitled note' : note.title,
+                      note.title.trim().isEmpty ? tr('Untitled note') : note.title,
                       style: t.displaySmall,
                     ),
                     const SizedBox(height: 9),
                     Text(
-                      'Written ${relativeDay(note.createdAt)} · '
-                      'Updated ${relativeDay(note.updatedAt)}',
-                      style: const TextStyle(
+                      trp('Written {0} · Updated {1}', [relativeDay(note.createdAt), relativeDay(note.updatedAt)]),
+                      style: TextStyle(
                         fontFamily: NestFont.body,
                         fontSize: 12,
                         color: NestColor.inkFaint,
@@ -239,15 +240,14 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                   boxShadow: NestShadow.resting,
                 ),
                 child: note.body.trim().isEmpty
-                    ? Text('This note has no body yet.', style: t.bodySmall)
-                    : SelectableText(
-                        note.body,
-                        style: const TextStyle(
-                          fontFamily: NestFont.body,
-                          fontSize: 15.5,
-                          height: 1.62,
-                          color: NestColor.ink,
-                        ),
+                    ? Text(tr('This note has no body yet.'), style: t.bodySmall)
+                    : NoteBody(
+                        body: note.body,
+                        // Ticking a checkbox saves straight away, so a
+                        // checklist can be worked through without opening
+                        // the editor.
+                        onChanged: (next) =>
+                            _repo.updateNote(note.copyWith(body: next)),
                       ),
               ),
             ],
@@ -293,7 +293,7 @@ class _SharedBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Shared by ${note.sharedBy}',
+                  trp('Shared by {0}', [note.sharedBy]),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 if (note.sharedAt != null || reference) ...[
@@ -341,7 +341,7 @@ class _StatusPicker extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('STUDY STATUS', style: nestEyebrow),
+          Text(tr('STUDY STATUS'), style: nestEyebrow),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

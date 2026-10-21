@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 /// One stop on the tour.
 class TourStep {
@@ -178,7 +179,7 @@ class _TourOverlayState extends State<_TourOverlay> {
                 const SizedBox(width: 12),
                 Expanded(child: Text(_step.title, style: t.titleMedium)),
                 Text(
-                  '${_index + 1} / ${widget.steps.length}',
+                  trp('{0} / {1}', [_index + 1, widget.steps.length]),
                   style: t.bodySmall,
                 ),
                 const SizedBox(width: 6),
@@ -192,15 +193,15 @@ class _TourOverlayState extends State<_TourOverlay> {
                 if (!_last)
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Skip tour'),
+                    child: Text(tr('Skip tour')),
                   ),
                 const Spacer(),
                 if (_index > 0)
-                  TextButton(onPressed: _back, child: const Text('Back')),
+                  TextButton(onPressed: _back, child: Text(tr('Back'))),
                 const SizedBox(width: 4),
                 FilledButton(
                   onPressed: _next,
-                  child: Text(_last ? 'Start using NoteNest' : 'Next'),
+                  child: Text(_last ? tr('Start using NoteNest') : tr('Next')),
                 ),
               ],
             ),

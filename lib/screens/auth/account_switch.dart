@@ -6,6 +6,7 @@ import '../../models/user_account.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_mark_tile.dart';
 import 'login_page.dart';
+import '../../l10n/strings.dart';
 
 /// Signing out and switching accounts, shared by Settings and the profile.
 ///
@@ -20,18 +21,18 @@ Future<void> confirmSignOut(BuildContext context) async {
     context: context,
     builder: (dialogContext) => AlertDialog(
       backgroundColor: NestColor.card,
-      title: const Text('Sign out?'),
-      content: const Text(
-        'Your notes stay on this device. You can sign back in any time.',
+      title: Text(tr('Sign out?')),
+      content: Text(
+        tr('Your notes stay on this device. You can sign back in any time.'),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+          child: Text(tr('Cancel')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Sign out'),
+          child: Text(tr('Sign out')),
         ),
       ],
     ),
@@ -63,16 +64,16 @@ Future<void> showAccountSwitcher(BuildContext context) async {
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
-              child: Text('SWITCH ACCOUNT', style: nestEyebrow),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Text(tr('SWITCH ACCOUNT'), style: nestEyebrow),
             ),
             if (me != null)
               _AccountTile(
                 account: me,
-                trailing: const Icon(Icons.check_circle_rounded,
+                trailing: Icon(Icons.check_circle_rounded,
                     color: NestColor.mint),
-                subtitle: 'Signed in now',
+                subtitle: tr('Signed in now'),
               ),
             for (final a in others)
               _AccountTile(
@@ -82,13 +83,13 @@ Future<void> showAccountSwitcher(BuildContext context) async {
               ),
             const Divider(height: 18),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: NestColor.tintPen,
                 child: Icon(Icons.person_add_alt_1_rounded,
                     color: NestColor.pen, size: 20),
               ),
-              title: const Text('Use another account'),
-              subtitle: const Text('Sign in, or make a new one'),
+              title: Text(tr('Use another account')),
+              subtitle: Text(tr('Sign in, or make a new one')),
               onTap: () => Navigator.pop(sheetContext, (email: null)),
             ),
           ],
@@ -130,7 +131,7 @@ class _AccountTile extends StatelessWidget {
       title: Text(account.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: trailing ??
-          const Icon(Icons.chevron_right_rounded, color: NestColor.inkFaint),
+          Icon(Icons.chevron_right_rounded, color: NestColor.inkFaint),
       onTap: onTap,
     );
   }

@@ -8,6 +8,7 @@ import '../../models/day_plan.dart';
 import '../../models/exam.dart';
 import '../../models/task.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 const _months = [
   'Jan',
@@ -32,16 +33,18 @@ const _weekdays = [
   'Saturday',
   'Sunday',
 ];
-const _weekLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+List<String> get _weekLetters => AppLanguage.instance.isBangla
+    ? ['সো', 'ম', 'বু', 'বৃ', 'শু', 'শ', 'র']
+    : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /// "Today", "Tomorrow", "Yesterday", otherwise "Wed 21 Oct".
 String dayWord(DateTime day, {DateTime? now}) {
   final days = daysUntil(day, from: now ?? DateTime.now());
-  if (days == 0) return 'Today';
-  if (days == 1) return 'Tomorrow';
-  if (days == -1) return 'Yesterday';
-  return '${_weekdays[day.weekday - 1].substring(0, 3)} ${day.day} '
-      '${_months[day.month - 1]}';
+  if (days == 0) return tr('Today');
+  if (days == 1) return tr('Tomorrow');
+  if (days == -1) return tr('Yesterday');
+  return localDate('${_weekdays[day.weekday - 1].substring(0, 3)} ${day.day} '
+      '${_months[day.month - 1]}');
 }
 
 /// "Mon 12 Oct, 5:30 PM" — the due time as it reads in a list. A task saved
@@ -50,16 +53,16 @@ String taskDueLabel(DateTime at, {DateTime? now}) {
   final n = now ?? DateTime.now();
   final days = daysUntil(at, from: n);
   final day = days == 0
-      ? 'Today'
+      ? tr('Today')
       : days == 1
-          ? 'Tomorrow'
+          ? tr('Tomorrow')
           : days == -1
-              ? 'Yesterday'
+              ? tr('Yesterday')
               : '${at.day} ${_months[at.month - 1]}';
-  if (!hasRealClock(at)) return day;
+  if (!hasRealClock(at)) return localDate(day);
   final h = at.hour % 12 == 0 ? 12 : at.hour % 12;
   final m = at.minute.toString().padLeft(2, '0');
-  return '$day, $h:$m ${at.hour < 12 ? 'AM' : 'PM'}';
+  return localDate('$day, $h:$m ${at.hour < 12 ? 'AM' : 'PM'}');
 }
 
 DateTime _endOfDay(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59);
@@ -70,11 +73,11 @@ const _lineColor = Color(0xFFD3D7E4);
 const _rowHeight = 46.0;
 
 /// The small spaced-out headings of the planner sheet.
-const _sheetHeading = TextStyle(
+TextStyle get _sheetHeading => TextStyle(
   fontFamily: NestFont.body,
   fontSize: 12,
   fontWeight: FontWeight.w700,
-  letterSpacing: 2,
+  letterSpacing: ls(2),
   color: NestColor.inkSoft,
 );
 
@@ -83,7 +86,7 @@ const _sheetHeading = TextStyle(
 String _taskHeading(DateTime d) {
   final word = dayWord(d).toUpperCase();
   const named = {'TODAY', 'TOMORROW', 'YESTERDAY'};
-  return named.contains(word) ? '$word’S URGENT TASKS' : 'TASKS · $word';
+  return named.contains(word) ? trp('{0}’S URGENT TASKS', [word]) : trp('TASKS · {0}', [word]);
 }
 
 /// The to-do page, laid out like a printed planner sheet: the week's seven
@@ -202,8 +205,8 @@ class _TasksPageState extends State<TasksPage> {
         controller: _search,
         autofocus: true,
         onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(
-          hintText: 'Search tasks',
+        decoration: InputDecoration(
+          hintText: tr('Search tasks'),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
@@ -213,12 +216,12 @@ class _TasksPageState extends State<TasksPage> {
 
   List<Widget> _actions() => [
         IconButton(
-          tooltip: 'New task with details',
+          tooltip: tr('New task with details'),
           icon: const Icon(Icons.add_task_rounded),
           onPressed: () => showTaskForm(context, dueOn: _day),
         ),
         IconButton(
-          tooltip: _searching ? 'Close search' : 'Search tasks',
+          tooltip: _searching ? tr('Close search') : tr('Search tasks'),
           icon: Icon(_searching ? Icons.close_rounded : Icons.search_rounded),
           onPressed: () => setState(() {
             _searching = !_searching;
@@ -247,7 +250,7 @@ class _TasksPageState extends State<TasksPage> {
                       TextButton.icon(
                         onPressed: widget.onBack,
                         icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                        label: const Text('Today'),
+                        label: Text(tr('Today')),
                       ),
                     if (_searching)
                       Expanded(child: _searchField())
@@ -267,7 +270,7 @@ class _TasksPageState extends State<TasksPage> {
     return Scaffold(
       backgroundColor: NestColor.ground,
       appBar: AppBar(
-        title: _searching ? _searchField() : const Text('To-do'),
+        title: _searching ? _searchField() : Text(tr('To-do')),
         actions: _actions(),
       ),
       body: body,
@@ -282,10 +285,10 @@ class _TasksPageState extends State<TasksPage> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          const Center(
+          Center(
               child: Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: Text('COURSE', style: nestEyebrow),
+            padding: const EdgeInsets.only(right: 10),
+            child: Text(tr('COURSE'), style: nestEyebrow),
           )),
           for (final s in subjects)
             Padding(
@@ -312,7 +315,7 @@ class _TasksPageState extends State<TasksPage> {
           ? Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                'No tasks match.',
+                tr('No tasks match.'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -326,7 +329,7 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  static final _sheetDecoration = BoxDecoration(
+  static BoxDecoration get _sheetDecoration => BoxDecoration(
     color: NestColor.card,
     borderRadius: BorderRadius.circular(NestRadius.card),
     boxShadow: NestShadow.resting,
@@ -361,7 +364,7 @@ class _TasksPageState extends State<TasksPage> {
             _overdueBanner(overdue.length),
           ],
           if (overdue.isNotEmpty) ...[
-            _heading('OVERDUE', count: overdue.length, accent: NestColor.redPen),
+            _heading(tr('OVERDUE'), count: overdue.length, accent: NestColor.redPen),
             for (final t in overdue)
               TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
           ],
@@ -372,11 +375,11 @@ class _TasksPageState extends State<TasksPage> {
                 TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
             ],
             minLines: 6,
-            hint: 'Add a task',
+            hint: tr('Add a task'),
             onAdd: (title) =>
                 _repo.addTask(title: title, dueAt: _endOfDay(_day)),
           ),
-          _heading('MY TOP 7 GOALS', trailing: '$openGoals / $maxGoals open'),
+          _heading(tr('MY TOP 7 GOALS'), trailing: '$openGoals / $maxGoals open'),
           _Lines(
             rows: [
               for (var i = 0; i < goals.length; i++)
@@ -390,7 +393,7 @@ class _TasksPageState extends State<TasksPage> {
             minLines: maxGoals,
             numbered: true,
             canAdd: openGoals < maxGoals,
-            hint: 'Add a goal',
+            hint: tr('Add a goal'),
             onAdd: (title) async {
               await _repo.addGoal(title);
             },
@@ -402,22 +405,22 @@ class _TasksPageState extends State<TasksPage> {
                 TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
             ],
             minLines: 4,
-            hint: 'Plan ahead',
+            hint: tr('Plan ahead'),
             onAdd: (title) =>
                 _repo.addTask(title: title, dueAt: _endOfDay(next)),
           ),
-          _heading('RANDOM THOUGHTS · ${dayWord(_day).toUpperCase()}'),
+          _heading(trp('RANDOM THOUGHTS · {0}', [dayWord(_day).toUpperCase()])),
           _buildThoughts(),
-          _heading('PRODUCTIVITY'),
+          _heading(tr('PRODUCTIVITY')),
           _buildRating(),
-          _heading('SOMEDAY · NO DATE', count: later.length),
+          _heading(tr('SOMEDAY · NO DATE'), count: later.length),
           _Lines(
             rows: [
               for (final t in later)
                 TaskTile(key: ValueKey('row-${t.id}'), task: t, ruled: true),
             ],
             minLines: 3,
-            hint: 'Ideas and far-off tasks',
+            hint: tr('Ideas and far-off tasks'),
             onAdd: (title) => _repo.addTask(title: title),
           ),
         ],
@@ -450,7 +453,7 @@ class _TasksPageState extends State<TasksPage> {
                 borderRadius: BorderRadius.circular(NestRadius.pill),
               ),
               child: Text(
-                '$count',
+                trp('{0}', [count]),
                 style: t.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: accent == null ? NestColor.penDeep : NestColor.redDeep,
@@ -481,11 +484,11 @@ class _TasksPageState extends State<TasksPage> {
     final streak = doneStreak(_repo.tasks(), today);
     final String line;
     if (tasks.isEmpty) {
-      line = 'A clear page. Tap a line to add the first task.';
+      line = tr('A clear page. Tap a line to add the first task.');
     } else if (done == tasks.length) {
-      line = 'All $done done. Nice work.';
+      line = trp('All {0} done. Nice work.', [done]);
     } else {
-      line = '$done of ${tasks.length} done';
+      line = trp('{0} of {1} done', [done, tasks.length]);
     }
 
     return GestureDetector(
@@ -497,16 +500,16 @@ class _TasksPageState extends State<TasksPage> {
       },
       child: Column(
         children: [
-          const FittedBox(
+          FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              'TO DO LIST',
+              tr('TO DO LIST'),
               maxLines: 1,
               style: TextStyle(
                 fontFamily: NestFont.display,
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 6,
+                letterSpacing: ls(6),
                 color: NestColor.ink,
               ),
             ),
@@ -515,7 +518,7 @@ class _TasksPageState extends State<TasksPage> {
           Row(
             children: [
               IconButton(
-                tooltip: 'Previous day',
+                tooltip: tr('Previous day'),
                 onPressed: () =>
                     _goTo(DateTime(_day.year, _day.month, _day.day - 1)),
                 icon: const Icon(Icons.chevron_left_rounded),
@@ -531,21 +534,22 @@ class _TasksPageState extends State<TasksPage> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Date', style: t.bodySmall),
+                          Text(tr('Date'), style: t.bodySmall),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Container(
                               padding: const EdgeInsets.only(bottom: 2),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 border: Border(
                                   bottom: BorderSide(
                                       color: NestColor.ink, width: 1),
                                 ),
                               ),
                               child: Text(
-                                '${_weekdays[_day.weekday - 1].substring(0, 3)}, '
-                                '${_day.day} ${_months[_day.month - 1]} '
-                                '${_day.year}',
+                                localDate(
+                                    '${_weekdays[_day.weekday - 1].substring(0, 3)}, '
+                                    '${_day.day} ${_months[_day.month - 1]} '
+                                    '${_day.year}'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: t.titleSmall,
@@ -553,7 +557,7 @@ class _TasksPageState extends State<TasksPage> {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Icon(Icons.edit_calendar_rounded,
+                          Icon(Icons.edit_calendar_rounded,
                               size: 18, color: NestColor.pen),
                         ],
                       ),
@@ -562,7 +566,7 @@ class _TasksPageState extends State<TasksPage> {
                 ),
               ),
               IconButton(
-                tooltip: 'Next day',
+                tooltip: tr('Next day'),
                 onPressed: () =>
                     _goTo(DateTime(_day.year, _day.month, _day.day + 1)),
                 icon: const Icon(Icons.chevron_right_rounded),
@@ -573,7 +577,7 @@ class _TasksPageState extends State<TasksPage> {
             TextButton.icon(
               onPressed: () => _goTo(today),
               icon: const Icon(Icons.today_rounded, size: 18),
-              label: const Text('Back to today'),
+              label: Text(tr('Back to today')),
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
               ),
@@ -593,11 +597,11 @@ class _TasksPageState extends State<TasksPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.local_fire_department_rounded,
+                      Icon(Icons.local_fire_department_rounded,
                           size: 15, color: NestColor.warmDeep),
                       const SizedBox(width: 3),
                       Text(
-                        '$streak-day streak',
+                        trp('{0}-day streak', [streak]),
                         style: t.bodySmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: NestColor.warmDeep,
@@ -625,7 +629,7 @@ class _TasksPageState extends State<TasksPage> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'This week: $weekDone of ${weekTasks.length} done',
+                trp('This week: {0} of {1} done', [weekDone, weekTasks.length]),
                 style: t.bodySmall,
               ),
             ),
@@ -647,7 +651,7 @@ class _TasksPageState extends State<TasksPage> {
         children: [
           Expanded(
             child: Text(
-              '$count overdue',
+              trp('{0} overdue', [count]),
               style: t.bodySmall?.copyWith(
                 color: NestColor.redDeep,
                 fontWeight: FontWeight.w700,
@@ -659,12 +663,11 @@ class _TasksPageState extends State<TasksPage> {
               final n = await _repo.moveOverdueTo(_day);
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Moved $n ${n == 1 ? 'task' : 'tasks'} to '
-                    '${dayWord(_day).toLowerCase()}.'),
+                content: Text(trp('Moved {0} {1} to {2}.', [n, n == 1 ? tr('task') : tr('tasks'), dayWord(_day).toLowerCase()])),
               ));
             },
             style: TextButton.styleFrom(foregroundColor: NestColor.redDeep),
-            child: Text('Move to ${dayWord(_day).toLowerCase()}'),
+            child: Text(trp('Move to {0}', [dayWord(_day).toLowerCase()])),
           ),
         ],
       ),
@@ -693,7 +696,7 @@ class _TasksPageState extends State<TasksPage> {
             height: lineHeight / 15,
             forceStrutHeight: true,
           ),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: NestFont.body,
             fontSize: 15,
             color: NestColor.ink,
@@ -704,8 +707,8 @@ class _TasksPageState extends State<TasksPage> {
               _flushThoughts();
             });
           },
-          decoration: const InputDecoration(
-            hintText: 'Ideas, worries, things to remember…',
+          decoration: InputDecoration(
+            hintText: tr('Ideas, worries, things to remember…'),
             isDense: true,
             filled: false,
             contentPadding: EdgeInsets.zero,
@@ -722,7 +725,7 @@ class _TasksPageState extends State<TasksPage> {
   /// again clears it.
   Widget _buildRating() {
     final rating = _repo.dayLog(_day).rating;
-    const words = ['Tap a star', 'Rough', 'Meh', 'Okay', 'Good', 'Great'];
+    final words = [tr('Tap a star'), 'Rough', 'Meh', 'Okay', 'Good', 'Great'];
     final t = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,7 +738,7 @@ class _TasksPageState extends State<TasksPage> {
               Semantics(
                 button: true,
                 selected: i <= rating,
-                label: '$i star${i == 1 ? '' : 's'}',
+                label: trp('{0} star{1}', [i, i == 1 ? '' : 's']),
                 child: InkResponse(
                   radius: 30,
                   onTap: () {
@@ -832,7 +835,7 @@ class _WeekBoxes extends StatelessWidget {
                 child: Semantics(
                   button: true,
                   selected: selected,
-                  label: '${_weekdays[i]} ${d.day}',
+                  label: localDate('${_weekdays[i]} ${d.day}'),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => onPick(d),
@@ -865,7 +868,7 @@ class _WeekBoxes extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${d.day}',
+                            trp('{0}', [d.day]),
                             style: t.titleSmall?.copyWith(
                               color: selected ? Colors.white : null,
                               height: 1.25,
@@ -981,8 +984,8 @@ class _LinesState extends State<_Lines> {
             border: Border.all(color: _lineColor, width: 2),
           ),
           child: Text(
-            '${index + 1}',
-            style: const TextStyle(
+            trp('{0}', [index + 1]),
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: NestColor.inkFaint,
@@ -1113,10 +1116,10 @@ class _LineInputState extends State<_LineInput> {
           ),
           if (_c.text.trim().isNotEmpty)
             IconButton(
-              tooltip: 'Add',
+              tooltip: tr('Add'),
               visualDensity: VisualDensity.compact,
               onPressed: _submit,
-              icon: const Icon(Icons.arrow_upward_rounded,
+              icon: Icon(Icons.arrow_upward_rounded,
                   color: NestColor.pen),
             ),
         ],
@@ -1165,7 +1168,7 @@ class _GoalDialogState extends State<_GoalDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: NestColor.card,
-      title: const Text('Edit goal'),
+      title: Text(tr('Edit goal')),
       content: TextField(
         controller: _c,
         autofocus: true,
@@ -1176,11 +1179,11 @@ class _GoalDialogState extends State<_GoalDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context, ('delete', _c.text)),
           style: TextButton.styleFrom(foregroundColor: NestColor.redPen),
-          child: const Text('Delete'),
+          child: Text(tr('Delete')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, ('save', _c.text)),
-          child: const Text('Save'),
+          child: Text(tr('Save')),
         ),
       ],
     );
@@ -1209,7 +1212,7 @@ class _GoalRow extends StatelessWidget {
       leading: _TickCircle(
         done: goal.isDone,
         color: NestColor.pen,
-        label: '$number',
+        label: trp('{0}', [number]),
         onTap: () {
           HapticFeedback.selectionClick();
           repo.setGoalDone(goal, !goal.isDone);
@@ -1321,9 +1324,9 @@ Future<void> _deleteWithUndo(BuildContext context, Task task) async {
   await repo.deleteTask(task);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(SnackBar(
-    content: const Text('Task deleted'),
+    content: Text(tr('Task deleted')),
     action: SnackBarAction(
-      label: 'Undo',
+      label: tr('Undo'),
       onPressed: () async {
         final back = await repo.addTask(
           title: task.title,
@@ -1404,9 +1407,9 @@ class TaskTile extends StatelessWidget {
       if (subject != null)
         chip(subject.code, NestColor.tintPen, NestColor.penDeep),
       if (task.inProgress && !task.isDone)
-        chip('In progress', NestColor.tintWarm, NestColor.warmDeep),
+        chip(tr('In progress'), NestColor.tintWarm, NestColor.warmDeep),
       if (task.priority == TaskPriority.high && !task.isDone)
-        chip('High', NestColor.tintRed, NestColor.redDeep),
+        chip(tr('High'), NestColor.tintRed, NestColor.redDeep),
     ];
 
     final gap = ruled ? 0.0 : 6.0;
@@ -1459,7 +1462,7 @@ class TaskTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(NestRadius.chip),
         ),
         child:
-            const Icon(Icons.delete_outline_rounded, color: NestColor.redDeep),
+            Icon(Icons.delete_outline_rounded, color: NestColor.redDeep),
       ),
       confirmDismiss: (dir) async {
         if (dir == DismissDirection.startToEnd) {
@@ -1481,8 +1484,8 @@ class TaskTile extends StatelessWidget {
                 children: [
                   Expanded(child: title),
                   PopupMenuButton<String>(
-                    tooltip: 'More',
-                    icon: const Icon(Icons.more_horiz_rounded,
+                    tooltip: tr('More'),
+                    icon: Icon(Icons.more_horiz_rounded,
                         color: NestColor.inkFaint),
                     padding: EdgeInsets.zero,
                     onSelected: (v) {
@@ -1500,12 +1503,12 @@ class TaskTile extends StatelessWidget {
                         PopupMenuItem(
                           value: 'push',
                           child: Text(overdue || task.dueAt == null
-                              ? 'Move to today'
-                              : 'Push to next day'),
+                              ? tr('Move to today')
+                              : tr('Push to next day')),
                         ),
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(
-                          value: 'delete', child: Text('Delete')),
+                      PopupMenuItem(value: 'edit', child: Text(tr('Edit'))),
+                      PopupMenuItem(
+                          value: 'delete', child: Text(tr('Delete'))),
                     ],
                   ),
                 ],
@@ -1635,7 +1638,7 @@ class _TaskFormState extends State<_TaskForm> {
   Future<void> _save() async {
     if (_saving) return;
     if (_title.text.trim().isEmpty) {
-      setState(() => _error = 'Give the task a title.');
+      setState(() => _error = tr('Give the task a title.'));
       return;
     }
     setState(() {
@@ -1672,7 +1675,7 @@ class _TaskFormState extends State<_TaskForm> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = 'That could not be saved. Try again.';
+          _error = tr('That could not be saved. Try again.');
         });
       }
     }
@@ -1685,17 +1688,17 @@ class _TaskFormState extends State<_TaskForm> {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Delete this task?'),
-        content: Text('"${task.title}" will be removed.'),
+        title: Text(tr('Delete this task?')),
+        content: Text(trp('"{0}" will be removed.', [task.title])),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Delete'),
+            child: Text(tr('Delete')),
           ),
         ],
       ),
@@ -1721,7 +1724,7 @@ class _TaskFormState extends State<_TaskForm> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.existing == null ? 'New task' : 'Edit task',
+              widget.existing == null ? tr('New task') : tr('Edit task'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
@@ -1730,14 +1733,14 @@ class _TaskFormState extends State<_TaskForm> {
               autofocus: widget.existing == null,
               textCapitalization: TextCapitalization.sentences,
               maxLength: 120,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(labelText: tr('Title')),
             ),
             TextField(
               controller: _desc,
               maxLines: 3,
               maxLength: 1000,
               decoration:
-                  const InputDecoration(labelText: 'Details (optional)'),
+                  InputDecoration(labelText: tr('Details (optional)')),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1747,20 +1750,20 @@ class _TaskFormState extends State<_TaskForm> {
                     onPressed: _pickDue,
                     icon: const Icon(Icons.event_rounded),
                     label: Text(
-                      _due == null ? 'Set due date' : taskDueLabel(_due!),
+                      _due == null ? tr('Set due date') : taskDueLabel(_due!),
                     ),
                   ),
                 ),
                 if (_due != null)
                   IconButton(
-                    tooltip: 'Clear due date',
+                    tooltip: tr('Clear due date'),
                     onPressed: () => setState(() => _due = null),
                     icon: const Icon(Icons.close_rounded),
                   ),
               ],
             ),
             const SizedBox(height: 14),
-            const Text('PRIORITY', style: nestEyebrow),
+            Text(tr('PRIORITY'), style: nestEyebrow),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -1775,20 +1778,20 @@ class _TaskFormState extends State<_TaskForm> {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('In progress'),
+              title: Text(tr('In progress')),
               value: _inProgress,
               onChanged: (v) => setState(() => _inProgress = v),
             ),
             if (subjects.isNotEmpty) ...[
               const SizedBox(height: 14),
-              const Text('COURSE', style: nestEyebrow),
+              Text(tr('COURSE'), style: nestEyebrow),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   ChoiceChip(
-                    label: const Text('None'),
+                    label: Text(tr('None')),
                     selected: _subjectId == null,
                     onSelected: (_) => setState(() => _subjectId = null),
                   ),
@@ -1805,7 +1808,7 @@ class _TaskFormState extends State<_TaskForm> {
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: const TextStyle(color: NestColor.redPen),
+                style: TextStyle(color: NestColor.redPen),
               ),
             ],
             const SizedBox(height: 18),
@@ -1817,12 +1820,12 @@ class _TaskFormState extends State<_TaskForm> {
                     style: TextButton.styleFrom(
                       foregroundColor: NestColor.redPen,
                     ),
-                    child: const Text('Delete'),
+                    child: Text(tr('Delete')),
                   ),
                 const Spacer(),
                 FilledButton(
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Saving…' : 'Save'),
+                  child: Text(_saving ? tr('Saving…') : tr('Save')),
                 ),
               ],
             ),
@@ -1861,9 +1864,9 @@ class TasksCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('To-do', style: t.titleMedium)),
+              Expanded(child: Text(tr('To-do'), style: t.titleMedium)),
               IconButton(
-                tooltip: 'Add a task',
+                tooltip: tr('Add a task'),
                 onPressed: () => showTaskForm(context),
                 icon: const Icon(Icons.add_rounded),
               ),
@@ -1872,7 +1875,7 @@ class TasksCard extends StatelessWidget {
                     () => Navigator.of(context).push(
                           MaterialPageRoute(builder: (_) => const TasksPage()),
                         ),
-                child: const Text('See all'),
+                child: Text(tr('See all')),
               ),
             ],
           ),
@@ -1881,8 +1884,8 @@ class TasksCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8, right: 8),
               child: Text(
                 repo.openTasks.isEmpty
-                    ? 'Nothing planned. Add a task to keep track of work.'
-                    : 'Nothing due today. ${repo.openTasks.length} open in total.',
+                    ? tr('Nothing planned. Add a task to keep track of work.')
+                    : trp('Nothing due today. {0} open in total.', [repo.openTasks.length]),
                 style: t.bodySmall,
               ),
             )
@@ -1891,7 +1894,7 @@ class TasksCard extends StatelessWidget {
             if (more > 0)
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text('+ $more more', style: t.bodySmall),
+                child: Text(trp('+ {0} more', [more]), style: t.bodySmall),
               ),
           ],
         ],

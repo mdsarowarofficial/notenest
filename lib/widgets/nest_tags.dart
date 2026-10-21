@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/note_query.dart';
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 /// Tags as they appear on a note: small torn-paper labels in pen ink.
 ///
@@ -110,7 +111,7 @@ class NestTagChip extends StatelessWidget {
             if (trailingCount != null) ...[
               const SizedBox(width: 6),
               Text(
-                '$trailingCount',
+                trp('{0}', [trailingCount]),
                 style: TextStyle(
                   fontFamily: NestFont.mono,
                   fontSize: dense ? 10 : 11,
@@ -250,13 +251,20 @@ class _NestTagFieldState extends State<NestTagField> {
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   isDense: true,
+                  // The app theme gives every field a white fill and its own
+                  // enabled/focused/disabled borders; setting only `border`
+                  // left a second pill drawn inside this box.
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                   hintText: _full
-                      ? 'Tag limit reached'
+                      ? tr('Tag limit reached')
                       : widget.tags.isEmpty
-                          ? 'Add a tag, e.g. formula'
-                          : 'Add another tag',
+                          ? tr('Add a tag, e.g. formula')
+                          : tr('Add another tag'),
                   suffixIcon: _input.text.trim().isEmpty
                       ? null
                       : IconButton(
@@ -270,7 +278,7 @@ class _NestTagFieldState extends State<NestTagField> {
         ),
         if (offer.isNotEmpty) ...[
           const SizedBox(height: 10),
-          const Text('ALREADY IN USE', style: nestEyebrow),
+          Text(tr('ALREADY IN USE'), style: nestEyebrow),
           const SizedBox(height: 7),
           Wrap(
             spacing: 6,

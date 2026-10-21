@@ -14,13 +14,13 @@ class Highlighted extends StatelessWidget {
     super.key,
     required this.child,
     this.active = true,
-    this.color = NestColor.highlight,
+    this.color,
     this.duration = const Duration(milliseconds: 320),
   });
 
   final Widget child;
   final bool active;
-  final Color color;
+  final Color? color;
   final Duration duration;
 
   @override
@@ -31,7 +31,7 @@ class Highlighted extends StatelessWidget {
       tween: Tween(begin: 0, end: active ? 1 : 0),
       builder: (context, t, child) {
         return CustomPaint(
-          painter: _SwipePainter(t, color),
+          painter: _SwipePainter(t, color ?? NestColor.highlight),
           child: child,
         );
       },

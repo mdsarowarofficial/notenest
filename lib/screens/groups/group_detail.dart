@@ -7,6 +7,7 @@ import '../../models/cloud_profile.dart';
 import '../../models/study_group.dart';
 import '../../theme/nest_theme.dart';
 import '../chat/message_request.dart';
+import '../../l10n/strings.dart';
 
 /// One group: who is in it, the code that lets one more person in, and the way
 /// out.
@@ -35,11 +36,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(group?.name ?? 'Group'),
+            title: Text(group?.name ?? tr('Group')),
             actions: [
               if (group != null && group.isOwner(cloud.uid))
                 IconButton(
-                  tooltip: 'Delete group',
+                  tooltip: tr('Delete group'),
                   icon: const Icon(Icons.delete_outline_rounded),
                   onPressed: () => _confirmDelete(context, group),
                 ),
@@ -49,11 +50,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               ? Center(
                   child: snap.connectionState == ConnectionState.waiting
                       ? const CircularProgressIndicator()
-                      : const Padding(
-                          padding: EdgeInsets.all(30),
+                      : Padding(
+                          padding: const EdgeInsets.all(30),
                           child: Text(
-                            'This group is no longer there, or you are not in '
-                            'it any more.',
+                            tr('This group is no longer there, or you are not in '
+                            'it any more.'),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -71,21 +72,19 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete this group?'),
+        title: Text(tr('Delete this group?')),
         content: Text(
-          'Everyone in ${group.name} loses it, and the code '
-          '${prettyJoinCode(group.joinCode)} stops working. Notes already '
-          'accepted stay in their notebooks.',
+          trp('Everyone in {0} loses it, and the code {1} stops working. Notes already accepted stay in their notebooks.', [group.name, prettyJoinCode(group.joinCode)]),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep it'),
+            child: Text(tr('Keep it')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(tr('Delete')),
           ),
         ],
       ),
@@ -160,20 +159,20 @@ class _Body extends StatelessWidget {
         ),
 
         const SizedBox(height: 24),
-        const Text('GROUP CODE', style: nestEyebrow),
+        Text(tr('GROUP CODE'), style: nestEyebrow),
         const SizedBox(height: 8),
         _CodeCard(group: group),
 
         const SizedBox(height: 24),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'MEMBERS',
+                tr('MEMBERS'),
                 style: nestEyebrow,
               ),
             ),
-            Text('${group.memberCount}', style: nestEyebrow),
+            Text(trp('{0}', [group.memberCount]), style: nestEyebrow),
           ],
         ),
         const SizedBox(height: 8),
@@ -185,13 +184,13 @@ class _Body extends StatelessWidget {
             onPressed: () => _leave(context, group),
             style: OutlinedButton.styleFrom(foregroundColor: NestColor.redPen),
             icon: const Icon(Icons.logout_rounded, size: 18),
-            label: const Text('Leave this group'),
+            label: Text(tr('Leave this group')),
           )
         else if (group.isOwner(me))
           Text(
-            'You made this group, so you cannot leave it — a group with no '
+            tr('You made this group, so you cannot leave it — a group with no '
             'owner is one nobody can delete. Delete it instead when it is '
-            'finished with.',
+            'finished with.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
       ],
@@ -233,29 +232,29 @@ class _CodeCard extends StatelessWidget {
               children: [
                 Text(
                   prettyJoinCode(group.joinCode),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
-                    letterSpacing: 4,
+                    letterSpacing: ls(4),
                     fontWeight: FontWeight.w700,
                     color: NestColor.penDeep,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Anyone with this code can join. There is no O or I in a '
-                  'code — those are zero and one.',
+                  tr('Anyone with this code can join. There is no O or I in a '
+                  'code — those are zero and one.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
           IconButton(
-            tooltip: 'Copy code',
+            tooltip: tr('Copy code'),
             icon: const Icon(Icons.copy_rounded),
             onPressed: () {
               Clipboard.setData(ClipboardData(text: group.joinCode));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Code copied')),
+                SnackBar(content: Text(tr('Code copied'))),
               );
             },
           ),
@@ -323,7 +322,7 @@ class _MembersState extends State<_Members> {
             children: [
               for (var i = 0; i < people.length; i++) ...[
                 if (i > 0)
-                  const Divider(height: 1, indent: 60, color: NestColor.rule),
+                  Divider(height: 1, indent: 60, color: NestColor.rule),
                 _MemberRow(
                   person: people[i],
                   isOwner: people[i].uid == group.ownerUid,
@@ -385,7 +384,7 @@ class _MemberRow extends StatelessWidget {
             ),
             child: Text(
               person.initials,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: NestColor.pen,
@@ -421,8 +420,8 @@ class _MemberRow extends StatelessWidget {
                 color: NestColor.o(NestColor.mint, 0.12),
                 borderRadius: BorderRadius.circular(NestRadius.chip),
               ),
-              child: const Text(
-                'Owner',
+              child: Text(
+                tr('Owner'),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -431,10 +430,10 @@ class _MemberRow extends StatelessWidget {
               ),
             )
           else if (person.isTeacher)
-            Text('Teacher', style: Theme.of(context).textTheme.bodySmall),
+            Text(tr('Teacher'), style: Theme.of(context).textTheme.bodySmall),
           if (!isYou) ...[
             const SizedBox(width: 6),
-            const Icon(
+            Icon(
               Icons.chat_bubble_outline_rounded,
               size: 17,
               color: NestColor.inkFaint,

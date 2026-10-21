@@ -4,6 +4,7 @@
          still asks the student the first time either is used; this only
          declares that the app may ask. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
 
     <!-- The device speech recogniser sends audio to Google's service unless an
          offline language pack is installed, so it needs the network. -->
@@ -27,6 +28,9 @@
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="messages" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

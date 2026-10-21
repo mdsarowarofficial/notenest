@@ -7,6 +7,7 @@ import '../../data/note_repository.dart';
 import '../../data/profile_photo.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
+import '../../theme/theme_controller.dart';
 import '../../widgets/nest_mark_tile.dart';
 import '../auth/account_switch.dart';
 import '../backup/drive_backup_page.dart';
@@ -15,6 +16,9 @@ import '../cover/university_picker.dart';
 import '../semester/degree_sheet.dart';
 import '../semester/semester_page.dart';
 import '../trash/trash_page.dart';
+import '../../l10n/strings.dart';
+import '../../data/app_lock.dart';
+import '../lock/lock_screen.dart';
 
 /// The gear in the drawer used to say "Settings is not built yet", because it
 /// was not. This is it.
@@ -41,7 +45,7 @@ class SettingsPage extends StatelessWidget {
     final repo = NoteRepository.instance;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(tr('Settings'))),
       body: ListenableBuilder(
         listenable: Listenable.merge([repo, CloudService.instance]),
         builder: (context, _) {
@@ -52,17 +56,17 @@ class SettingsPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
               if (repo.isTeacher) ...[
-                const _Heading('TEACHING'),
+                _Heading(tr('TEACHING')),
                 _Card(
                   children: [
                     _Row(
                       icon: Icons.account_balance_rounded,
                       tint: NestColor.tintPen,
                       ink: NestColor.penDeep,
-                      title: 'University',
+                      title: tr('University'),
                       value: repo.university?.isNotEmpty == true
                           ? repo.university!
-                          : 'Not set',
+                          : tr('Not set'),
                       onTap: () async {
                         final picked = await showUniversityPicker(context);
                         if (picked != null) {
@@ -74,15 +78,15 @@ class SettingsPage extends StatelessWidget {
                       icon: Icons.class_outlined,
                       tint: NestColor.tintWarm,
                       ink: NestColor.warmDeep,
-                      title: 'Course',
-                      value: repo.teachingCourse ?? 'Not set (optional)',
+                      title: tr('Course'),
+                      value: repo.teachingCourse ?? tr('Not set (optional)'),
                       onTap: () => _editCourse(context, repo),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
               ] else ...[
-                const _Heading('YOUR DEGREE'),
+                _Heading(tr('YOUR DEGREE')),
                 _Card(
                   children: [
                     _Row(
@@ -91,19 +95,19 @@ class SettingsPage extends StatelessWidget {
                       ink: NestColor.penDeep,
                       title: plan.university?.isNotEmpty == true
                           ? plan.university!
-                          : 'University and dates',
+                          : tr('University and dates'),
                       value: plan.isDated
-                          ? '${current == null ? '—' : semesterLabelFor(current)}'
+                          ? '${current == null ? '—' : shownSemester(semesterLabelFor(current))}'
                               ' · ${plan.system.label}'
-                          : 'Not set up yet',
+                          : tr('Not set up yet'),
                       onTap: () => showDegreeSheet(context),
                     ),
                     _Row(
                       icon: Icons.menu_book_rounded,
                       tint: NestColor.tintWarm,
                       ink: NestColor.warmDeep,
-                      title: 'Semesters and courses',
-                      value: 'What each term held',
+                      title: tr('Semesters and courses'),
+                      value: tr('What each term held'),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const SemesterPage()),
                       ),
@@ -112,33 +116,35 @@ class SettingsPage extends StatelessWidget {
                       icon: Icons.alarm_rounded,
                       tint: NestColor.tintMint,
                       ink: NestColor.mintDeep,
-                      title: 'Revision plan',
-                      value: repo.reminderChoice ?? 'Not chosen',
+                      title: tr('Revision plan'),
+                      value: repo.reminderChoice == null
+                          ? tr('Not chosen')
+                          : tr(repo.reminderChoice!),
                       onTap: () => _pickReminder(context, repo),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
               ],
-              const _Heading('ACCOUNT'),
+              _Heading(tr('ACCOUNT')),
               _Card(
                 children: [
                   _Row(
                     icon: Icons.badge_outlined,
                     tint: NestColor.tintPen,
                     ink: NestColor.penDeep,
-                    title: 'Account type',
-                    value: repo.isTeacher ? 'Teacher' : 'Student',
+                    title: tr('Account type'),
+                    value: repo.isTeacher ? tr('Teacher') : tr('Student'),
                     onTap: () => _pickRole(context, repo),
                   ),
                   _Row(
                     icon: Icons.account_circle_outlined,
                     tint: NestColor.tintWarm,
                     ink: NestColor.warmDeep,
-                    title: 'Profile photo',
+                    title: tr('Profile photo'),
                     value: myPhoto() == null
-                        ? 'Not set — tap to add one'
-                        : 'Shown on Today and to your classes',
+                        ? tr('Not set — tap to add one')
+                        : tr('Shown on Today and to your classes'),
                     onTap: () async {
                       final messenger = ScaffoldMessenger.of(context);
                       final message = await changeMyPhoto(context);
@@ -152,8 +158,8 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.cloud_queue_rounded,
                     tint: NestColor.tintPen,
                     ink: NestColor.penDeep,
-                    title: 'Cloud account',
-                    value: 'Sharing, groups and chat',
+                    title: tr('Cloud account'),
+                    value: tr('Sharing, groups and chat'),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const CloudPage()),
                     ),
@@ -167,50 +173,49 @@ class SettingsPage extends StatelessWidget {
                       icon: Icons.password_rounded,
                       tint: NestColor.tintRed,
                       ink: NestColor.redDeep,
-                      title: 'Change password',
-                      value: 'The one you use on this device',
+                      title: tr('Change password'),
+                      value: tr('The one you use on this device'),
                       onTap: () => _changePassword(context),
                     )
                   else
-                    const _Row(
+                    _Row(
                       icon: Icons.verified_user_outlined,
                       tint: NestColor.tintPen,
                       ink: NestColor.penDeep,
-                      title: 'Sign-in method',
-                      value: 'Google — there is no password to change',
+                      title: tr('Sign-in method'),
+                      value: tr('Google — there is no password to change'),
                     ),
                   _Row(
                     icon: Icons.switch_account_outlined,
                     tint: NestColor.tintMint,
                     ink: NestColor.mintDeep,
-                    title: 'Switch account',
+                    title: tr('Switch account'),
                     value: AuthRepository.instance.currentUser?.email ??
-                        'Another account on this phone',
+                        tr('Another account on this phone'),
                     onTap: () => showAccountSwitcher(context),
                   ),
                   _Row(
                     icon: Icons.logout_rounded,
                     tint: NestColor.tintRed,
                     ink: NestColor.redDeep,
-                    title: 'Sign out',
-                    value: 'Your notes stay on this phone',
+                    title: tr('Sign out'),
+                    value: tr('Your notes stay on this phone'),
                     onTap: () => confirmSignOut(context),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              const _Heading('BACKUP'),
+              _Heading(tr('BACKUP')),
               _Card(
                 children: [
                   _Row(
                     icon: Icons.add_to_drive_rounded,
                     tint: NestColor.tintPen,
                     ink: NestColor.penDeep,
-                    title: 'Google Drive backup',
+                    title: tr('Google Drive backup'),
                     value: repo.lastBackupAt == null
-                        ? 'Not backed up yet'
-                        : 'Last backup ${_ago(repo.lastBackupAt!)}'
-                            '${repo.autoBackup ? ' · daily' : ''}',
+                        ? tr('Not backed up yet')
+                        : trp('Last backup {0}{1}', [_ago(repo.lastBackupAt!), repo.autoBackup ? tr(' · daily') : '']),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                           builder: (_) => const DriveBackupPage()),
@@ -219,15 +224,21 @@ class SettingsPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              const _Heading('ON THIS DEVICE'),
+              _Heading(tr('PRIVACY')),
+              const _Card(children: [_LockRow()]),
+              const SizedBox(height: 24),
+              _Heading(tr('APPEARANCE')),
+              const _Card(children: [_ThemeRow(), _LanguageRow()]),
+              const SizedBox(height: 24),
+              _Heading(tr('ON THIS DEVICE')),
               _Card(
                 children: [
                   _Row(
                     icon: Icons.delete_outline_rounded,
                     tint: NestColor.tintWarm,
                     ink: NestColor.warmDeep,
-                    title: 'Trash',
-                    value: 'Notes you deleted',
+                    title: tr('Trash'),
+                    value: tr('Notes you deleted'),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const TrashPage()),
                     ),
@@ -236,29 +247,29 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.search_off_rounded,
                     tint: NestColor.tintMint,
                     ink: NestColor.mintDeep,
-                    title: 'Clear recent searches',
-                    value: 'Only the list of what you typed',
+                    title: tr('Clear recent searches'),
+                    value: tr('Only the list of what you typed'),
                     onTap: () async {
                       final messenger = ScaffoldMessenger.of(context);
                       await repo.clearRecentSearches();
                       messenger.showSnackBar(
-                        const SnackBar(
-                            content: Text('Recent searches cleared.')),
+                        SnackBar(
+                            content: Text(tr('Recent searches cleared.'))),
                       );
                     },
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              const _Heading('ABOUT'),
+              _Heading(tr('ABOUT')),
               _Card(
                 children: [
                   _Row(
                     icon: Icons.tour_outlined,
                     tint: NestColor.tintMint,
                     ink: NestColor.mintDeep,
-                    title: 'Show the app tour again',
-                    value: 'A step-by-step look at each screen',
+                    title: tr('Show the app tour again'),
+                    value: tr('A step-by-step look at each screen'),
                     onTap: () async {
                       await repo.saveTourDone(false);
                       if (!context.mounted) return;
@@ -271,8 +282,8 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.article_outlined,
                     tint: NestColor.tintPen,
                     ink: NestColor.penDeep,
-                    title: 'Open-source licences',
-                    value: 'The packages NoteNest is built on',
+                    title: tr('Open-source licences'),
+                    value: tr('The packages NoteNest is built on'),
                     onTap: () => showLicensePage(
                       context: context,
                       applicationName: 'NoteNest',
@@ -303,16 +314,16 @@ class SettingsPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 16),
-            const Text('ACCOUNT TYPE', style: nestEyebrow),
+            Text(tr('ACCOUNT TYPE'), style: nestEyebrow),
             const SizedBox(height: 6),
-            for (final (key, label, blurb) in const [
+            for (final (key, label, blurb) in [
               (
                 'student',
                 'Student',
-                'Semesters, subjects, exams, and classes '
-                    'you join'
+                tr('Semesters, subjects, exams, and classes '
+                    'you join')
               ),
-              ('teacher', 'Teacher', 'Make classes, post work, and grade it'),
+              ('teacher', 'Teacher', tr('Make classes, post work, and grade it')),
             ])
               ListTile(
                 leading: Icon(
@@ -341,7 +352,7 @@ class SettingsPage extends StatelessWidget {
     final saved = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Course you teach'),
+        title: Text(tr('Course you teach')),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -352,11 +363,11 @@ class SettingsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Save'),
+            child: Text(tr('Save')),
           ),
         ],
       ),
@@ -367,15 +378,16 @@ class SettingsPage extends StatelessWidget {
 
   static String _ago(DateTime at) {
     final d = DateTime.now().difference(at);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inHours < 1) return '${d.inMinutes} min ago';
-    if (d.inDays < 1) return '${d.inHours} h ago';
+    if (d.inMinutes < 1) return tr('just now');
+    if (d.inHours < 1) return trp('{0} min ago', [d.inMinutes]);
+    if (d.inDays < 1) return trp('{0} h ago', [d.inHours]);
     if (d.inDays == 1) return 'yesterday';
-    return '${d.inDays} days ago';
+    return trp('{0} days ago', [d.inDays]);
   }
 
   static Future<void> _pickReminder(
       BuildContext context, NoteRepository repo) async {
+    // Saved as written; translated only where shown.
     const options = [
       'After every class',
       'Every evening',
@@ -389,13 +401,13 @@ class SettingsPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 18),
-            const Text('YOUR REVISION PLAN', style: nestEyebrow),
+            Text(tr('YOUR REVISION PLAN'), style: nestEyebrow),
             const SizedBox(height: 14),
             for (final option in options)
               ListTile(
-                title: Text(option),
+                title: Text(tr(option)),
                 trailing: repo.reminderChoice == option
-                    ? const Icon(Icons.check_rounded, color: NestColor.pen)
+                    ? Icon(Icons.check_rounded, color: NestColor.pen)
                     : null,
                 onTap: () => Navigator.pop(sheetContext, option),
               ),
@@ -421,7 +433,214 @@ class SettingsPage extends StatelessWidget {
     );
     messenger.showSnackBar(
       SnackBar(
-        content: Text(error == null ? 'Password changed.' : error.message),
+        content: Text(error == null ? tr('Password changed.') : error.message),
+      ),
+    );
+  }
+}
+
+/// The app lock: off, or a PIN with an optional fingerprint.
+class _LockRow extends StatelessWidget {
+  const _LockRow();
+
+  Future<void> _turnOn(BuildContext context) async {
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const PinSetupPage()),
+    );
+    if (done != true || !context.mounted) return;
+    // Offer the fingerprint only if this phone has one set up.
+    if (await AppLock.instance.biometricsAvailable()) {
+      await AppLock.instance.setBiometric(true);
+    }
+  }
+
+  Future<void> _manage(BuildContext context) async {
+    final lock = AppLock.instance;
+    final canBio = await lock.biometricsAvailable();
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListenableBuilder(
+          listenable: lock,
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const Icon(Icons.pin_outlined),
+                title: Text(tr('Change PIN')),
+                onTap: () async {
+                  final ok = await Navigator.of(sheetContext).push<bool>(
+                    MaterialPageRoute(builder: (_) => const PinVerifyPage()),
+                  );
+                  if (ok != true || !sheetContext.mounted) return;
+                  await Navigator.of(sheetContext).push<bool>(
+                    MaterialPageRoute(builder: (_) => const PinSetupPage()),
+                  );
+                },
+              ),
+              if (canBio)
+                SwitchListTile(
+                  secondary: const Icon(Icons.fingerprint_rounded),
+                  title: Text(tr('Unlock with fingerprint')),
+                  value: lock.biometric,
+                  onChanged: lock.setBiometric,
+                ),
+              ListTile(
+                leading: Icon(Icons.lock_open_rounded, color: NestColor.redPen),
+                title: Text(tr('Turn the lock off'),
+                    style: TextStyle(color: NestColor.redPen)),
+                onTap: () async {
+                  final ok = await Navigator.of(sheetContext).push<bool>(
+                    MaterialPageRoute(builder: (_) => const PinVerifyPage()),
+                  );
+                  if (ok != true) return;
+                  await lock.disable();
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lock = AppLock.instance;
+    return ListenableBuilder(
+      listenable: lock,
+      builder: (context, _) => _Row(
+        icon: Icons.lock_outline_rounded,
+        tint: NestColor.tintRed,
+        ink: NestColor.redDeep,
+        title: tr('App lock'),
+        value: !lock.enabled
+            ? tr('Off — anyone with your phone can open your notes')
+            : lock.biometric
+                ? tr('On · PIN and fingerprint')
+                : tr('On · PIN'),
+        onTap: () => lock.enabled ? _manage(context) : _turnOn(context),
+      ),
+    );
+  }
+}
+
+/// English or Bangla. Each is written in its own script.
+class _LanguageRow extends StatelessWidget {
+  const _LanguageRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final language = AppLanguage.instance;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              MarkTile.tool(Icons.translate_rounded,
+                  tint: NestColor.tintMint, ink: NestColor.mintDeep, size: 40),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('Language'),
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      'English · বাংলা',
+                      style: TextStyle(
+                        fontFamily: NestFont.body,
+                        fontSize: 12,
+                        color: NestColor.inkMeta,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<AppLang>(
+              showSelectedIcon: false,
+              segments: [
+                for (final l in AppLang.values)
+                  ButtonSegment(value: l, label: Text(l.nativeName)),
+              ],
+              selected: {language.lang},
+              onSelectionChanged: (s) => language.set(s.first),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Light, dark, or whatever the phone is set to.
+class _ThemeRow extends StatelessWidget {
+  const _ThemeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ThemeController.instance;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              MarkTile.tool(
+                NestColor.isDark
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                tint: NestColor.tintPen,
+                ink: NestColor.pen,
+                size: 40,
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('Theme'), style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      tr('Dark is easier on the eyes at night'),
+                      style: TextStyle(
+                        fontFamily: NestFont.body,
+                        fontSize: 12,
+                        color: NestColor.inkMeta,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<ThemeChoice>(
+              showSelectedIcon: false,
+              segments: [
+                for (final c in ThemeChoice.values)
+                  ButtonSegment(value: c, label: Text(c.label)),
+              ],
+              selected: {controller.choice},
+              onSelectionChanged: (s) => controller.set(s.first),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -499,7 +718,7 @@ class _Row extends StatelessWidget {
                       value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: NestFont.body,
                         fontSize: 12,
                         color: NestColor.inkMeta,
@@ -509,7 +728,7 @@ class _Row extends StatelessWidget {
                 ),
               ),
               if (onTap != null)
-                const Icon(Icons.chevron_right_rounded,
+                Icon(Icons.chevron_right_rounded,
                     color: NestColor.inkFaint),
             ],
           ),
@@ -542,20 +761,20 @@ class _Honesty extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Worth knowing', style: t.titleSmall),
+          Text(tr('Worth knowing'), style: t.titleSmall),
           const SizedBox(height: 8),
           Text(
-            'Your revision plan decides what the app puts in front of you. '
+            tr('Your revision plan decides what the app puts in front of you. '
             'Phone reminders for tasks and exams are off until you turn them '
             'on in the notifications settings; they ring from this phone, '
-            'with no internet needed.',
+            'with no internet needed.'),
             style: t.bodySmall,
           ),
           const SizedBox(height: 8),
           Text(
-            'Notes live on this device. A cloud account is for sharing, '
+            tr('Notes live on this device. A cloud account is for sharing, '
             'classes and chat; notes are not copied to it. To keep them if '
-            'this phone is lost, use Google Drive backup above.',
+            'this phone is lost, use Google Drive backup above.'),
             style: t.bodySmall,
           ),
         ],
@@ -594,11 +813,11 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
 
   void _submit() {
     if (_next.text.length < 6) {
-      setState(() => _problem = 'Six characters at least.');
+      setState(() => _problem = tr('Six characters at least.'));
       return;
     }
     if (_next.text != _again.text) {
-      setState(() => _problem = 'The two new passwords are different.');
+      setState(() => _problem = tr('The two new passwords are different.'));
       return;
     }
     Navigator.pop(context, _PasswordPair(_current.text, _next.text));
@@ -607,35 +826,35 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Change password'),
+      title: Text(tr('Change password')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'This is the password for this device. Your cloud password is '
-              'separate and is changed by email.',
+              tr('This is the password for this device. Your cloud password is '
+              'separate and is changed by email.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _current,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Current password'),
+              decoration: InputDecoration(labelText: tr('Current password')),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _next,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'New password'),
+              decoration: InputDecoration(labelText: tr('New password')),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _again,
               obscureText: true,
               decoration:
-                  const InputDecoration(labelText: 'New password again'),
+                  InputDecoration(labelText: tr('New password again')),
             ),
             if (_problem != null) ...[
               const SizedBox(height: 12),
@@ -653,9 +872,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(tr('Cancel')),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Change')),
+        FilledButton(onPressed: _submit, child: Text(tr('Change'))),
       ],
     );
   }

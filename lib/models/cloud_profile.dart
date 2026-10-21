@@ -6,6 +6,8 @@
 /// that genuinely need a network stay in `cloud_service.dart`.
 library;
 
+import '../l10n/strings.dart';
+
 /// What the account is for. Chosen when connecting, and it decides what the
 /// app offers later: a teacher sets assignments, a student submits them.
 enum CloudRole { student, teacher }
@@ -16,18 +18,18 @@ extension CloudRoleData on CloudRole {
   String get label {
     switch (this) {
       case CloudRole.student:
-        return 'Student';
+        return tr('Student');
       case CloudRole.teacher:
-        return 'Teacher';
+        return tr('Teacher');
     }
   }
 
   String get blurb {
     switch (this) {
       case CloudRole.student:
-        return 'Share notes with classmates, join a class, hand work in.';
+        return tr('Share notes with classmates, join a class, hand work in.');
       case CloudRole.teacher:
-        return 'Set assignments with a deadline and see what comes back.';
+        return tr('Set assignments with a deadline and see what comes back.');
     }
   }
 
@@ -171,9 +173,9 @@ const minPasswordLength = 6;
 
 /// What is wrong with a password, or null when nothing is.
 String? passwordProblem(String password) {
-  if (password.isEmpty) return 'Type a password.';
+  if (password.isEmpty) return tr('Type a password.');
   if (password.length < minPasswordLength) {
-    return 'At least $minPasswordLength characters.';
+    return trp('At least {0} characters.', [minPasswordLength]);
   }
   return null;
 }
@@ -186,32 +188,31 @@ String? passwordProblem(String password) {
 String describeAuthError(String? code) {
   switch (code) {
     case 'email-already-in-use':
-      return 'There is already a cloud account on that email. '
-          'Use Sign in instead.';
+      return tr('There is already a cloud account on that email. '
+          'Use Sign in instead.');
     case 'invalid-email':
-      return 'That address does not look right. Check for a typo.';
+      return tr('That address does not look right. Check for a typo.');
     case 'weak-password':
-      return 'That password is too short. Use at least '
-          '$minPasswordLength characters.';
+      return trp('That password is too short. Use at least {0} characters.', [minPasswordLength]);
     case 'user-not-found':
-      return 'No cloud account on that email yet. Use Create instead.';
+      return tr('No cloud account on that email yet. Use Create instead.');
     case 'wrong-password':
     case 'invalid-credential':
       // Firebase now returns the vaguer `invalid-credential` for both a wrong
       // password and an unknown account, so the message cannot promise which.
-      return 'That email and password do not match an account.';
+      return tr('That email and password do not match an account.');
     case 'user-disabled':
-      return 'That account has been disabled.';
+      return tr('That account has been disabled.');
     case 'too-many-requests':
-      return 'Too many tries. Wait a minute and try again.';
+      return tr('Too many tries. Wait a minute and try again.');
     case 'network-request-failed':
-      return 'No connection to Firebase. Check your internet and try again.';
+      return tr('No connection to Firebase. Check your internet and try again.');
     case 'operation-not-allowed':
       // Almost always the one Console switch nobody remembers.
-      return 'Email and password sign-in is switched off in the Firebase '
-          'console. Turn it on under Authentication → Sign-in method.';
+      return tr('Email and password sign-in is switched off in the Firebase '
+          'console. Turn it on under Authentication → Sign-in method.');
     default:
-      return 'That did not work. Try again in a moment.';
+      return tr('That did not work. Try again in a moment.');
   }
 }
 
@@ -219,16 +220,16 @@ String describeAuthError(String? code) {
 String describeStoreError(String? code) {
   switch (code) {
     case 'permission-denied':
-      return 'Firestore refused that. The security rules may not be published '
-          'yet, or you are signed out of the cloud.';
+      return tr('Firestore refused that. The security rules may not be published '
+          'yet, or you are signed out of the cloud.');
     case 'unavailable':
-      return 'Firestore could not be reached. You are probably offline.';
+      return tr('Firestore could not be reached. You are probably offline.');
     case 'not-found':
-      return 'That is not there any more.';
+      return tr('That is not there any more.');
     case 'failed-precondition':
-      return 'Firestore needs an index for that query. The console error log '
-          'has a link that creates it.';
+      return tr('Firestore needs an index for that query. The console error log '
+          'has a link that creates it.');
     default:
-      return 'The cloud did not answer. Try again in a moment.';
+      return tr('The cloud did not answer. Try again in a moment.');
   }
 }

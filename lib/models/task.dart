@@ -5,6 +5,8 @@
 /// disagree with them.
 library;
 
+import '../l10n/strings.dart';
+
 enum TaskPriority { low, normal, high }
 
 extension TaskPriorityData on TaskPriority {
@@ -13,11 +15,11 @@ extension TaskPriorityData on TaskPriority {
   String get label {
     switch (this) {
       case TaskPriority.low:
-        return 'Low';
+        return tr('Low');
       case TaskPriority.normal:
-        return 'Normal';
+        return tr('Normal');
       case TaskPriority.high:
-        return 'High';
+        return tr('High');
     }
   }
 

@@ -7,6 +7,7 @@
 library;
 
 import 'dart:convert';
+import '../l10n/strings.dart';
 
 /// What is being handed in. The wording on the page changes with it, and so
 /// does what the numbered field is called.
@@ -18,15 +19,15 @@ extension CoverKindData on CoverKind {
   String get label {
     switch (this) {
       case CoverKind.assignment:
-        return 'Assignment';
+        return tr('Assignment');
       case CoverKind.labReport:
-        return 'Lab Report';
+        return tr('Lab Report');
       case CoverKind.project:
-        return 'Project Report';
+        return tr('Project Report');
       case CoverKind.thesis:
-        return 'Thesis';
+        return tr('Thesis');
       case CoverKind.presentation:
-        return 'Presentation';
+        return tr('Presentation');
     }
   }
 
@@ -38,13 +39,13 @@ extension CoverKindData on CoverKind {
   String? get serialLabel {
     switch (this) {
       case CoverKind.assignment:
-        return 'Assignment No.';
+        return tr('Assignment No.');
       case CoverKind.labReport:
-        return 'Experiment No.';
+        return tr('Experiment No.');
       case CoverKind.project:
-        return 'Project No.';
+        return tr('Project No.');
       case CoverKind.presentation:
-        return 'Presentation No.';
+        return tr('Presentation No.');
       case CoverKind.thesis:
         return null;
     }
@@ -54,11 +55,11 @@ extension CoverKindData on CoverKind {
   String get titleLabel {
     switch (this) {
       case CoverKind.labReport:
-        return 'Experiment name';
+        return tr('Experiment name');
       case CoverKind.thesis:
-        return 'Thesis title';
+        return tr('Thesis title');
       default:
-        return 'Title';
+        return tr('Title');
     }
   }
 
@@ -80,32 +81,32 @@ extension CoverTemplateData on CoverTemplate {
   String get label {
     switch (this) {
       case CoverTemplate.framed:
-        return 'Framed';
+        return tr('Framed');
       case CoverTemplate.classic:
-        return 'Classic';
+        return tr('Classic');
       case CoverTemplate.ruled:
-        return 'Ruled';
+        return tr('Ruled');
       case CoverTemplate.crest:
-        return 'Crest';
+        return tr('Crest');
       case CoverTemplate.minimal:
-        return 'Minimal';
+        return tr('Minimal');
     }
   }
 
   String get note {
     switch (this) {
       case CoverTemplate.framed:
-        return 'Ruled border, logo in the corner, details in panels. The '
-            'arrangement most departments here hand out.';
+        return tr('Ruled border, logo in the corner, details in panels. The '
+            'arrangement most departments here hand out.');
       case CoverTemplate.classic:
-        return 'Centred, double rule, two columns at the bottom. What most '
-            'departments expect.';
+        return tr('Centred, double rule, two columns at the bottom. What most '
+            'departments expect.');
       case CoverTemplate.ruled:
-        return 'Notebook rules behind the text, in the app\'s own hand.';
+        return tr('Notebook rules behind the text, in the app\'s own hand.');
       case CoverTemplate.crest:
-        return 'A drawn seal at the top, everything stacked under it.';
+        return tr('A drawn seal at the top, everything stacked under it.');
       case CoverTemplate.minimal:
-        return 'Left-aligned, one thin rule, a lot of air.';
+        return tr('Left-aligned, one thin rule, a lot of air.');
     }
   }
 
@@ -142,11 +143,11 @@ extension CoverDensityData on CoverDensity {
   String get label {
     switch (this) {
       case CoverDensity.compact:
-        return 'Tight';
+        return tr('Tight');
       case CoverDensity.normal:
-        return 'Normal';
+        return tr('Normal');
       case CoverDensity.airy:
-        return 'Airy';
+        return tr('Airy');
     }
   }
 
@@ -179,11 +180,11 @@ extension SignatureStyleData on SignatureStyle {
   String get label {
     switch (this) {
       case SignatureStyle.staggered:
-        return 'Stepped';
+        return tr('Stepped');
       case SignatureStyle.level:
-        return 'Level';
+        return tr('Level');
       case SignatureStyle.stacked:
-        return 'Stacked';
+        return tr('Stacked');
     }
   }
 
@@ -204,15 +205,15 @@ extension FrameStyleData on FrameStyle {
   String get label {
     switch (this) {
       case FrameStyle.dotted:
-        return 'Dotted';
+        return tr('Dotted');
       case FrameStyle.double:
-        return 'Double';
+        return tr('Double');
       case FrameStyle.hairline:
-        return 'Hairline';
+        return tr('Hairline');
       case FrameStyle.corners:
-        return 'Corners';
+        return tr('Corners');
       case FrameStyle.none:
-        return 'None';
+        return tr('None');
     }
   }
 

@@ -10,6 +10,7 @@ import 'auth_repository.dart';
 import 'drive_service.dart';
 import 'note_repository.dart';
 import '../models/course_file.dart' show extensionOf;
+import '../l10n/strings.dart';
 
 /// What a restore brought back.
 class RestoreReport {
@@ -31,7 +32,7 @@ class RestoreReport {
 
   String get summary {
     if (notes == 0 && subjects == 0 && exams == 0) {
-      return 'Everything in the backup is already on this phone.';
+      return tr('Everything in the backup is already on this phone.');
     }
     final parts = <String>[
       '$notes ${notes == 1 ? 'note' : 'notes'}',
@@ -40,8 +41,8 @@ class RestoreReport {
       if (exams > 0) '$exams ${exams == 1 ? 'date' : 'dates'}',
     ];
     final tail =
-        skipped > 0 ? ' $skipped already here were left as they were.' : '';
-    return 'Restored ${parts.join(', ')}.$tail';
+        skipped > 0 ? trp(' {0} already here were left as they were.', [skipped]) : '';
+    return trp('Restored {0}.{1}', [parts.join(', '), tail]);
   }
 }
 
@@ -183,11 +184,16 @@ class DriveBackup {
       where: 'user_id = ? AND drive_id IS NOT NULL',
       whereArgs: [userId],
     );
+    // Not `SELECT *`: the text read out of a PDF for search is large and is
+    // rebuilt from the file, so it stays out of the backup.
     final attachments = await _db.db.rawQuery(
-      'SELECT * FROM attachments '
+      'SELECT id, note_id, type, file_name, stored_name, size_bytes, '
+      'page_count, duration_ms, position, created_at FROM attachments '
       'WHERE note_id IN (SELECT id FROM notes WHERE user_id = ?)',
       [userId],
     );
+    final studySessions = await _db.db.query('study_sessions',
+        where: 'user_id = ?', whereArgs: [userId]);
 
     final archive = Archive();
     final kept = <Map<String, Object?>>[];
@@ -214,6 +220,7 @@ class DriveBackup {
       'attachments': kept,
       'tasks': tasks,
       'goals': goals,
+      'studySessions': studySessions,
       'dayLogs': dayLogs,
       'courseFiles': courseFiles,
       'settings': [
@@ -234,25 +241,25 @@ class DriveBackup {
     try {
       archive = ZipDecoder().decodeBytes(bytes);
     } catch (_) {
-      throw const DriveException('That backup file is damaged.');
+      throw DriveException(tr('That backup file is damaged.'));
     }
     final entry = archive.find('backup.json');
     final raw = entry?.readBytes();
     if (raw == null) {
-      throw const DriveException('That is not a NoteNest backup.');
+      throw DriveException(tr('That is not a NoteNest backup.'));
     }
     final Map<String, dynamic> m;
     try {
       m = jsonDecode(utf8.decode(raw)) as Map<String, dynamic>;
     } catch (_) {
-      throw const DriveException('That backup file is damaged.');
+      throw DriveException(tr('That backup file is damaged.'));
     }
     if (m['format'] != _format) {
-      throw const DriveException('That is not a NoteNest backup.');
+      throw DriveException(tr('That is not a NoteNest backup.'));
     }
     if ((m['version'] as int? ?? 0) > _version) {
-      throw const DriveException(
-        'That backup was made by a newer NoteNest. Update the app first.',
+      throw DriveException(
+        tr('That backup was made by a newer NoteNest. Update the app first.'),
       );
     }
 
@@ -277,7 +284,10 @@ class DriveBackup {
         final data = file?.readBytes();
         if (data == null) continue;
         final dot = old.lastIndexOf('.');
-        final ext = dot < 0 ? 'bin' : old.substring(dot + 1);
+        // Only letters and digits, so a doctored backup cannot steer the file
+        // out of the attachments folder with a name like "x/../../y".
+        final tail = dot < 0 ? '' : old.substring(dot + 1);
+        final ext = RegExp(r'^[A-Za-z0-9]{1,8}$').hasMatch(tail) ? tail : 'bin';
         storedNames[old] =
             await AttachmentStore.saveBytes(Uint8List.fromList(data), ext);
       }
@@ -389,6 +399,22 @@ class DriveBackup {
         );
         if (existing.isNotEmpty) continue;
         await txn.insert('goals', {..._withoutId(g), 'user_id': userId});
+      }
+
+      for (final s in rows('studySessions')) {
+        final existing = await txn.query(
+          'study_sessions',
+          columns: ['id'],
+          where: 'user_id = ? AND started_at = ? AND minutes = ?',
+          whereArgs: [userId, s['started_at'], s['minutes']],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) continue;
+        await txn.insert('study_sessions', {
+          ..._withoutId(s),
+          'user_id': userId,
+          'subject_id': null,
+        });
       }
 
       // A day already written here keeps what this phone has.

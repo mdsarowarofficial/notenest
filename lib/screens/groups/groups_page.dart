@@ -8,6 +8,7 @@ import '../../widgets/nest_empty_state.dart';
 import '../classroom/classroom_page.dart';
 import '../cloud/cloud_page.dart';
 import 'group_detail.dart';
+import '../../l10n/strings.dart';
 
 /// Study groups and classes: the list, making one, and joining one.
 ///
@@ -58,7 +59,7 @@ class _GroupsPageState extends State<GroupsPage> {
             stream: _stream(),
             builder: (context, snap) {
               if (snap.hasError) {
-                return _Problem(message: '${snap.error}');
+                return _Problem(message: trp('{0}', [snap.error]));
               }
               if (!snap.hasData) {
                 return const Center(child: CircularProgressIndicator());
@@ -70,11 +71,11 @@ class _GroupsPageState extends State<GroupsPage> {
                   padding: const EdgeInsets.all(22),
                   child: NestEmptyState(
                     icon: Icons.groups_2_outlined,
-                    title: 'No groups yet',
-                    message: 'A group is where a few people keep one subject '
+                    title: tr('No groups yet'),
+                    message: tr('A group is where a few people keep one subject '
                         'together. Make one and share the code, or type a code '
-                        'somebody gave you.',
-                    actionLabel: 'Make a group',
+                        'somebody gave you.'),
+                    actionLabel: tr('Make a group'),
                     onAction: () => showCreateGroupSheet(context),
                   ),
                 );
@@ -94,7 +95,7 @@ class _GroupsPageState extends State<GroupsPage> {
     if (widget.embedded) return body;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Groups')),
+      appBar: AppBar(title: Text(tr('Groups'))),
       body: body,
       floatingActionButton: ListenableBuilder(
         listenable: cloud,
@@ -107,7 +108,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 heroTag: 'join',
                 onPressed: () => showJoinGroupSheet(context),
                 icon: const Icon(Icons.login_rounded, size: 18),
-                label: const Text('Join'),
+                label: Text(tr('Join')),
                 backgroundColor: NestColor.card,
                 foregroundColor: NestColor.pen,
                 elevation: 1,
@@ -117,7 +118,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 heroTag: 'make',
                 onPressed: () => showCreateGroupSheet(context),
                 icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('Make one'),
+                label: Text(tr('Make one')),
               ),
             ],
           );
@@ -202,7 +203,7 @@ class _GroupTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: NestColor.inkFaint,
                 ),
@@ -224,11 +225,11 @@ class _NeedsAccount extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       child: NestEmptyState(
         icon: Icons.cloud_queue_rounded,
-        title: 'Connect a cloud account first',
-        message: 'A group lives somewhere both phones can see, so it needs an '
+        title: tr('Connect a cloud account first'),
+        message: tr('A group lives somewhere both phones can see, so it needs an '
             'account. Everything already on this device keeps working either '
-            'way.',
-        actionLabel: 'Cloud account',
+            'way.'),
+        actionLabel: tr('Cloud account'),
         onAction: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CloudPage()),
         ),
@@ -248,7 +249,7 @@ class _Problem extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       child: NestEmptyState(
         icon: Icons.error_outline_rounded,
-        title: 'Could not load your groups',
+        title: tr('Could not load your groups'),
         message: message,
       ),
     );
@@ -329,7 +330,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     final teacher = CloudService.instance.profile?.isTeacher ?? false;
 
     return _Sheet(
-      title: 'Make a group',
+      title: tr('Make a group'),
       error: _error,
       children: [
         TextField(
@@ -337,8 +338,8 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           autofocus: true,
           maxLength: maxGroupName,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            labelText: 'Name',
+          decoration: InputDecoration(
+            labelText: tr('Name'),
             hintText: 'Thesis group, CSE 112 Section B',
             counterText: '',
           ),
@@ -348,24 +349,24 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           controller: _subject,
           maxLength: maxGroupSubject,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: 'Subject (optional)',
+          decoration: InputDecoration(
+            labelText: tr('Subject (optional)'),
             hintText: 'CSE 112',
             counterText: '',
           ),
         ),
         const SizedBox(height: 18),
-        const Text('WHAT KIND', style: nestEyebrow),
+        Text(tr('WHAT KIND'), style: nestEyebrow),
         const SizedBox(height: 8),
         SegmentedButton<GroupKind>(
           segments: [
-            const ButtonSegment(
+            ButtonSegment(
               value: GroupKind.study,
-              label: Text('Study group'),
+              label: Text(tr('Study group')),
             ),
             ButtonSegment(
               value: GroupKind.classroom,
-              label: const Text('Class'),
+              label: Text(tr('Class')),
               enabled: teacher,
             ),
           ],
@@ -378,8 +379,8 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
               ? _kind.blurb
               // Said plainly rather than hidden: a disabled control with no
               // explanation is a dead end, and the fix is one tap away.
-              : 'Only a teacher account can make a class. You can change your '
-                  'account to Teacher on the Cloud account screen.',
+              : tr('Only a teacher account can make a class. You can change your '
+                  'account to Teacher on the Cloud account screen.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 22),
@@ -396,7 +397,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('Make the group'),
+                : Text(tr('Make the group')),
           ),
         ),
       ],
@@ -456,7 +457,7 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
       if (!mounted) return;
       navigator.pop();
       messenger.showSnackBar(
-        SnackBar(content: Text('Joined ${group.name}')),
+        SnackBar(content: Text(trp('Joined {0}', [group.name]))),
       );
       navigator.push(
         MaterialPageRoute(builder: (_) => groupScreen(group)),
@@ -473,16 +474,16 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
   @override
   Widget build(BuildContext context) {
     return _Sheet(
-      title: widget.asClass ? 'Join a class' : 'Join a group',
+      title: widget.asClass ? tr('Join a class') : tr('Join a group'),
       error: _error,
       children: [
         TextField(
           controller: _code,
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 26,
-            letterSpacing: 6,
+            letterSpacing: ls(6),
             fontWeight: FontWeight.w700,
           ),
           textAlign: TextAlign.center,
@@ -497,8 +498,8 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
         ),
         const SizedBox(height: 14),
         Text(
-          'Ask whoever made the group for its code. It is six characters, and '
-          'spaces or dashes do not matter.',
+          tr('Ask whoever made the group for its code. It is six characters, and '
+          'spaces or dashes do not matter.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 22),
@@ -515,7 +516,7 @@ class _JoinGroupSheetState extends State<_JoinGroupSheet> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('Join'),
+                : Text(tr('Join')),
           ),
         ),
       ],
@@ -543,9 +544,9 @@ class _Sheet extends StatelessWidget {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: NestColor.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 26),
         child: SingleChildScrollView(

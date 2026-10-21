@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../theme/nest_theme.dart';
 import 'cloud_service.dart';
 import 'note_repository.dart';
+import '../l10n/strings.dart';
 
 /// Picking, squaring and shrinking a profile photo.
 ///
@@ -51,7 +52,7 @@ class ProfilePhoto {
         compressQuality: 90,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Your photo',
+            toolbarTitle: tr('Your photo'),
             toolbarColor: NestColor.pen,
             toolbarWidgetColor: Colors.white,
             backgroundColor: NestColor.ink,
@@ -60,7 +61,7 @@ class ProfilePhoto {
             lockAspectRatio: true,
           ),
           IOSUiSettings(
-            title: 'Your photo',
+            title: tr('Your photo'),
             cropStyle: CropStyle.circle,
             aspectRatioLockEnabled: true,
           ),
@@ -150,7 +151,7 @@ Future<String?> changeMyPhoto(BuildContext context) async {
         choice == PhotoChoice.camera ? ImageSource.camera : ImageSource.gallery,
       );
     } catch (e) {
-      return 'Could not open that photo. $e';
+      return trp('Could not open that photo. {0}', [e]);
     }
     if (bytes == null) return null;
   }
@@ -160,17 +161,17 @@ Future<String?> changeMyPhoto(BuildContext context) async {
   final cloud = CloudService.instance;
   if (!cloud.isSignedIn || cloud.profile == null) {
     return bytes == null
-        ? 'Photo removed.'
-        : 'Photo saved on this phone. Connect the cloud account so '
-            'classmates see it too.';
+        ? tr('Photo removed.')
+        : tr('Photo saved on this phone. Connect the cloud account so '
+            'classmates see it too.');
   }
   try {
     await cloud.updateProfile(
       photo: bytes == null ? '' : ProfilePhoto.encode(bytes),
     );
-    return bytes == null ? 'Photo removed.' : 'Photo updated.';
+    return bytes == null ? tr('Photo removed.') : tr('Photo updated.');
   } on CloudException catch (e) {
-    return 'Saved on this phone, but not in the cloud yet: ${e.message}';
+    return trp('Saved on this phone, but not in the cloud yet: {0}', [e.message]);
   }
 }
 
@@ -191,24 +192,24 @@ Future<PhotoChoice?> askPhotoSource(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 14),
-          const Text('PROFILE PHOTO', style: nestEyebrow),
+          Text(tr('PROFILE PHOTO'), style: nestEyebrow),
           const SizedBox(height: 6),
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Take a photo'),
+            title: Text(tr('Take a photo')),
             onTap: () => Navigator.pop(sheetContext, PhotoChoice.camera),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choose from gallery'),
+            title: Text(tr('Choose from gallery')),
             onTap: () => Navigator.pop(sheetContext, PhotoChoice.gallery),
           ),
           if (hasPhoto)
             ListTile(
-              leading: const Icon(Icons.delete_outline_rounded,
+              leading: Icon(Icons.delete_outline_rounded,
                   color: NestColor.redPen),
-              title: const Text(
-                'Remove photo',
+              title: Text(
+                tr('Remove photo'),
                 style: TextStyle(color: NestColor.redPen),
               ),
               onTap: () => Navigator.pop(sheetContext, PhotoChoice.remove),

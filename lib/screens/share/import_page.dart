@@ -7,6 +7,7 @@ import '../../models/note_bundle.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_tags.dart';
 import '../notes/note_detail.dart';
+import '../../l10n/strings.dart';
 
 /// Takes a note a classmate sent and puts it in the notebook. Requirement 9.2.
 ///
@@ -59,7 +60,7 @@ class _ImportNotePageState extends State<ImportNotePage> {
       if (!mounted) return;
       setState(() {
         _bundle = null;
-        _error = 'That file could not be opened.';
+        _error = tr('That file could not be opened.');
         _busy = false;
       });
     }
@@ -78,9 +79,9 @@ class _ImportNotePageState extends State<ImportNotePage> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('That note could not be saved on this phone. Check '
-              'there is free space and try again.'),
+        SnackBar(
+          content: Text(tr('That note could not be saved on this phone. Check '
+              'there is free space and try again.')),
         ),
       );
       return;
@@ -97,8 +98,8 @@ class _ImportNotePageState extends State<ImportNotePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Import a note',
+        title: Text(
+          tr('Import a note'),
           style: TextStyle(
             fontFamily: NestFont.display,
             fontSize: 19,
@@ -121,7 +122,7 @@ class _ImportNotePageState extends State<ImportNotePage> {
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 54),
                         ),
-                        child: const Text('Pick another'),
+                        child: Text(tr('Pick another')),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -130,7 +131,7 @@ class _ImportNotePageState extends State<ImportNotePage> {
                       child: FilledButton.icon(
                         onPressed: _busy ? null : _add,
                         icon: const Icon(Icons.library_add_rounded, size: 18),
-                        label: Text(_busy ? 'Adding…' : 'Add to my notes'),
+                        label: Text(_busy ? tr('Adding…') : tr('Add to my notes')),
                       ),
                     ),
                   ],
@@ -166,9 +167,9 @@ class _ImportNotePageState extends State<ImportNotePage> {
         Text(bundle.title, style: t.displaySmall),
         const SizedBox(height: 8),
         Text(
-          'Written ${relativeDay(bundle.writtenAt)}',
+          trp('Written {0}', [relativeDay(bundle.writtenAt)]),
           style: nestEyebrow.copyWith(
-            letterSpacing: 0.3,
+            letterSpacing: ls(0.3),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -179,39 +180,39 @@ class _ImportNotePageState extends State<ImportNotePage> {
         const SizedBox(height: 20),
         _Row(
           icon: Icons.folder_outlined,
-          label: 'Subject',
+          label: tr('Subject'),
           value: subject == null
-              ? 'None — it will sit outside your subjects'
+              ? tr('None — it will sit outside your subjects')
               : mine == null
-                  ? '$subject will be created in your notebook'
-                  : 'Goes into your existing $subject',
+                  ? trp('{0} will be created in your notebook', [subject])
+                  : trp('Goes into your existing {0}', [subject]),
         ),
         if (bundle.topic != null)
           _Row(
             icon: Icons.label_outline_rounded,
-            label: 'Topic',
+            label: tr('Topic'),
             value: bundle.topic!,
           ),
         _Row(
           icon: Icons.attach_file_rounded,
-          label: 'Files',
+          label: tr('Files'),
           value: bundle.hasFiles
-              ? '${bundle.files.length} '
-                  '${bundle.files.length == 1 ? 'file' : 'files'}  ·  '
+              ? '${num_(bundle.files.length)} '
+                  '${tr(bundle.files.length == 1 ? 'file' : 'files')}  ·  '
                   '${readableBytes(bundle.fileBytes)}'
-              : 'None',
+              : tr('None'),
         ),
         const SizedBox(height: 22),
         Container(height: 1, color: NestColor.rule),
         const SizedBox(height: 18),
-        const Text('WHAT IT SAYS', style: nestEyebrow),
+        Text(tr('WHAT IT SAYS'), style: nestEyebrow),
         const SizedBox(height: 10),
         if (bundle.body.trim().isEmpty)
-          Text('This note has no text, only its title.', style: t.bodySmall)
+          Text(tr('This note has no text, only its title.'), style: t.bodySmall)
         else
           Text(
             bundle.body,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               height: 1.6,
               color: NestColor.ink,
@@ -237,15 +238,15 @@ class _ImportNotePageState extends State<ImportNotePage> {
             ),
             const SizedBox(height: 16),
             Text(
-              _error == null ? 'Pick the file' : 'That did not work',
+              _error == null ? tr('Pick the file') : tr('That did not work'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 10),
             Text(
               _error ??
-                  'Save the .notenest file your classmate sent you, then pick '
+                  tr('Save the .notenest file your classmate sent you, then pick '
                       'it here. Everything in it is shown before anything is '
-                      'added to your notebook.',
+                      'added to your notebook.'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -253,7 +254,7 @@ class _ImportNotePageState extends State<ImportNotePage> {
             FilledButton.icon(
               onPressed: _busy ? null : _pick,
               icon: const Icon(Icons.folder_open_rounded, size: 18),
-              label: Text(_error == null ? 'Choose a file' : 'Try again'),
+              label: Text(_error == null ? tr('Choose a file') : tr('Try again')),
             ),
           ],
         ),
@@ -284,12 +285,12 @@ class _FromCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.person_outline_rounded,
+              Icon(Icons.person_outline_rounded,
                   size: 16, color: NestColor.inkSoft),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'From ${bundle.sharedBy}',
+                  trp('From {0}', [bundle.sharedBy]),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
@@ -298,11 +299,8 @@ class _FromCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             reference
-                ? '${bundle.sharedBy} asked that you keep this as reference '
-                    'rather than pass it on. NoteNest cannot enforce that — it '
-                    'is a request, and the copy will be yours to edit.'
-                : '${bundle.sharedBy} is happy for you to edit this and pass '
-                    'it on. Their name stays on it either way.',
+                ? trp('{0} asked that you keep this as reference rather than pass it on. NoteNest cannot enforce that — it is a request, and the copy will be yours to edit.', [bundle.sharedBy])
+                : trp('{0} is happy for you to edit this and pass it on. Their name stays on it either way.', [bundle.sharedBy]),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

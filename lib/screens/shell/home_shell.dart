@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -34,6 +36,8 @@ import '../profile/profile_page.dart';
 import '../subjects/subject_form.dart';
 import '../tasks/tasks_page.dart';
 import '../trash/trash_page.dart';
+import '../../l10n/strings.dart';
+import '../study/study_timer_page.dart';
 
 /// Holds the drawer, the navigation bar and the four destinations.
 ///
@@ -80,9 +84,32 @@ class _HomeShellState extends State<HomeShell> {
     if (mounted) setState(() => _tab = i);
   }
 
+  /// True while a page is being scrolled. The To-do pill floats over the
+  /// lists, so it slides away rather than hide the end of a row, and comes back
+  /// a moment after the scrolling stops.
+  final _scrolling = ValueNotifier<bool>(false);
+  Timer? _scrollIdle;
+
+  bool _onScroll(ScrollNotification n) {
+    // Only the page's own vertical lists, not the chip rows or the week strip.
+    if (n.metrics.axis != Axis.vertical || n.depth != 0) return false;
+    if (n is ScrollStartNotification || n is ScrollUpdateNotification) {
+      _scrollIdle?.cancel();
+      _scrolling.value = true;
+    } else if (n is ScrollEndNotification) {
+      _scrollIdle?.cancel();
+      _scrollIdle = Timer(const Duration(milliseconds: 450), () {
+        _scrolling.value = false;
+      });
+    }
+    return false;
+  }
+
   @override
   void dispose() {
     HomeShell._tabRequest.removeListener(_onTabRequest);
+    _scrollIdle?.cancel();
+    _scrolling.dispose();
     super.dispose();
   }
 
@@ -112,30 +139,30 @@ class _HomeShellState extends State<HomeShell> {
 
   /// A teacher's four: no Exam countdown (that is a student's question), and
   /// Classes gets a tab of its own because it is most of what they do here.
-  static const _teacherItems = <NestNavItem>[
+  static List<NestNavItem> get _teacherItems => <NestNavItem>[
     NestNavItem(
       icon: Icons.home_outlined,
       activeIcon: Icons.home_rounded,
-      label: 'Today',
-      accent: Color(0xFFFFE45E),
+      label: tr('Today'),
+      accent: const Color(0xFFFFE45E),
     ),
     NestNavItem(
       icon: Icons.auto_stories_outlined,
       activeIcon: Icons.auto_stories_rounded,
-      label: 'Notes',
-      accent: Color(0xFF7EC4F2),
+      label: tr('Notes'),
+      accent: const Color(0xFF7EC4F2),
     ),
     NestNavItem(
       icon: Icons.co_present_outlined,
       activeIcon: Icons.co_present_rounded,
-      label: 'Classes',
-      accent: Color(0xFF7ED9A6),
+      label: tr('Classes'),
+      accent: const Color(0xFF7ED9A6),
     ),
     NestNavItem(
       icon: Icons.people_outline_rounded,
       activeIcon: Icons.people_rounded,
-      label: 'People',
-      accent: Color(0xFFFF9BB3),
+      label: tr('People'),
+      accent: const Color(0xFFFF9BB3),
     ),
   ];
 
@@ -165,66 +192,66 @@ class _HomeShellState extends State<HomeShell> {
 
   List<TourStep> _tourSteps() {
     final name = _repo.userName.trim().split(RegExp(r'\s+')).first;
-    final hello = name.isEmpty ? 'Welcome to NoteNest' : 'Welcome, $name';
+    final hello = name.isEmpty ? tr('Welcome to NoteNest') : trp('Welcome, {0}', [name]);
     if (_teacher) {
       return [
         TourStep(
           title: hello,
           icon: Icons.waving_hand_rounded,
-          body: 'A quick look round — about a minute. Tap Next, or anywhere '
-              'on the dark part of the screen.',
+          body: tr('A quick look round — about a minute. Tap Next, or anywhere '
+              'on the dark part of the screen.'),
         ),
         TourStep(
           target: _tabKeys[2],
-          title: 'Classes',
+          title: tr('Classes'),
           icon: Icons.co_present_rounded,
-          body: 'Make a class here and give your students its six-letter '
+          body: tr('Make a class here and give your students its six-letter '
               'code. Inside a class: Stream for announcements, Classwork for '
-              'materials and assignments, People for who has joined.',
+              'materials and assignments, People for who has joined.'),
         ),
         TourStep(
           target: _captureKey,
-          title: 'Post or write',
+          title: tr('Post or write'),
           icon: Icons.edit_rounded,
-          body: 'Post slides, a PDF or an assignment with a deadline to a '
+          body: tr('Post slides, a PDF or an assignment with a deadline to a '
               'class — or write a note of your own. Files are saved in your '
-              'Google Drive and shared with the class by link.',
+              'Google Drive and shared with the class by link.'),
         ),
         TourStep(
           target: _tabKeys[1],
-          title: 'Notes',
+          title: tr('Notes'),
           icon: Icons.auto_stories_rounded,
-          body: 'Your own notes, lecture plans and PDFs, filed by course.',
+          body: tr('Your own notes, lecture plans and PDFs, filed by course.'),
         ),
         TourStep(
           target: _todoKey,
-          title: 'To-do',
+          title: tr('To-do'),
           icon: Icons.checklist_rtl_rounded,
-          body: 'Your planner: a page for every day with goals, today\'s and '
+          body: tr('Your planner: a page for every day with goals, today\'s and '
               'tomorrow\'s tasks, loose thoughts and a star rating. This '
-              'button is on most screens.',
+              'button is on most screens.'),
         ),
         TourStep(
           target: _tabKeys[3],
-          title: 'People',
+          title: tr('People'),
           icon: Icons.people_rounded,
-          body: 'Chats, study groups, and notes shared with you. Each class '
+          body: tr('Chats, study groups, and notes shared with you. Each class '
               'also has its own chat — the speech-bubble at the top of the '
-              'class.',
+              'class.'),
         ),
         TourStep(
           target: _avatarKey,
-          title: 'Your profile',
+          title: tr('Your profile'),
           icon: Icons.account_circle_rounded,
-          body: 'Tap your picture to add a profile photo. Your students see '
-              'it in the class.',
+          body: tr('Tap your picture to add a profile photo. Your students see '
+              'it in the class.'),
         ),
         TourStep(
           target: _menuKey,
-          title: 'Menu and Settings',
+          title: tr('Menu and Settings'),
           icon: Icons.menu_rounded,
-          body: 'Settings, Google Drive backup, switching account and signing '
-              'out are in here. You can replay this tour from Settings.',
+          body: tr('Settings, Google Drive backup, switching account and signing '
+              'out are in here. You can replay this tour from Settings.'),
         ),
       ];
     }
@@ -232,72 +259,72 @@ class _HomeShellState extends State<HomeShell> {
       TourStep(
         title: hello,
         icon: Icons.waving_hand_rounded,
-        body: 'A quick look round — about a minute. Tap Next, or anywhere on '
-            'the dark part of the screen.',
+        body: tr('A quick look round — about a minute. Tap Next, or anywhere on '
+            'the dark part of the screen.'),
       ),
       TourStep(
         target: _tabKeys[0],
-        title: 'Today',
+        title: tr('Today'),
         icon: Icons.home_rounded,
-        body: 'What to revise next, your next exam, and the notes you were '
-            'last working on.',
+        body: tr('What to revise next, your next exam, and the notes you were '
+            'last working on.'),
       ),
       TourStep(
         target: _captureKey,
-        title: 'New note',
+        title: tr('New note'),
         icon: Icons.edit_rounded,
-        body: 'Type a note, photograph a page, attach a PDF, record a lecture '
-            'or dictate. Every note belongs to a subject.',
+        body: tr('Type a note, photograph a page, attach a PDF, record a lecture '
+            'or dictate. Every note belongs to a subject.'),
       ),
       TourStep(
         target: _tabKeys[1],
-        title: 'Notes',
+        title: tr('Notes'),
         icon: Icons.auto_stories_rounded,
-        body: 'Everything you have written, by subject. Mark notes as read, '
-            'review or mastered to track your revision.',
+        body: tr('Everything you have written, by subject. Mark notes as read, '
+            'review or mastered to track your revision.'),
       ),
       TourStep(
         target: _todoKey,
-        title: 'To-do',
+        title: tr('To-do'),
         icon: Icons.checklist_rtl_rounded,
-        body: 'Your planner: a page for every day with goals, today\'s and '
+        body: tr('Your planner: a page for every day with goals, today\'s and '
             'tomorrow\'s tasks, loose thoughts and a star rating. This '
-            'button is on most screens.',
+            'button is on most screens.'),
       ),
       TourStep(
         target: _tabKeys[2],
-        title: 'People and Classes',
+        title: tr('People and Classes'),
         icon: Icons.people_rounded,
-        body: 'Join your teacher\'s class with its code, then get slides and '
+        body: tr('Join your teacher\'s class with its code, then get slides and '
             'assignments and hand your work in — all under Classes. Chats, '
-            'study groups and shared notes are here too.',
+            'study groups and shared notes are here too.'),
       ),
       TourStep(
         target: _tabKeys[3],
-        title: 'Exam',
+        title: tr('Exam'),
         icon: Icons.timer_rounded,
-        body: 'Countdowns to exams, quizzes and deadlines. An assignment from '
-            'a class can be added here with one tap.',
+        body: tr('Countdowns to exams, quizzes and deadlines. An assignment from '
+            'a class can be added here with one tap.'),
       ),
       TourStep(
         target: _searchKey,
-        title: 'Search',
+        title: tr('Search'),
         icon: Icons.search_rounded,
-        body: 'Find any note by its title, text, topic or tag.',
+        body: tr('Find any note by its title, text, topic or tag.'),
       ),
       TourStep(
         target: _avatarKey,
-        title: 'Your profile',
+        title: tr('Your profile'),
         icon: Icons.account_circle_rounded,
-        body: 'Tap your picture to set a profile photo.',
+        body: tr('Tap your picture to set a profile photo.'),
       ),
       TourStep(
         target: _menuKey,
-        title: 'Menu and Settings',
+        title: tr('Menu and Settings'),
         icon: Icons.menu_rounded,
-        body: 'Subjects, semesters, cover pages, Google Drive backup, '
+        body: tr('Subjects, semesters, cover pages, Google Drive backup, '
             'switching account and signing out. You can replay this tour '
-            'from Settings.',
+            'from Settings.'),
       ),
     ];
   }
@@ -311,20 +338,20 @@ class _HomeShellState extends State<HomeShell> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 14),
-            const Text('CREATE', style: nestEyebrow),
+            Text(tr('CREATE'), style: nestEyebrow),
             const SizedBox(height: 6),
             ListTile(
               leading:
-                  const Icon(Icons.assignment_outlined, color: NestColor.pen),
-              title: const Text('Post to a class'),
-              subtitle: const Text('Announcement, material or assignment'),
+                  Icon(Icons.assignment_outlined, color: NestColor.pen),
+              title: Text(tr('Post to a class')),
+              subtitle: Text(tr('Announcement, material or assignment')),
               onTap: () => Navigator.pop(sheetContext, 'post'),
             ),
             ListTile(
               leading:
-                  const Icon(Icons.edit_note_rounded, color: NestColor.pen),
-              title: const Text('Write a note'),
-              subtitle: const Text('Lecture notes and plans for yourself'),
+                  Icon(Icons.edit_note_rounded, color: NestColor.pen),
+              title: Text(tr('Write a note')),
+              subtitle: Text(tr('Lecture notes and plans for yourself')),
               onTap: () => Navigator.pop(sheetContext, 'note'),
             ),
             const SizedBox(height: 8),
@@ -340,7 +367,7 @@ class _HomeShellState extends State<HomeShell> {
     final cloud = CloudService.instance;
     if (!cloud.isSignedIn) {
       setState(() => _tab = _peopleTab);
-      _toast('Connect a cloud account to post to a class');
+      _toast(tr('Connect a cloud account to post to a class'));
       return;
     }
     List<StudyGroup> mine;
@@ -354,7 +381,7 @@ class _HomeShellState extends State<HomeShell> {
     if (!mounted) return;
     if (mine.isEmpty) {
       setState(() => _tab = _peopleTab);
-      _toast('Make a class first, then post to it');
+      _toast(tr('Make a class first, then post to it'));
       return;
     }
     final target = mine.length == 1
@@ -366,9 +393,9 @@ class _HomeShellState extends State<HomeShell> {
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
-                    child: Text('POST TO WHICH CLASS?', style: nestEyebrow),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                    child: Text(tr('POST TO WHICH CLASS?'), style: nestEyebrow),
                   ),
                   for (final c in mine)
                     ListTile(
@@ -387,30 +414,30 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  static const _items = <NestNavItem>[
+  static List<NestNavItem> get _items => <NestNavItem>[
     NestNavItem(
       icon: Icons.home_outlined,
       activeIcon: Icons.home_rounded,
-      label: 'Today',
-      accent: Color(0xFFFFE45E),
+      label: tr('Today'),
+      accent: const Color(0xFFFFE45E),
     ),
     NestNavItem(
       icon: Icons.auto_stories_outlined,
       activeIcon: Icons.auto_stories_rounded,
-      label: 'Notes',
-      accent: Color(0xFF7EC4F2),
+      label: tr('Notes'),
+      accent: const Color(0xFF7EC4F2),
     ),
     NestNavItem(
       icon: Icons.people_outline_rounded,
       activeIcon: Icons.people_rounded,
-      label: 'People',
-      accent: Color(0xFFFF9BB3),
+      label: tr('People'),
+      accent: const Color(0xFFFF9BB3),
     ),
     NestNavItem(
       icon: Icons.timer_outlined,
       activeIcon: Icons.timer_rounded,
-      label: 'Exam',
-      accent: Color(0xFF7ED9A6),
+      label: tr('Exam'),
+      accent: const Color(0xFF7ED9A6),
     ),
   ];
 
@@ -433,9 +460,9 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _openCapture() async {
     if (!_repo.hasSubjects) {
       _toast(_teacher
-          ? 'Add a course from the menu first, so the note has somewhere to '
-              'live'
-          : 'Add a subject first so the note has somewhere to live');
+          ? tr('Add a course from the menu first, so the note has somewhere to '
+              'live')
+          : tr('Add a subject first so the note has somewhere to live'));
       return;
     }
     final kind = await showCaptureSheet(context);
@@ -480,7 +507,7 @@ class _HomeShellState extends State<HomeShell> {
     // Photo and PDF both need a note to attach to, so one is created first and
     // the editor opens on it with the file already in place.
     final note = await _repo.createNote(
-      title: kind == CaptureKind.photo ? 'Handwritten note' : 'PDF note',
+      title: kind == CaptureKind.photo ? tr('Handwritten note') : tr('PDF note'),
       subjectId: subject?.id,
     );
     if (!mounted) return;
@@ -520,7 +547,7 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _addSubject() async {
     Navigator.pop(context); // close the drawer first
     final added = await showSubjectForm(context);
-    if (added && mounted) _toast('Subject added');
+    if (added && mounted) _toast(tr('Subject added'));
   }
 
   @override
@@ -540,9 +567,12 @@ class _HomeShellState extends State<HomeShell> {
   /// bar, that pops in and out. Yellow is the app's "do this next" colour. It
   /// carries a count of what is overdue or due today.
   Widget _todoButton() {
-    return Builder(builder: (context) {
+    return ValueListenableBuilder<bool>(
+        valueListenable: _scrolling,
+        builder: (context, scrolling, _) {
       final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-      final show = _tab != _todoTab && !_tabHasOwnButton && !typing;
+      final show =
+          _tab != _todoTab && !_tabHasOwnButton && !typing && !scrolling;
       final due = _repo.overdueTasks.length + _repo.tasksDueToday.length;
       final t = Theme.of(context).textTheme;
       // The button slot hands its child tight constraints; Align lets the pill
@@ -563,7 +593,7 @@ class _HomeShellState extends State<HomeShell> {
               child: Semantics(
                 key: _todoKey,
                 button: true,
-                label: due > 0 ? 'To-do, $due due' : 'To-do',
+                label: due > 0 ? trp('To-do, {0} due', [due]) : tr('To-do'),
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(NestRadius.pill),
@@ -584,13 +614,14 @@ class _HomeShellState extends State<HomeShell> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(Icons.checklist_rounded,
-                                size: 22, color: NestColor.ink),
+                                size: 22, color: NestColor.onHighlight),
                             const SizedBox(width: 8),
                             Text(
-                              'To-do',
+                              tr('To-do'),
                               style: t.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
+                                color: NestColor.onHighlight,
                               ),
                             ),
                             if (due > 0) ...[
@@ -609,7 +640,7 @@ class _HomeShellState extends State<HomeShell> {
                                       BorderRadius.circular(NestRadius.pill),
                                 ),
                                 child: Text(
-                                  '$due',
+                                  trp('{0}', [due]),
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     color: Colors.white,
@@ -660,8 +691,8 @@ class _HomeShellState extends State<HomeShell> {
         userName: _repo.userName,
         userPhoto: myPhoto(),
         semester: _teacher
-            ? (_repo.teachingCourse ?? _repo.university ?? 'Teacher')
-            : _repo.semesterLabel ?? 'No semester set',
+            ? (_repo.teachingCourse ?? _repo.university ?? tr('Teacher'))
+            : shownSemester(_repo.semesterLabel ?? tr('No semester set')),
         subjects: _repo.subjects(),
         // A teacher has no semesters to look back through.
         links: _repo
@@ -687,6 +718,10 @@ class _HomeShellState extends State<HomeShell> {
             case 'cover':
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CoverPageScreen()),
+              );
+            case 'timer':
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StudyTimerPage()),
               );
             case 'convert':
               Navigator.of(context).push(
@@ -729,18 +764,18 @@ class _HomeShellState extends State<HomeShell> {
         leading: Builder(
           builder: (barContext) => IconButton(
             key: _menuKey,
-            tooltip: 'Menu',
+            tooltip: tr('Menu'),
             icon: const Icon(Icons.menu_rounded),
             onPressed: () => Scaffold.of(barContext).openDrawer(),
           ),
         ),
-        title: const Text(
+        title: Text(
           'NoteNest',
           style: TextStyle(
             fontFamily: NestFont.display,
             fontSize: 21,
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
+            letterSpacing: ls(-0.3),
             color: NestColor.ink,
           ),
         ),
@@ -749,13 +784,15 @@ class _HomeShellState extends State<HomeShell> {
             key: _searchKey,
             onPressed: _openSearch,
             icon: const Icon(Icons.search_rounded),
-            tooltip: 'Search notes',
+            tooltip: tr('Search notes'),
           ),
           const NoticeBell(),
           const SizedBox(width: 6),
         ],
       ),
-      body: IndexedStack(
+      body: NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: IndexedStack(
         index: _tab,
         children: [
           TodayPage(
@@ -792,6 +829,7 @@ class _HomeShellState extends State<HomeShell> {
             onBack: () => setState(() => _tab = 0),
           ),
         ],
+        ),
       ),
       floatingActionButton: _todoButton(),
       // The planner is typed into line by line; with the keyboard up the bar

@@ -53,6 +53,72 @@ class ReminderService {
     }
   }
 
+  /// The channel push notifications arrive on. Created up front because
+  /// Android only takes a channel's importance from its first creation, and a
+  /// message should make a sound.
+  Future<void> ensureMessagesChannel() async {
+    await init();
+    if (!_ready) return;
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await android?.createNotificationChannel(const AndroidNotificationChannel(
+        'messages',
+        'Messages and classes',
+        description: 'New messages, class posts and notes sent to you',
+        importance: Importance.high,
+      ));
+    } catch (e) {
+      debugPrint('Could not create the messages channel: $e');
+    }
+  }
+
+  /// The study timer's alarm. Its own id, and not part of the reminder plan,
+  /// so it rings even when reminders are switched off (the student just
+  /// started a timer) and a reminder rebuild does not wipe it.
+  static const timerId = 5000000;
+
+  Future<void> _cancelAllButTimer() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final p in pending) {
+      if (p.id != timerId) await _plugin.cancel(id: p.id);
+    }
+  }
+
+  Future<void> scheduleTimer(DateTime at, String title, String body) async {
+    await init();
+    if (!_ready) return;
+    try {
+      await requestPermission();
+      await _plugin.zonedSchedule(
+        id: timerId,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(at, tz.local),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'timer',
+            'Study timer',
+            channelDescription: 'Rings when a study session is over',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('Could not schedule the timer alarm: $e');
+    }
+  }
+
+  Future<void> cancelTimer() async {
+    if (!_ready) return;
+    try {
+      await _plugin.cancel(id: timerId);
+    } catch (_) {}
+  }
+
   /// Rebuilds the schedule whenever the repository changes.
   void attach(NoteRepository repo) {
     repo.addListener(() {
@@ -80,7 +146,7 @@ class ReminderService {
     if (!_ready) return;
     final repo = NoteRepository.instance;
     try {
-      await _plugin.cancelAll();
+      await _cancelAllButTimer();
       if (!AuthRepository.instance.isSignedIn || !repo.remindersOn) return;
 
       final plan = planReminders(
@@ -89,6 +155,10 @@ class ReminderService {
         now: DateTime.now(),
         disabledGroups: repo.noticeOff,
         idleNudge: repo.idleReminder,
+        reviewDue: [
+          for (final n in repo.notes())
+            if (n.nextReviewAt != null) n.nextReviewAt!,
+        ],
       );
       for (final r in plan) {
         await _plugin.zonedSchedule(

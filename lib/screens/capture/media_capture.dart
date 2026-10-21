@@ -9,6 +9,7 @@ import '../../data/note_repository.dart';
 import '../../models/attachment.dart';
 import '../../models/note.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Picking, cropping and filing the material a note is built from.
 ///
@@ -91,7 +92,7 @@ class MediaCapture {
       compressQuality: 90,
       uiSettings: [
         AndroidUiSettings(
-          toolbarTitle: 'Straighten the page',
+          toolbarTitle: tr('Straighten the page'),
           toolbarColor: NestColor.pen,
           toolbarWidgetColor: Colors.white,
           backgroundColor: NestColor.ink,
@@ -100,7 +101,7 @@ class MediaCapture {
           lockAspectRatio: false,
         ),
         IOSUiSettings(
-          title: 'Straighten the page',
+          title: tr('Straighten the page'),
           aspectRatioLockEnabled: false,
         ),
       ],
@@ -118,9 +119,9 @@ class MediaCapture {
   static bool _supported(BuildContext context) {
     if (AttachmentStore.isSupported) return true;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Photos and PDFs need the phone app. Run it on a device or emulator.',
+          tr('Photos and PDFs need the phone app. Run it on a device or emulator.'),
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -156,20 +157,20 @@ Future<ImageSource?> askImageSource(BuildContext context) {
             ),
             const SizedBox(height: 20),
             Text(
-              'Add a page',
+              tr('Add a page'),
               style: Theme.of(sheetContext).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
             _SourceTile(
               icon: Icons.photo_camera_rounded,
-              title: 'Take a photo',
-              subtitle: 'Point at the page and shoot',
+              title: tr('Take a photo'),
+              subtitle: tr('Point at the page and shoot'),
               onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
             ),
             _SourceTile(
               icon: Icons.photo_library_rounded,
-              title: 'Choose from gallery',
-              subtitle: 'A photo you already took',
+              title: tr('Choose from gallery'),
+              subtitle: tr('A photo you already took'),
               onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
             ),
           ],
@@ -223,7 +224,7 @@ class _SourceTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
+            Icon(Icons.chevron_right_rounded,
                 color: NestColor.inkFaint),
           ],
         ),

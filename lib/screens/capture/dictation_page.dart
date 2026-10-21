@@ -4,6 +4,7 @@ import '../../data/dictation.dart';
 import '../../models/transcript.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_level_meter.dart';
+import '../../l10n/strings.dart';
 
 /// Speaks a lecture straight into text. Requirement 8.2.
 ///
@@ -79,20 +80,20 @@ class _DictationPageState extends State<DictationPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Clear the transcript?'),
-        content: const Text(
-          'Everything dictated so far will be removed. The microphone stays '
-          'on, so you can start again straight away.',
+        title: Text(tr('Clear the transcript?')),
+        content: Text(
+          tr('Everything dictated so far will be removed. The microphone stays '
+          'on, so you can start again straight away.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Clear'),
+            child: Text(tr('Clear')),
           ),
         ],
       ),
@@ -114,11 +115,11 @@ class _DictationPageState extends State<DictationPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
           children: [
-            const Text('RECOGNITION LANGUAGE', style: nestEyebrow),
+            Text(tr('RECOGNITION LANGUAGE'), style: nestEyebrow),
             const SizedBox(height: 6),
             Text(
-              'These are the languages this device can recognise. Adding more '
-              'is done in the phone speech settings, not here.',
+              tr('These are the languages this device can recognise. Adding more '
+              'is done in the phone speech settings, not here.'),
               style: Theme.of(sheetContext).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
@@ -128,7 +129,7 @@ class _DictationPageState extends State<DictationPage> {
                 contentPadding: EdgeInsets.zero,
                 title: Text(locale.name, style: const TextStyle(fontSize: 14)),
                 trailing: locale.id == _dictation.localeId
-                    ? const Icon(Icons.check_rounded,
+                    ? Icon(Icons.check_rounded,
                         size: 18, color: NestColor.pen)
                     : null,
                 onTap: () => Navigator.pop(sheetContext, locale.id),
@@ -155,8 +156,8 @@ class _DictationPageState extends State<DictationPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text(
-              'Dictate',
+            title: Text(
+              tr('Dictate'),
               style: TextStyle(
                 fontFamily: NestFont.display,
                 fontSize: 19,
@@ -167,13 +168,13 @@ class _DictationPageState extends State<DictationPage> {
             actions: [
               if (_dictation.locales.isNotEmpty)
                 IconButton(
-                  tooltip: 'Recognition language',
+                  tooltip: tr('Recognition language'),
                   icon: const Icon(Icons.language_rounded),
                   onPressed: _pickLanguage,
                 ),
               if (!_dictation.isEmpty)
                 IconButton(
-                  tooltip: 'Clear transcript',
+                  tooltip: tr('Clear transcript'),
                   icon: const Icon(Icons.backspace_outlined),
                   onPressed: _clear,
                 ),
@@ -228,7 +229,7 @@ class _DictationPageState extends State<DictationPage> {
                           onPressed: _dictation.isEmpty ? null : _use,
                           icon: const Icon(Icons.arrow_forward_rounded,
                               size: 18),
-                          label: const Text('Use this text'),
+                          label: Text(tr('Use this text')),
                         ),
                       ),
                     ],
@@ -255,7 +256,7 @@ class _DictationPageState extends State<DictationPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              listening ? 'Listening…' : 'Tap the microphone and talk',
+              listening ? tr('Listening…') : tr('Tap the microphone and talk'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 10),
@@ -263,18 +264,18 @@ class _DictationPageState extends State<DictationPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Text(
                 listening
-                    ? 'Words appear as the device recognises them. Pauses are '
-                        'fine — it starts itself again.'
+                    ? tr('Words appear as the device recognises them. Pauses are '
+                        'fine — it starts itself again.')
                     // Deliberately not "nothing leaves your phone". The
                     // recogniser belongs to the device, but on Android and in
                     // the browser it normally passes the audio on to the
                     // platform speech service — only an installed offline
                     // language pack keeps it local. Claiming otherwise would
                     // be a privacy promise the app cannot keep.
-                    : 'The listening is done by the recogniser built into '
+                    : tr('The listening is done by the recogniser built into '
                         'this device. Unless it has an offline language pack, '
                         'that passes the audio on to the platform speech '
-                        'service. You can fix the words on the next screen.',
+                        'service. You can fix the words on the next screen.'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -290,7 +291,7 @@ class _DictationPageState extends State<DictationPage> {
         padding: const EdgeInsets.only(top: 6, bottom: 6),
         child: RichText(
           text: TextSpan(
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16.5,
               height: 1.6,
               color: NestColor.ink,
@@ -303,8 +304,8 @@ class _DictationPageState extends State<DictationPage> {
                   // still replace them, and showing them in the same ink as
                   // the rest would make the text look like it was rewriting
                   // itself.
-                  text: ' ${_dictation.partial.trim()}',
-                  style: const TextStyle(color: NestColor.inkFaint),
+                  text: trp(' {0}', [_dictation.partial.trim()]),
+                  style: TextStyle(color: NestColor.inkFaint),
                 ),
             ],
           ),
@@ -355,10 +356,10 @@ class _Footer extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               live
-                  ? 'LISTENING'
+                  ? tr('LISTENING')
                   : listening
-                      ? 'RESTARTING'
-                      : 'STOPPED',
+                      ? tr('RESTARTING')
+                      : tr('STOPPED'),
               style: nestEyebrow.copyWith(
                 color: live ? NestColor.redPen : NestColor.inkFaint,
               ),
@@ -385,7 +386,7 @@ class _Notice extends StatelessWidget {
       decoration: BoxDecoration(
         color: NestColor.o(NestColor.redPen, 0.08),
         borderRadius: BorderRadius.circular(NestRadius.tile),
-        border: const Border(
+        border: Border(
           left: BorderSide(color: NestColor.redPen, width: 3),
         ),
       ),

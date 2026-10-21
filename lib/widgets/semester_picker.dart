@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/semester.dart';
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 /// Choosing a semester: the system first, then the number.
 ///
@@ -65,7 +66,7 @@ class _SemesterPickerState extends State<SemesterPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('HOW YOUR UNIVERSITY COUNTS', style: nestEyebrow),
+        Text(tr('HOW YOUR UNIVERSITY COUNTS'), style: nestEyebrow),
         const SizedBox(height: 8),
         for (final system in SemesterSystem.values)
           Padding(
@@ -121,15 +122,15 @@ class _SemesterPickerState extends State<SemesterPicker> {
             controller: _custom,
             maxLength: 40,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Your semester',
-              hintText: 'Year 2 Term 1',
+            decoration: InputDecoration(
+              labelText: tr('Your semester'),
+              hintText: tr('Year 2 Term 1'),
               counterText: '',
             ),
             onChanged: (_) => _emit(),
           )
         else ...[
-          const Text('WHICH ONE ARE YOU IN', style: nestEyebrow),
+          Text(tr('WHICH ONE ARE YOU IN'), style: nestEyebrow),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -137,7 +138,7 @@ class _SemesterPickerState extends State<SemesterPicker> {
             children: [
               for (var n = 1; n <= _system.count; n++)
                 ChoiceChip(
-                  label: Text('$n'),
+                  label: Text(trp('{0}', [n])),
                   selected: _number == n,
                   onSelected: (_) {
                     setState(() => _number = n);
@@ -149,9 +150,8 @@ class _SemesterPickerState extends State<SemesterPicker> {
           const SizedBox(height: 10),
           Text(
             _number == null
-                ? 'Pick the one you are in now.'
-                : 'Saved as "${semesterLabelFor(_number!)}" — this is what a '
-                    'cover page prints.',
+                ? tr('Pick the one you are in now.')
+                : trp('Saved as "{0}" — this is what a cover page prints.', [semesterLabelFor(_number!)]),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

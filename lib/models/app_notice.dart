@@ -6,6 +6,8 @@
 /// when the person last looked, which decides what counts as new.
 library;
 
+import '../l10n/strings.dart';
+
 enum NoticeKind { request, share, taskOverdue, taskToday, exam }
 
 extension NoticeKindData on NoticeKind {
@@ -25,11 +27,12 @@ extension NoticeKindData on NoticeKind {
   }
 }
 
-const noticeGroups = {
-  'messages': 'Messages and message requests',
-  'shares': 'Notes shared with me',
-  'tasks': 'Task reminders',
-  'exams': 'Exam and deadline reminders',
+Map<String, String> get noticeGroups => {
+  'messages': tr('Messages and message requests'),
+  'shares': tr('Notes shared with me'),
+  'tasks': tr('Task reminders'),
+  'exams': tr('Exam and deadline reminders'),
+  'reviews': tr('Notes to review'),
 };
 
 class AppNotice {

@@ -7,6 +7,7 @@ import '../../models/cover_spec.dart';
 import '../../theme/nest_theme.dart';
 import 'cover_canvas.dart';
 import 'cover_form.dart';
+import '../../l10n/strings.dart';
 
 /// The cover page generator.
 ///
@@ -74,7 +75,7 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
       if (shared) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_spec.suggestedFileName} sent'),
+            content: Text(trp('{0} sent', [_spec.suggestedFileName])),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -90,8 +91,8 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = 'The page could not be exported. '
-              'Scroll so the preview is visible and try again.';
+          _error = tr('The page could not be exported. '
+              'Scroll so the preview is visible and try again.');
         });
       }
     }
@@ -128,12 +129,12 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
   Widget _build(BuildContext context, List<String> missing) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cover page'),
+        title: Text(tr('Cover page')),
         actions: [
           IconButton(
             onPressed: _openFullSize,
             icon: const Icon(Icons.fullscreen_rounded),
-            tooltip: 'See it full size',
+            tooltip: tr('See it full size'),
           ),
           const SizedBox(width: 4),
         ],
@@ -208,9 +209,9 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'The PDF holds the page as a 200 DPI image, which is how '
+                  tr('The PDF holds the page as a 200 DPI image, which is how '
                   'Bengali text survives the trip — the text in it cannot be '
-                  'selected or searched.',
+                  'selected or searched.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -235,7 +236,7 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
                       ),
                     )
                   : const Icon(Icons.ios_share_rounded, size: 18),
-              label: Text(_busy ? 'Making the PDF…' : 'Export as PDF'),
+              label: Text(_busy ? tr('Making the PDF…') : tr('Export as PDF')),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 54),
               ),
@@ -264,12 +265,11 @@ class _MissingHint extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.edit_note_rounded, size: 18, color: NestColor.ink),
+          Icon(Icons.edit_note_rounded, size: 18, color: NestColor.ink),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Still empty: ${missing.join(', ')}. '
-              'You can export anyway and write them in by hand.',
+              trp('Still empty: {0}. You can export anyway and write them in by hand.', [missing.join(', ')]),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),

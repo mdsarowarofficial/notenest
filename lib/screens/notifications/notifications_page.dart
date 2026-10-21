@@ -12,6 +12,7 @@ import '../chat/message_request.dart';
 import '../exam/exam_page.dart';
 import '../shared/shared_page.dart';
 import '../shell/home_shell.dart';
+import '../../l10n/strings.dart';
 
 /// Everything that needs the person's attention, worked out from what exists
 /// right now. Nothing here is a copy that could go stale.
@@ -28,7 +29,7 @@ List<AppNotice> collectNotices({
     out.add(AppNotice(
       id: 'req:${r.id}',
       kind: NoticeKind.request,
-      title: 'New message request',
+      title: tr('New message request'),
       body: r.text,
       at: r.createdAt ?? DateTime.now(),
     ));
@@ -38,7 +39,7 @@ List<AppNotice> collectNotices({
     out.add(AppNotice(
       id: 'share:${s.id}',
       kind: NoticeKind.share,
-      title: '${s.fromLabel} sent you a note',
+      title: trp('{0} sent you a note', [s.fromLabel]),
       body: s.title,
       at: s.createdAt ?? DateTime.now(),
     ));
@@ -47,18 +48,23 @@ List<AppNotice> collectNotices({
     out.add(AppNotice(
       id: 'over:${t.id}',
       kind: NoticeKind.taskOverdue,
-      title: 'Overdue',
+      title: tr('Overdue'),
       body: t.title,
       at: t.dueAt!,
     ));
   }
+  final now = DateTime.now();
+  final startOfToday = DateTime(now.year, now.month, now.day);
   for (final t in repo.tasksDueToday) {
     out.add(AppNotice(
       id: 'today:${t.id}',
       kind: NoticeKind.taskToday,
-      title: 'Due today',
+      title: tr('Due today'),
       body: t.title,
-      at: t.dueAt!,
+      // Not the due time: a task due at 6 pm is stamped after "now", so it
+      // would still count as new after Mark all read. It became news when the
+      // day began, and that is what clears once it has been seen.
+      at: startOfToday,
     ));
   }
   for (final e in repo.dueReminders()) {
@@ -67,8 +73,8 @@ List<AppNotice> collectNotices({
       id: 'exam:${e.id}',
       kind: NoticeKind.exam,
       title: e.isToday
-          ? '${e.title} is today'
-          : '${e.title} in ${e.daysAway} days',
+          ? trp('{0} is today', [e.title])
+          : trp('{0} in {1} days', [e.title, e.daysAway]),
       body: e.kind.label,
       at: e.date.subtract(Duration(days: lead)),
     ));
@@ -117,13 +123,13 @@ class NoticeBell extends StatelessWidget {
         final unread =
             unreadCount(notices, NoteRepository.instance.noticeSeenAt);
         return IconButton(
-          tooltip: unread > 0 ? 'Notifications, $unread new' : 'Notifications',
+          tooltip: unread > 0 ? trp('Notifications, {0} new', [unread]) : tr('Notifications'),
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const NotificationsPage()),
           ),
           icon: Badge(
             isLabelVisible: unread > 0,
-            label: Text('$unread'),
+            label: Text(trp('{0}', [unread])),
             child: const Icon(Icons.notifications_none_rounded),
           ),
         );
@@ -149,7 +155,7 @@ class NotificationsPage extends StatelessWidget {
       case NoticeKind.share:
         page = Scaffold(
           backgroundColor: NestColor.paper,
-          appBar: AppBar(title: const Text('Shared with me')),
+          appBar: AppBar(title: Text(tr('Shared with me'))),
           body: const SharedPage(),
         );
       case NoticeKind.taskOverdue || NoticeKind.taskToday:
@@ -174,10 +180,10 @@ class NotificationsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: NestColor.paper,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(tr('Notifications')),
         actions: [
           IconButton(
-            tooltip: 'Notification settings',
+            tooltip: tr('Notification settings'),
             icon: const Icon(Icons.tune_rounded),
             onPressed: () => showModalBottomSheet<void>(
               context: context,
@@ -188,11 +194,14 @@ class NotificationsPage extends StatelessWidget {
             ),
           ),
           NoticeBuilder(
-            builder: (context, notices) => TextButton(
-              onPressed: unreadCount(notices, repo.noticeSeenAt) == 0
-                  ? null
-                  : repo.markNoticesSeen,
-              child: const Text('Mark all read'),
+            builder: (context, notices) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: unreadCount(notices, repo.noticeSeenAt) == 0
+                    ? null
+                    : repo.markNoticesSeen,
+                child: Text(tr('Mark all read')),
+              ),
             ),
           ),
         ],
@@ -200,12 +209,12 @@ class NotificationsPage extends StatelessWidget {
       body: NoticeBuilder(
         builder: (context, notices) {
           if (notices.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: Text(
-                  "You're all caught up.\nRequests, shared notes, tasks and "
-                  'exam reminders show up here.',
+                  tr("You're all caught up.\nRequests, shared notes, tasks and "
+                  'exam reminders show up here.'),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -220,22 +229,35 @@ class NotificationsPage extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Text(
-                    'These appear while NoteNest is open. Alerts that arrive '
-                    'when the app is closed need a push service, which is not '
-                    'set up.',
+                    tr('These appear while NoteNest is open. With notifications '
+                    'allowed, new messages and class posts also reach you '
+                    'when it is closed.'),
                     style: t.bodySmall,
                   ),
                 );
               }
               final n = notices[i];
               final unread = n.isUnread(repo.noticeSeenAt);
+              // Unread is a white card with an indigo edge and a dot; read ones
+              // sink back into the page, so the two are told apart at a glance.
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 elevation: 0,
-                color:
-                    unread ? NestColor.o(NestColor.pen, 0.07) : NestColor.card,
+                color: unread ? NestColor.card : NestColor.o(NestColor.card, 0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(NestRadius.card),
+                  side: unread
+                      ? BorderSide(
+                          color: NestColor.o(NestColor.pen, 0.45), width: 1.5)
+                      : BorderSide.none,
+                ),
                 child: ListTile(
-                  leading: Icon(_icon(n.kind)),
+                  leading: Badge(
+                    isLabelVisible: unread,
+                    backgroundColor: NestColor.pen,
+                    smallSize: 9,
+                    child: Icon(_icon(n.kind)),
+                  ),
                   title: Text(
                     n.title,
                     style: t.titleSmall?.copyWith(
@@ -277,7 +299,7 @@ class _NoticeSettings extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Show notifications for',
+                    tr('Show notifications for'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -291,9 +313,9 @@ class _NoticeSettings extends StatelessWidget {
                 ),
               const Divider(),
               SwitchListTile(
-                title: const Text('Remind me when the app is closed'),
-                subtitle: const Text(
-                  'Task and exam alerts on this phone. Quiet from 10 pm to 7 am.',
+                title: Text(tr('Remind me when the app is closed')),
+                subtitle: Text(
+                  tr('Task and exam alerts on this phone. Quiet from 10 pm to 7 am.'),
                 ),
                 value: repo.remindersOn,
                 onChanged: (on) async {
@@ -303,9 +325,9 @@ class _NoticeSettings extends StatelessWidget {
                         await ReminderService.instance.requestPermission();
                     if (!ok) {
                       messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Notifications are blocked. Allow them '
-                              'in the phone settings.'),
+                        SnackBar(
+                          content: Text(tr('Notifications are blocked. Allow them '
+                              'in the phone settings.')),
                         ),
                       );
                       return;
@@ -315,7 +337,7 @@ class _NoticeSettings extends StatelessWidget {
                 },
               ),
               SwitchListTile(
-                title: const Text("Nudge me if I haven't visited for 3 days"),
+                title: Text(tr("Nudge me if I haven't visited for 3 days")),
                 value: repo.idleReminder && repo.remindersOn,
                 onChanged: repo.remindersOn
                     ? (on) => repo.setReminders(idle: on)

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/note_repository.dart';
 import '../../models/note.dart';
@@ -12,6 +13,9 @@ import '../capture/media_capture.dart';
 import '../capture/record_page.dart';
 import 'attachment_strip.dart';
 import 'transcript_editor.dart';
+import '../../l10n/strings.dart';
+import '../../data/note_format.dart';
+import '../../widgets/note_format_bar.dart';
 
 /// Write or edit a text note. Requirement 5.1.
 ///
@@ -32,6 +36,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
 
   late final TextEditingController _title;
   late final TextEditingController _body;
+  final _bodyFocus = FocusNode();
   late final TextEditingController _topic;
 
   int? _subjectId;
@@ -72,6 +77,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
     _autosave?.cancel();
     _title.dispose();
     _body.dispose();
+    _bodyFocus.dispose();
     _topic.dispose();
     super.dispose();
   }
@@ -88,7 +94,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
     _saving = true;
 
     final title =
-        _title.text.trim().isEmpty ? 'Untitled note' : _title.text.trim();
+        _title.text.trim().isEmpty ? tr('Untitled note') : _title.text.trim();
 
     if (_note == null) {
       _note = await _repo.createNote(
@@ -129,7 +135,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   Future<Note?> _ensureSaved() async {
     if (_note == null && _isEmpty) {
       _note = await _repo.createNote(
-        title: 'Untitled note',
+        title: tr('Untitled note'),
         subjectId: _subjectId,
         topic: _topic.text,
         tags: _tags,
@@ -249,8 +255,8 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             onPressed: _saveAndClose,
           ),
           title: Text(
-            widget.existing == null ? 'New note' : 'Edit note',
-            style: const TextStyle(
+            widget.existing == null ? tr('New note') : tr('Edit note'),
+            style: TextStyle(
               fontFamily: NestFont.display,
               fontSize: 19,
               fontWeight: FontWeight.w700,
@@ -263,9 +269,9 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
               child: Center(
                 child: Text(
                   _dirty
-                      ? 'Unsaved'
+                      ? tr('Unsaved')
                       : _savedAt != null
-                          ? 'Saved'
+                          ? tr('Saved')
                           : '',
                   style: nestEyebrow.copyWith(
                     color: _dirty ? NestColor.redPen : NestColor.mint,
@@ -273,7 +279,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                 ),
               ),
             ),
-            TextButton(onPressed: _saveAndClose, child: const Text('Done')),
+            TextButton(onPressed: _saveAndClose, child: Text(tr('Done'))),
           ],
         ),
         body: ListView(
@@ -282,14 +288,14 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             TextField(
               controller: _title,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: NestFont.display,
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: NestColor.ink,
               ),
-              decoration: const InputDecoration(
-                hintText: 'Note title',
+              decoration: InputDecoration(
+                hintText: tr('Note title'),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -301,7 +307,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('SUBJECT', style: nestEyebrow),
+                      Text(tr('SUBJECT'), style: nestEyebrow),
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -317,10 +323,10 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                             borderRadius:
                                 BorderRadius.circular(NestRadius.tile),
                             items: [
-                              const DropdownMenuItem<int?>(
+                              DropdownMenuItem<int?>(
                                 value: null,
-                                child: Text('No subject',
-                                    style: TextStyle(fontSize: 14)),
+                                child: Text(tr('No subject'),
+                                    style: const TextStyle(fontSize: 14)),
                               ),
                               for (final s in subjects)
                                 DropdownMenuItem<int?>(
@@ -363,7 +369,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('TOPIC', style: nestEyebrow),
+                      Text(tr('TOPIC'), style: nestEyebrow),
                       const SizedBox(height: 6),
                       TextField(
                         controller: _topic,
@@ -389,7 +395,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
               ],
             ),
             const SizedBox(height: 18),
-            const Text('TAGS', style: nestEyebrow),
+            Text(tr('TAGS'), style: nestEyebrow),
             const SizedBox(height: 7),
             NestTagField(
               tags: _tags,
@@ -402,18 +408,25 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             const SizedBox(height: 20),
             Container(height: 1, color: NestColor.rule),
             const SizedBox(height: 16),
+            NoteFormatBar(controller: _body, focus: _bodyFocus),
+            const SizedBox(height: 12),
             TextField(
               controller: _body,
+              focusNode: _bodyFocus,
+              inputFormatters: [
+                const ListContinueFormatter(),
+                LengthLimitingTextInputFormatter(Note.maxBody),
+              ],
               maxLines: null,
               minLines: 12,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15.5,
                 height: 1.55,
                 color: NestColor.ink,
               ),
-              decoration: const InputDecoration(
-                hintText: 'Write your note...',
+              decoration: InputDecoration(
+                hintText: tr('Write your note...'),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -432,7 +445,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: OutlinedButton.icon(
                     onPressed: _addPage,
                     icon: const Icon(Icons.photo_camera_rounded, size: 18),
-                    label: const Text('Add page'),
+                    label: Text(tr('Add page')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -440,7 +453,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: OutlinedButton.icon(
                     onPressed: _addPdf,
                     icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                    label: const Text('Add PDF'),
+                    label: Text(tr('Add PDF')),
                   ),
                 ),
               ],
@@ -452,7 +465,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: OutlinedButton.icon(
                     onPressed: _record,
                     icon: const Icon(Icons.mic_rounded, size: 18),
-                    label: const Text('Record'),
+                    label: Text(tr('Record')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -460,7 +473,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                   child: OutlinedButton.icon(
                     onPressed: _dictate,
                     icon: const Icon(Icons.graphic_eq_rounded, size: 18),
-                    label: const Text('Dictate'),
+                    label: Text(tr('Dictate')),
                   ),
                 ),
               ],

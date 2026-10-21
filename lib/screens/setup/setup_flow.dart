@@ -10,6 +10,7 @@ import '../../widgets/nest_stepper.dart';
 import '../cover/university_picker.dart';
 import '../shell/home_shell.dart';
 import '../subjects/subject_form.dart';
+import '../../l10n/strings.dart';
 
 /// First-run setup. Requirement 1.
 ///
@@ -46,20 +47,20 @@ class _SetupFlowState extends State<SetupFlow> {
       '';
   late final _course = TextEditingController(text: _repo.teachingCourse ?? '');
 
-  static const _roleStep = NestStep(
-    title: 'Who are you',
+  static NestStep get _roleStep => NestStep(
+    title: tr('Who are you'),
     icon: Icons.badge_rounded,
-    hint: 'NoteNest works a little differently for teachers.',
+    hint: tr('NoteNest works a little differently for teachers.'),
   );
 
-  static const _teachStep = NestStep(
-    title: 'Where you teach',
+  static NestStep get _teachStep => NestStep(
+    title: tr('Where you teach'),
     icon: Icons.co_present_rounded,
-    hint: 'Your university, and the course if you like. Both can change later.',
+    hint: tr('Your university, and the course if you like. Both can change later.'),
   );
 
   List<NestStep> get _steps =>
-      _teacher ? const [_roleStep, _teachStep] : [_roleStep, ..._studentSteps];
+      _teacher ? [_roleStep, _teachStep] : [_roleStep, ..._studentSteps];
 
   /// What the current index means, so the logic below reads by name rather
   /// than by a number that shifts with the role.
@@ -69,19 +70,19 @@ class _SetupFlowState extends State<SetupFlow> {
     return const ['semester', 'subjects', 'routine'][_step - 1];
   }
 
-  static const _studentSteps = <NestStep>[
+  static List<NestStep> get _studentSteps => <NestStep>[
     NestStep(
-      title: 'Your semester',
+      title: tr('Your semester'),
       icon: Icons.school_rounded,
-      hint: 'Name the semester these notes belong to.',
+      hint: tr('Name the semester these notes belong to.'),
     ),
     NestStep(
-      title: 'Your subjects',
+      title: tr('Your subjects'),
       icon: Icons.folder_rounded,
-      hint: 'Add the subjects you are taking. You can change these later.',
+      hint: tr('Add the subjects you are taking. You can change these later.'),
     ),
     NestStep(
-      title: 'Study routine',
+      title: tr('Study routine'),
       icon: Icons.alarm_rounded,
       // Deliberately a plan, not a promise.
       //
@@ -92,18 +93,20 @@ class _SetupFlowState extends State<SetupFlow> {
       // coming. So the question now asks what it can honestly ask, the answer
       // is shown back on the profile as their own stated routine, and when
       // scheduled reminders are built this is the setting that will drive them.
-      hint: 'When do you plan to revise? Noted for you — NoteNest does not '
-          'send alerts yet.',
+      hint: tr('When do you plan to revise? Noted for you — NoteNest does not '
+          'send alerts yet.'),
     ),
   ];
 
+  /// Saved as written, so they stay English here and are translated only
+  /// where they are shown.
   static const _reminders = [
     'After every class',
     'Every evening',
     'Only before exams',
   ];
 
-  String _reminder = 'Every evening';
+  String _reminder = tr('Every evening');
 
   @override
   void initState() {
@@ -125,10 +128,10 @@ class _SetupFlowState extends State<SetupFlow> {
       case 'semester':
         return semesterProblem(_semesterLabel);
       case 'subjects':
-        if (!_repo.hasSubjects) return 'Add at least one subject';
+        if (!_repo.hasSubjects) return tr('Add at least one subject');
         return null;
       case 'teach':
-        if (_university.trim().isEmpty) return 'Pick your university';
+        if (_university.trim().isEmpty) return tr('Pick your university');
         return null;
       default:
         return null;
@@ -222,13 +225,13 @@ class _SetupFlowState extends State<SetupFlow> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline_rounded,
+                      Icon(Icons.error_outline_rounded,
                           size: 17, color: NestColor.redPen),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             color: NestColor.redPen,
                           ),
@@ -247,7 +250,7 @@ class _SetupFlowState extends State<SetupFlow> {
                                 _step--;
                                 _error = null;
                               }),
-                      child: const Text('Back'),
+                      child: Text(tr('Back')),
                     ),
                   const Spacer(),
                   ConstrainedBox(
@@ -258,8 +261,8 @@ class _SetupFlowState extends State<SetupFlow> {
                       onPressed: _busy ? null : _next,
                       child: Text(
                         _step == _steps.length - 1
-                            ? 'Open my notebook'
-                            : 'Continue',
+                            ? tr('Open my notebook')
+                            : tr('Continue'),
                       ),
                     ),
                   ),
@@ -277,13 +280,13 @@ class _SetupFlowState extends State<SetupFlow> {
       case 'role':
         return _Sheet(
           children: [
-            const Text('I AM A', style: nestEyebrow),
+            Text(tr('I AM A'), style: nestEyebrow),
             const SizedBox(height: 12),
             _RoleCard(
               icon: Icons.backpack_rounded,
-              title: 'Student',
-              blurb: 'Notes by semester and subject, exam countdowns, and '
-                  'classes you join with a code.',
+              title: tr('Student'),
+              blurb: tr('Notes by semester and subject, exam countdowns, and '
+                  'classes you join with a code.'),
               selected: !_teacher,
               onTap: () => setState(() {
                 _role = 'student';
@@ -293,9 +296,9 @@ class _SetupFlowState extends State<SetupFlow> {
             const SizedBox(height: 10),
             _RoleCard(
               icon: Icons.co_present_rounded,
-              title: 'Teacher',
-              blurb: 'Make classes, share slides and PDFs, set assignments '
-                  'with a deadline, and grade what comes back.',
+              title: tr('Teacher'),
+              blurb: tr('Make classes, share slides and PDFs, set assignments '
+                  'with a deadline, and grade what comes back.'),
               selected: _teacher,
               onTap: () => setState(() {
                 _role = 'teacher';
@@ -304,7 +307,7 @@ class _SetupFlowState extends State<SetupFlow> {
             ),
             const SizedBox(height: 12),
             Text(
-              'You can change this later in Settings.',
+              tr('You can change this later in Settings.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -312,7 +315,7 @@ class _SetupFlowState extends State<SetupFlow> {
       case 'teach':
         return _Sheet(
           children: [
-            const Text('UNIVERSITY', style: nestEyebrow),
+            Text(tr('UNIVERSITY'), style: nestEyebrow),
             const SizedBox(height: 8),
             InkWell(
               borderRadius: BorderRadius.circular(NestRadius.tile),
@@ -325,13 +328,13 @@ class _SetupFlowState extends State<SetupFlow> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.account_balance_rounded,
+                    Icon(Icons.account_balance_rounded,
                         color: NestColor.pen),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _university.isEmpty
-                            ? 'Pick your university'
+                            ? tr('Pick your university')
                             : _university,
                         style: TextStyle(
                           fontSize: 14.5,
@@ -341,13 +344,13 @@ class _SetupFlowState extends State<SetupFlow> {
                         ),
                       ),
                     ),
-                    const Icon(Icons.search_rounded, color: NestColor.inkFaint),
+                    Icon(Icons.search_rounded, color: NestColor.inkFaint),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 18),
-            const Text('COURSE (OPTIONAL)', style: nestEyebrow),
+            Text(tr('COURSE (OPTIONAL)'), style: nestEyebrow),
             const SizedBox(height: 8),
             TextField(
               controller: _course,
@@ -358,8 +361,8 @@ class _SetupFlowState extends State<SetupFlow> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No semester to choose: that is a student\'s question. You make '
-              'classes from the Classes tab, and students join with the code.',
+              tr('No semester to choose: that is a student\'s question. You make '
+              'classes from the Classes tab, and students join with the code.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -378,8 +381,8 @@ class _SetupFlowState extends State<SetupFlow> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Notes and subjects are filed under this semester, and a cover '
-              'page prints it. You can change it later from your profile.',
+              tr('Notes and subjects are filed under this semester, and a cover '
+              'page prints it. You can change it later from your profile.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -390,10 +393,10 @@ class _SetupFlowState extends State<SetupFlow> {
           children: [
             Row(
               children: [
-                const Text('SUBJECTS', style: nestEyebrow),
+                Text(tr('SUBJECTS'), style: nestEyebrow),
                 const Spacer(),
                 if (subjects.isNotEmpty)
-                  Text('${subjects.length}', style: nestEyebrow),
+                  Text(trp('{0}', [subjects.length]), style: nestEyebrow),
               ],
             ),
             const SizedBox(height: 10),
@@ -401,7 +404,7 @@ class _SetupFlowState extends State<SetupFlow> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
-                  'No subjects added yet.',
+                  tr('No subjects added yet.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -421,7 +424,7 @@ class _SetupFlowState extends State<SetupFlow> {
                       ),
                       child: Text(
                         s.code,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: NestColor.ink,
@@ -441,13 +444,13 @@ class _SetupFlowState extends State<SetupFlow> {
                       borderRadius: BorderRadius.circular(NestRadius.chip),
                       border: Border.all(color: NestColor.rule),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.add_rounded, size: 16, color: NestColor.pen),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
-                          'Add subject',
+                          tr('Add subject'),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -462,7 +465,7 @@ class _SetupFlowState extends State<SetupFlow> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Tap a subject to rename it or change its index tab colour.',
+              tr('Tap a subject to rename it or change its index tab colour.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -470,7 +473,7 @@ class _SetupFlowState extends State<SetupFlow> {
       default:
         return _Sheet(
           children: [
-            const Text('YOUR REVISION PLAN', style: nestEyebrow),
+            Text(tr('YOUR REVISION PLAN'), style: nestEyebrow),
             const SizedBox(height: 12),
             for (final r in _reminders)
               Padding(
@@ -497,8 +500,8 @@ class _SetupFlowState extends State<SetupFlow> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          r,
-                          style: const TextStyle(
+                          tr(r),
+                          style: TextStyle(
                             fontSize: 14.5,
                             color: NestColor.ink,
                           ),
@@ -510,8 +513,8 @@ class _SetupFlowState extends State<SetupFlow> {
               ),
             const SizedBox(height: 4),
             Text(
-              'Your choice is saved now. Reminders start arriving once '
-              'notifications are added to the app.',
+              tr('Your choice is saved now. Reminders start arriving once '
+              'notifications are added to the app.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

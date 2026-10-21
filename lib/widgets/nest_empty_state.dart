@@ -38,7 +38,7 @@ class NestEmptyState extends StatelessWidget {
             Container(
               width: 76,
               height: 76,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: NestColor.card,
                 shape: BoxShape.circle,
                 boxShadow: NestShadow.resting,
@@ -47,7 +47,7 @@ class NestEmptyState extends StatelessWidget {
                 child: Container(
                   width: 52,
                   height: 52,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: NestColor.tintPen,
                     shape: BoxShape.circle,
                   ),

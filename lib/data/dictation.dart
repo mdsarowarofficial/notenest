@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import '../l10n/strings.dart';
 
 /// Turns speech into text using whatever recogniser the device already has.
 ///
@@ -87,9 +88,9 @@ class Dictation extends ChangeNotifier {
     }
 
     if (!available) {
-      error = 'This device has no speech recogniser available to the app. On '
+      error = tr('This device has no speech recogniser available to the app. On '
           'Android the Google app provides it, and it needs to be installed '
-          'and allowed to use the microphone.';
+          'and allowed to use the microphone.');
       notifyListeners();
       return false;
     }
@@ -176,8 +177,8 @@ class Dictation extends ChangeNotifier {
       _failedRestarts++;
       if (_failedRestarts >= _maxFailedRestarts) {
         wanted = false;
-        error = 'The recogniser stopped responding. The text so far has been '
-            'kept — tap the microphone to carry on.';
+        error = tr('The recogniser stopped responding. The text so far has been '
+            'kept — tap the microphone to carry on.');
       }
     }
     notifyListeners();
@@ -279,26 +280,26 @@ class Dictation extends ChangeNotifier {
   static String _readable(String raw) {
     final code = raw.toLowerCase();
     if (code.contains('permission')) {
-      return 'NoteNest needs permission to use the microphone. Allow it in '
-          'your phone settings and try again.';
+      return tr('NoteNest needs permission to use the microphone. Allow it in '
+          'your phone settings and try again.');
     }
     if (code.contains('network')) {
-      return 'The recogniser on this device needs an internet connection and '
-          'could not reach it.';
+      return tr('The recogniser on this device needs an internet connection and '
+          'could not reach it.');
     }
     if (code.contains('busy')) {
-      return 'The microphone is busy. Close anything else that might be '
-          'using it.';
+      return tr('The microphone is busy. Close anything else that might be '
+          'using it.');
     }
     if (code.contains('language') || code.contains('locale')) {
-      return 'That language is not installed on this device. Pick another, or '
-          'add it in the device speech settings.';
+      return tr('That language is not installed on this device. Pick another, or '
+          'add it in the device speech settings.');
     }
     if (code.contains('client')) {
-      return 'The device recogniser could not start. On Android this usually '
-          'means the Google app is disabled or has no microphone permission.';
+      return tr('The device recogniser could not start. On Android this usually '
+          'means the Google app is disabled or has no microphone permission.');
     }
-    return 'The recogniser reported: $raw';
+    return trp('The recogniser reported: {0}', [raw]);
   }
 
   @override

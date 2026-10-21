@@ -14,6 +14,7 @@ import '../../models/classwork.dart';
 import '../../models/exam.dart';
 import '../../models/subject.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Files in a class: picking them, showing them, opening them, keeping them.
 
@@ -26,7 +27,7 @@ const maxClassFileBytes = 50 * 1024 * 1024;
 /// out, and throws a message-ready string for a file that is too large.
 Future<List<PendingFile>> pickClassFiles() async {
   final picked = await FilePicker.pickFiles(
-    dialogTitle: 'Attach files',
+    dialogTitle: tr('Attach files'),
   );
   final out = <PendingFile>[];
   for (final f in picked) {
@@ -78,7 +79,7 @@ class PendingFileChip extends StatelessWidget {
     return InputChip(
       avatar: Icon(iconForFile(file.name), size: 18, color: NestColor.pen),
       label: Text(
-        '${file.name} · ${formatSize(file.bytes.length)}',
+        trp('{0} · {1}', [file.name, formatSize(file.bytes.length)]),
         overflow: TextOverflow.ellipsis,
       ),
       onDeleted: onRemove,
@@ -127,12 +128,12 @@ class ClassFileTile extends StatelessWidget {
         onTap: () => openClassFile(context, file),
         trailing: onRemove != null
             ? IconButton(
-                tooltip: 'Remove',
+                tooltip: tr('Remove'),
                 icon: const Icon(Icons.close_rounded, size: 20),
                 onPressed: onRemove,
               )
             : PopupMenuButton<String>(
-                tooltip: 'More',
+                tooltip: tr('More'),
                 onSelected: (v) {
                   if (v == 'drive') _openInDrive(context, file);
                   if (v == 'save') {
@@ -145,16 +146,16 @@ class ClassFileTile extends StatelessWidget {
                   }
                 },
                 itemBuilder: (_) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'drive',
-                    child: Text('Open in Google Drive'),
+                    child: Text(tr('Open in Google Drive')),
                   ),
                   if (saveTitle != null &&
                       (file.isPdf || file.isImage) &&
                       AttachmentStore.isSupported)
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'save',
-                      child: Text('Save to my notes (works offline)'),
+                      child: Text(tr('Save to my notes (works offline)')),
                     ),
                 ],
               ),
@@ -170,7 +171,7 @@ Future<void> _openInDrive(BuildContext context, ClassFile file) async {
   );
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open a browser for that file.')),
+      SnackBar(content: Text(tr('Could not open a browser for that file.'))),
     );
   }
 }
@@ -183,7 +184,7 @@ Future<Uint8List> _download(
   final messenger = ScaffoldMessenger.of(context);
   messenger.showSnackBar(
     SnackBar(
-      content: Text('$verb ${file.name}…'),
+      content: Text(trp('{0} {1}…', [verb, file.name])),
       duration: const Duration(seconds: 20),
     ),
   );
@@ -229,7 +230,7 @@ class _BytesViewer extends StatelessWidget {
         title: Text(file.name, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
-            tooltip: 'Open in Google Drive',
+            tooltip: tr('Open in Google Drive'),
             icon: const Icon(Icons.open_in_new_rounded),
             onPressed: () => _openInDrive(context, file),
           ),
@@ -281,7 +282,7 @@ Future<void> saveClassFileToNotes(
       sizeBytes: bytes.length,
     );
     messenger.showSnackBar(
-      SnackBar(content: Text('Saved to your notes as "$title".')),
+      SnackBar(content: Text(trp('Saved to your notes as "{0}".', [title]))),
     );
   } on DriveException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -301,9 +302,9 @@ Future<Subject?> _pickSubject(BuildContext context, List<Subject> subjects) {
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 14),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
-              child: Text('SAVE UNDER WHICH SUBJECT?', style: nestEyebrow),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: Text(tr('SAVE UNDER WHICH SUBJECT?'), style: nestEyebrow),
             ),
             for (final s in subjects)
               ListTile(
@@ -317,7 +318,7 @@ Future<Subject?> _pickSubject(BuildContext context, List<Subject> subjects) {
               ),
             ListTile(
               leading: const Icon(Icons.inbox_outlined),
-              title: const Text('No subject'),
+              title: Text(tr('No subject')),
               onTap: () => Navigator.pop(
                 sheetContext,
                 // A stand-in meaning "none", since null already means the
@@ -360,7 +361,7 @@ Future<void> addDeadlineToExams(
   final messenger = ScaffoldMessenger.of(context);
   if (already) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('Already in your Exam countdown.')),
+      SnackBar(content: Text(tr('Already in your Exam countdown.'))),
     );
     return;
   }
@@ -372,6 +373,6 @@ Future<void> addDeadlineToExams(
     remindDays: 1,
   );
   messenger.showSnackBar(
-    const SnackBar(content: Text('Added to your Exam countdown.')),
+    SnackBar(content: Text(tr('Added to your Exam countdown.'))),
   );
 }

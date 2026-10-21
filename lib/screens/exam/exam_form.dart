@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../models/exam.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Adds or edits a dated thing: an exam, a quiz, an assignment. Requirement 12.
 ///
@@ -81,7 +82,7 @@ class _ExamFormState extends State<_ExamForm> {
         _subjectId == null ? null : _repo.subjectById(_subjectId!);
     return subject == null
         ? _kind.label
-        : '${subject.code} ${_kind.label.toLowerCase()}';
+        : trp('{0} {1}', [subject.code, _kind.label.toLowerCase()]);
   }
 
   Future<void> _pickDate() async {
@@ -134,7 +135,7 @@ class _ExamFormState extends State<_ExamForm> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = 'That could not be saved. Try again.';
+          _error = tr('That could not be saved. Try again.');
         });
       }
     }
@@ -148,18 +149,17 @@ class _ExamFormState extends State<_ExamForm> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Remove this date?'),
-        content: Text('${exam.title} will be taken off your calendar. Your '
-            'notes are not touched.'),
+        title: Text(tr('Remove this date?')),
+        content: Text(trp('{0} will be taken off your calendar. Your notes are not touched.', [exam.title])),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(tr('Remove')),
           ),
         ],
       ),
@@ -203,11 +203,11 @@ class _ExamFormState extends State<_ExamForm> {
               ),
               const SizedBox(height: 20),
               Text(
-                widget.existing == null ? 'Add a date' : 'Edit this date',
+                widget.existing == null ? tr('Add a date') : tr('Edit this date'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 18),
-              const Text('WHAT IS IT', style: nestEyebrow),
+              Text(tr('WHAT IS IT'), style: nestEyebrow),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -222,7 +222,7 @@ class _ExamFormState extends State<_ExamForm> {
                 ],
               ),
               const SizedBox(height: 18),
-              const Text('WHEN', style: nestEyebrow),
+              Text(tr('WHEN'), style: nestEyebrow),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _pickDate,
@@ -236,7 +236,7 @@ class _ExamFormState extends State<_ExamForm> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.event_rounded,
+                      Icon(Icons.event_rounded,
                           size: 18, color: NestColor.pen),
                       const SizedBox(width: 12),
                       Expanded(
@@ -261,7 +261,7 @@ class _ExamFormState extends State<_ExamForm> {
               ),
               if (subjects.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                const Text('SUBJECT', style: nestEyebrow),
+                Text(tr('SUBJECT'), style: nestEyebrow),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -275,10 +275,10 @@ class _ExamFormState extends State<_ExamForm> {
                       isExpanded: true,
                       borderRadius: BorderRadius.circular(NestRadius.tile),
                       items: [
-                        const DropdownMenuItem<int?>(
+                        DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Everything — all subjects',
-                              style: TextStyle(fontSize: 14)),
+                          child: Text(tr('Everything — all subjects'),
+                              style: const TextStyle(fontSize: 14)),
                         ),
                         for (final s in subjects)
                           DropdownMenuItem<int?>(
@@ -312,13 +312,13 @@ class _ExamFormState extends State<_ExamForm> {
                 const SizedBox(height: 4),
                 Text(
                   _subjectId == null
-                      ? 'Revision will cover every note you have.'
-                      : 'Revision will cover that subject only.',
+                      ? tr('Revision will cover every note you have.')
+                      : tr('Revision will cover that subject only.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
               const SizedBox(height: 18),
-              const Text('REMIND ME', style: nestEyebrow),
+              Text(tr('REMIND ME'), style: nestEyebrow),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -342,15 +342,12 @@ class _ExamFormState extends State<_ExamForm> {
                 // Said plainly, because a reminder the student believes will
                 // wake their phone and does not is worse than no reminder.
                 Text(
-                  'Shown inside NoteNest from '
-                  '${reminderLabel(_remindDays).toLowerCase()}. It also rings '
-                  'from this phone when phone reminders are switched on in '
-                  'the notifications settings.',
+                  trp('Shown inside NoteNest from {0}. It also rings from this phone when phone reminders are switched on in the notifications settings.', [reminderLabel(_remindDays).toLowerCase()]),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
               const SizedBox(height: 18),
-              const Text('CALL IT', style: nestEyebrow),
+              Text(tr('CALL IT'), style: nestEyebrow),
               const SizedBox(height: 6),
               TextField(
                 controller: _title,
@@ -390,7 +387,7 @@ class _ExamFormState extends State<_ExamForm> {
                           minimumSize: const Size(0, 54),
                           foregroundColor: NestColor.redPen,
                         ),
-                        child: const Text('Remove'),
+                        child: Text(tr('Remove')),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -399,7 +396,7 @@ class _ExamFormState extends State<_ExamForm> {
                     flex: 2,
                     child: FilledButton(
                       onPressed: _saving ? null : _save,
-                      child: Text(_saving ? 'Saving…' : 'Save'),
+                      child: Text(_saving ? tr('Saving…') : tr('Save')),
                     ),
                   ),
                 ],
@@ -462,5 +459,5 @@ String longDate(DateTime d) {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
-  return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]} ${d.year}';
+  return localDate("${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]} ${d.year}");
 }

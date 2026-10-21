@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'auth_repository.dart';
 import 'google_identity.dart';
+import '../l10n/strings.dart';
 
 /// A file the app put in somebody's Google Drive.
 class DriveFile {
@@ -91,8 +92,8 @@ class DriveService {
   /// doing.
   Future<String> _accessToken({bool prompt = true}) async {
     if (!isSupported) {
-      throw const DriveException(
-        'Google Drive needs the NoteNest app on a phone.',
+      throw DriveException(
+        tr('Google Drive needs the NoteNest app on a phone.'),
       );
     }
     String? token;
@@ -103,9 +104,9 @@ class DriveService {
       throw DriveException('Google Drive could not be reached. $e');
     }
     if (token == null || token.isEmpty) {
-      throw const DriveException(
-        'Google Drive access was not given. Allow it when Google asks, so '
-        'NoteNest can save files in your Drive.',
+      throw DriveException(
+        tr('Google Drive access was not given. Allow it when Google asks, so '
+        'NoteNest can save files in your Drive.'),
       );
     }
     _token = token;
@@ -160,22 +161,22 @@ class DriveService {
       reason = (body['error']?['message'] ?? '').toString();
     } catch (_) {}
     if (res.statusCode == 403 && reason.contains('has not been used')) {
-      return 'The Google Drive API is switched off for this app\'s Google '
+      return tr('The Google Drive API is switched off for this app\'s Google '
           'Cloud project. Turn it on in the Cloud console (APIs & Services → '
-          'Library → Google Drive API) and try again.';
+          'Library → Google Drive API) and try again.');
     }
     if (res.statusCode == 403 && reason.toLowerCase().contains('quota')) {
       return fullMessage;
     }
     if (res.statusCode == 404) {
-      return 'That file is no longer in Google Drive.';
+      return tr('That file is no longer in Google Drive.');
     }
-    return 'Google Drive refused that (${res.statusCode}). $reason'.trim();
+    return trp('Google Drive refused that ({0}). {1}', [res.statusCode, reason]).trim();
   }
 
-  static const fullMessage =
-      'Your Google Drive has no space left. Free some space in Drive '
-      '(delete files or empty the bin), then try again.';
+  static String get fullMessage =>
+      tr('Your Google Drive has no space left. Free some space in Drive '
+      '(delete files or empty the bin), then try again.');
 
   /// Throws [fullMessage] when [bytes] more would not fit in the student's
   /// Drive. Drive reports no limit for unlimited (Workspace) accounts, which
@@ -201,7 +202,7 @@ class DriveService {
       return;
     }
     if (limit == null || used == null) return;
-    if (used + bytes > limit) throw const DriveException(fullMessage);
+    if (used + bytes > limit) throw DriveException(fullMessage);
   }
 
   // --------------------------------------------------------------- folders
@@ -287,7 +288,7 @@ class DriveService {
     );
     final session = start.headers['location'];
     if (session == null) {
-      throw const DriveException('Google Drive did not start the upload.');
+      throw DriveException(tr('Google Drive did not start the upload.'));
     }
     final done = await _send(
       (h) => http.put(
@@ -388,9 +389,9 @@ class DriveService {
     }
     final type = res.headers['content-type'] ?? '';
     if (res.statusCode != 200 || type.startsWith('text/html')) {
-      throw const DriveException(
-        'The file could not be downloaded. Its owner may have removed it or '
-        'stopped sharing it.',
+      throw DriveException(
+        tr('The file could not be downloaded. Its owner may have removed it or '
+        'stopped sharing it.'),
       );
     }
     return res.bodyBytes;

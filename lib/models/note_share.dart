@@ -6,6 +6,8 @@
 /// reads one off a file, validation and all.
 library;
 
+import '../l10n/strings.dart';
+
 /// Where a share has got to.
 enum ShareState { pending, accepted, declined }
 
@@ -15,11 +17,11 @@ extension ShareStateData on ShareState {
   String get label {
     switch (this) {
       case ShareState.pending:
-        return 'Waiting';
+        return tr('Waiting');
       case ShareState.accepted:
-        return 'Accepted';
+        return tr('Accepted');
       case ShareState.declined:
-        return 'Declined';
+        return tr('Declined');
     }
   }
 
@@ -98,7 +100,7 @@ class NoteShare {
   bool get isPending => state == ShareState.pending;
   bool get viaGroup => groupId.isNotEmpty;
 
-  String get fromLabel => fromName.trim().isEmpty ? 'Someone' : fromName.trim();
+  String get fromLabel => fromName.trim().isEmpty ? tr('Someone') : fromName.trim();
 
   /// A line under the title: who sent it, through what, with what attached.
   String get subtitle {
@@ -228,7 +230,5 @@ String? attachmentWarning({
   if (sharePayloadFits(total)) return null;
 
   final files = '$fileCount ${fileCount == 1 ? 'file' : 'files'}';
-  return 'The text will be sent, but $files '
-      '(${formatBytes(attachmentBytes)}) will not fit. '
-      'Send the note as a file instead to include them.';
+  return trp('The text will be sent, but {0} ({1}) will not fit. Send the note as a file instead to include them.', [files, formatBytes(attachmentBytes)]);
 }

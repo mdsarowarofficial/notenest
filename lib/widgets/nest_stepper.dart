@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/nest_theme.dart';
 import 'nest_marks.dart';
+import '../l10n/strings.dart';
 
 /// One stop in a NoteNest flow.
 class NestStep {
@@ -51,7 +52,7 @@ class NestStepper extends StatelessWidget {
           Row(
             children: [
               Text(
-                'STEP ${_two(currentIndex + 1)} / ${_two(steps.length)}',
+                trp('STEP {0} / {1}', [_two(currentIndex + 1), _two(steps.length)]),
                 style: nestEyebrow.copyWith(color: NestColor.pen),
               ),
               const SizedBox(width: 10),
@@ -159,7 +160,7 @@ class NestStepper extends StatelessWidget {
     return Semantics(
       button: done,
       selected: active,
-      label: '${steps[i].title}, step ${i + 1} of ${steps.length}',
+      label: trp('{0}, step {1} of {2}', [steps[i].title, i + 1, steps.length]),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: done ? () => onStepTapped?.call(i) : null,

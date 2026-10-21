@@ -17,6 +17,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../l10n/strings.dart';
 
 /// The sheet closed without an account being chosen.
 ///
@@ -28,7 +29,7 @@ class GoogleSignInCancelled implements Exception {
   const GoogleSignInCancelled();
 
   @override
-  String toString() => 'Google sign-in was closed.';
+  String toString() => tr('Google sign-in was closed.');
 }
 
 /// A Google sign-in failure with a message already written for the screen.
@@ -148,9 +149,9 @@ class GoogleAccounts {
   /// [GoogleIdentityError] for everything else.
   Future<GoogleCredential> signIn() async {
     if (!isSupported) {
-      throw const GoogleIdentityError(
-        'Signing in with Google needs the NoteNest app. In a browser, use '
-        'your email and password.',
+      throw GoogleIdentityError(
+        tr('Signing in with Google needs the NoteNest app. In a browser, use '
+        'your email and password.'),
       );
     }
 
@@ -189,11 +190,11 @@ class GoogleAccounts {
 
     final token = account.authentication.idToken;
     if (token == null || token.isEmpty) {
-      throw const GoogleIdentityError(
-        'Google signed in but sent no identity token, so there is nothing to '
+      throw GoogleIdentityError(
+        tr('Google signed in but sent no identity token, so there is nothing to '
         'prove who you are with. This almost always means the web OAuth '
         'client is missing from google-services.json — re-download it from '
-        'Firebase after switching the Google provider on.',
+        'Firebase after switching the Google provider on.'),
         looksLikeSetup: true,
       );
     }
@@ -246,26 +247,26 @@ class GoogleAccounts {
   static String _describe(String code, String? description) {
     switch (code) {
       case 'clientConfigurationError':
-        return 'Google refused this build of the app. The signing '
+        return tr('Google refused this build of the app. The signing '
             "fingerprint for this build is probably not registered in the "
-            'Firebase project yet.';
+            'Firebase project yet.');
       case 'providerConfigurationError':
-        return 'Google sign-in is not finished being set up for this project. '
+        return tr('Google sign-in is not finished being set up for this project. '
             'Check that the Google provider is switched on in Firebase '
-            'Authentication.';
+            'Authentication.');
       case 'uiUnavailable':
-        return 'Google could not show the sign-in sheet. Make sure Google '
-            'Play services is installed and up to date, then try again.';
+        return tr('Google could not show the sign-in sheet. Make sure Google '
+            'Play services is installed and up to date, then try again.');
       case 'userMismatch':
-        return 'That is a different Google account from the one expected. '
-            'Try again and pick the first one.';
+        return tr('That is a different Google account from the one expected. '
+            'Try again and pick the first one.');
       case 'interrupted':
-        return 'Google sign-in was interrupted. Try again.';
+        return tr('Google sign-in was interrupted. Try again.');
       default:
         final extra = (description == null || description.isEmpty)
             ? ''
             : '\n\n$description';
-        return 'Google sign-in did not work.$extra';
+        return trp('Google sign-in did not work.{0}', [extra]);
     }
   }
 }

@@ -7,6 +7,7 @@ import '../../models/transcript.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_tags.dart';
 import 'note_detail.dart';
+import '../../l10n/strings.dart';
 
 /// Turns a dictation into a note worth revising from. Requirement 8.3.
 ///
@@ -61,7 +62,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
     _title = TextEditingController(
       text: widget.existing?.title ??
           (structured.suggestedTitle.isEmpty
-              ? 'Dictated note'
+              ? tr('Dictated note')
               : structured.suggestedTitle),
     );
     _subjectId = widget.existing?.subjectId ??
@@ -106,7 +107,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
     setState(() => _saving = true);
 
     final title =
-        _title.text.trim().isEmpty ? 'Dictated note' : _title.text.trim();
+        _title.text.trim().isEmpty ? tr('Dictated note') : _title.text.trim();
 
     final old = widget.existing;
 
@@ -156,8 +157,8 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Transcript',
+        title: Text(
+          tr('Transcript'),
           style: TextStyle(
             fontFamily: NestFont.display,
             fontSize: 19,
@@ -168,7 +169,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
         actions: [
           TextButton(
             onPressed: _saving || _body.trim().isEmpty ? null : _save,
-            child: Text(_saving ? 'Saving…' : 'Save'),
+            child: Text(_saving ? tr('Saving…') : tr('Save')),
           ),
         ],
       ),
@@ -178,27 +179,26 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
           TextField(
             controller: _title,
             textCapitalization: TextCapitalization.sentences,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: NestFont.display,
               fontSize: 24,
               fontWeight: FontWeight.w700,
               color: NestColor.ink,
             ),
-            decoration: const InputDecoration(
-              hintText: 'Note title',
+            decoration: InputDecoration(
+              hintText: tr('Note title'),
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '${structured.wordCount} words  ·  '
-            '${structured.sentenceCount} sentences',
+            trp('{0} words  ·  {1} sentences', [structured.wordCount, structured.sentenceCount]),
             style: nestEyebrow,
           ),
           const SizedBox(height: 18),
           if (subjects.isNotEmpty) ...[
-            const Text('SUBJECT', style: nestEyebrow),
+            Text(tr('SUBJECT'), style: nestEyebrow),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -212,10 +212,10 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
                   isExpanded: true,
                   borderRadius: BorderRadius.circular(NestRadius.tile),
                   items: [
-                    const DropdownMenuItem<int?>(
+                    DropdownMenuItem<int?>(
                       value: null,
-                      child: Text('No subject',
-                          style: TextStyle(fontSize: 14)),
+                      child: Text(tr('No subject'),
+                          style: const TextStyle(fontSize: 14)),
                     ),
                     for (final s in subjects)
                       DropdownMenuItem<int?>(
@@ -248,7 +248,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             ),
             const SizedBox(height: 18),
           ],
-          const Text('TAGS', style: nestEyebrow),
+          Text(tr('TAGS'), style: nestEyebrow),
           const SizedBox(height: 7),
           NestTagField(
             tags: _tags,
@@ -258,11 +258,11 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
           const SizedBox(height: 22),
           Container(height: 1, color: NestColor.rule),
           const SizedBox(height: 16),
-          const Text('WHAT WAS HEARD', style: nestEyebrow),
+          Text(tr('WHAT WAS HEARD'), style: nestEyebrow),
           const SizedBox(height: 4),
           Text(
-            'Fix anything the recogniser misheard. Everything below follows '
-            'what you type here.',
+            tr('Fix anything the recogniser misheard. Everything below follows '
+            'what you type here.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
@@ -271,7 +271,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             maxLines: null,
             minLines: 6,
             textCapitalization: TextCapitalization.sentences,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               height: 1.55,
               color: NestColor.ink,
@@ -293,7 +293,7 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             onChanged: (v) => setState(() => _structure = v),
           ),
           const SizedBox(height: 18),
-          const Text('HOW THE NOTE WILL READ', style: nestEyebrow),
+          Text(tr('HOW THE NOTE WILL READ'), style: nestEyebrow),
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -305,12 +305,12 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             ),
             child: _body.trim().isEmpty
                 ? Text(
-                    'Nothing to save yet.',
+                    tr('Nothing to save yet.'),
                     style: Theme.of(context).textTheme.bodySmall,
                   )
                 : Text(
                     _body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14.5,
                       height: 1.6,
                       color: NestColor.ink,
@@ -351,7 +351,7 @@ class _StructureSwitch extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Lay it out as a study note',
+                  tr('Lay it out as a study note'),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
@@ -361,14 +361,11 @@ class _StructureSwitch extends StatelessWidget {
           Text(
             on
                 ? keyPointCount > 0
-                    ? 'Split into sentences and grouped. $keyPointCount '
-                        '${keyPointCount == 1 ? 'line' : 'lines'} went to Key '
-                        'points because of words like "important" or "for the '
-                        'exam".'
-                    : 'Split into sentences and grouped. No line used a word '
+                    ? trp('Split into sentences and grouped. {0} {1} went to Key points because of words like "important" or "for the exam".', [keyPointCount, keyPointCount == 1 ? tr('line') : tr('lines')])
+                    : tr('Split into sentences and grouped. No line used a word '
                         'like "important" or "remember", so there are no key '
-                        'points.'
-                : 'Saved exactly as it was dictated, in one block.',
+                        'points.')
+                : tr('Saved exactly as it was dictated, in one block.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

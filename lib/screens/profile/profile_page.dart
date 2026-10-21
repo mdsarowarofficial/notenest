@@ -14,6 +14,7 @@ import '../../widgets/nest_marks.dart';
 import '../auth/account_switch.dart';
 import '../auth/login_page.dart';
 import '../subjects/subject_form.dart';
+import '../../l10n/strings.dart';
 
 /// The account screen. Requirement 15.
 ///
@@ -61,8 +62,8 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     setState(() => _editing = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profile updated'),
+      SnackBar(
+        content: Text(tr('Profile updated')),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -83,9 +84,9 @@ class _ProfilePageState extends State<ProfilePage> {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
           ),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: NestColor.paper,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(22, 10, 22, 26),
           child: SingleChildScrollView(
@@ -105,7 +106,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Semester',
+                  tr('Semester'),
                   style: Theme.of(sheetContext).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 16),
@@ -122,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   height: 50,
                   child: FilledButton(
                     onPressed: () => Navigator.pop(sheetContext, true),
-                    child: const Text('Save'),
+                    child: Text(tr('Save')),
                   ),
                 ),
               ],
@@ -215,8 +216,8 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       setState(() => _deleting = false);
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Nothing was deleted — your account is still here.'),
+        SnackBar(
+          content: Text(tr('Nothing was deleted — your account is still here.')),
         ),
       );
     } on CloudException catch (e) {
@@ -242,8 +243,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Profile',
+        title: Text(
+          tr('Profile'),
           style: TextStyle(
             fontFamily: NestFont.display,
             fontSize: 20,
@@ -255,7 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
           if (!_editing)
             TextButton(
               onPressed: () => setState(() => _editing = true),
-              child: const Text('Edit'),
+              child: Text(tr('Edit')),
             ),
         ],
       ),
@@ -272,7 +273,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Semantics(
                     button: true,
-                    label: 'Change profile photo',
+                    label: tr('Change profile photo'),
                     child: GestureDetector(
                       onTap: _changePhoto,
                       child: Stack(
@@ -320,15 +321,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
               if (_editing) ...[
                 AuthField(
-                  label: 'FULL NAME',
-                  hint: 'Your full name',
+                  label: tr('FULL NAME'),
+                  hint: tr('Your full name'),
                   controller: _name,
                   capitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 16),
                 AuthField(
-                  label: 'UNIVERSITY',
-                  hint: 'Your university or college',
+                  label: tr('UNIVERSITY'),
+                  hint: tr('Your university or college'),
                   controller: _institution,
                   capitalization: TextCapitalization.words,
                 ),
@@ -342,14 +343,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           _institution.text = user.institution ?? '';
                           setState(() => _editing = false);
                         },
-                        child: const Text('Cancel'),
+                        child: Text(tr('Cancel')),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
                         onPressed: _save,
-                        child: const Text('Save'),
+                        child: Text(tr('Save')),
                       ),
                     ),
                   ],
@@ -358,33 +359,35 @@ class _ProfilePageState extends State<ProfilePage> {
                 // A teacher has no semester and no revision plan; showing
                 // "Not set" for questions they were never asked reads as
                 // something left undone.
-                _row('UNIVERSITY',
-                    _repo.university ?? user.institution ?? 'Not set'),
+                _row(tr('UNIVERSITY'),
+                    _repo.university ?? user.institution ?? tr('Not set')),
                 const PaperRule(),
-                _row('COURSE', _repo.teachingCourse ?? 'Not set'),
+                _row(tr('COURSE'), _repo.teachingCourse ?? tr('Not set')),
                 const PaperRule(),
-                _row('ACCOUNT', 'Teacher'),
+                _row(tr('ACCOUNT'), 'Teacher'),
               ] else ...[
-                _row('UNIVERSITY', user.institution ?? 'Not set'),
+                _row(tr('UNIVERSITY'), user.institution ?? tr('Not set')),
                 const PaperRule(),
                 _row(
-                  'SEMESTER',
-                  _repo.semesterLabel ?? 'Not set',
+                  tr('SEMESTER'),
+                  _repo.semesterLabel == null
+                      ? tr('Not set')
+                      : shownSemester(_repo.semesterLabel!),
                   onTap: _editSemester,
                 ),
                 const PaperRule(),
                 _row(
-                  'REVISION PLAN',
-                  _repo.reminderChoice ?? 'Not set',
+                  tr('REVISION PLAN'),
+                  _repo.reminderChoice ?? tr('Not set'),
                 ),
                 const PaperRule(),
-                _row('SUBJECTS', '${_repo.subjects().length}'),
+                _row(tr('SUBJECTS'), '${_repo.subjects().length}'),
               ],
 
               const SizedBox(height: 30),
               Row(
                 children: [
-                  const Text('YOUR SUBJECTS', style: nestEyebrow),
+                  Text(tr('YOUR SUBJECTS'), style: nestEyebrow),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Container(height: 1, color: NestColor.rule),
@@ -393,7 +396,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 12),
               if (_repo.subjects().isEmpty)
-                Text('No subjects yet.', style: t.bodySmall)
+                Text(tr('No subjects yet.'), style: t.bodySmall)
               else
                 for (final s in _repo.subjects())
                   ListTile(
@@ -412,7 +415,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       style: nestEyebrow.copyWith(fontSize: 11),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.edit_rounded,
+                      icon: Icon(Icons.edit_rounded,
                           size: 18, color: NestColor.inkFaint),
                       onPressed: () => showSubjectForm(context, existing: s),
                     ),
@@ -421,24 +424,24 @@ class _ProfilePageState extends State<ProfilePage> {
               OutlinedButton.icon(
                 onPressed: () => showSubjectForm(context),
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add subject'),
+                label: Text(tr('Add subject')),
               ),
 
               const SizedBox(height: 36),
               TextButton.icon(
                 onPressed: _deleting ? null : _signOut,
-                icon: const Icon(Icons.logout_rounded,
+                icon: Icon(Icons.logout_rounded,
                     size: 18, color: NestColor.redPen),
-                label: const Text(
-                  'Sign out',
+                label: Text(
+                  tr('Sign out'),
                   style: TextStyle(color: NestColor.redPen),
                 ),
               ),
               const SizedBox(height: 4),
               TextButton(
                 onPressed: _deleting ? null : _deleteAccount,
-                child: const Text(
-                  'Delete account',
+                child: Text(
+                  tr('Delete account'),
                   style: TextStyle(
                     color: NestColor.inkFaint,
                     decoration: TextDecoration.underline,
@@ -462,11 +465,11 @@ class _ProfilePageState extends State<ProfilePage> {
             Expanded(child: Text(label, style: nestEyebrow)),
             Text(
               value,
-              style: const TextStyle(fontSize: 14, color: NestColor.ink),
+              style: TextStyle(fontSize: 14, color: NestColor.ink),
             ),
             if (onTap != null) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded,
+              Icon(Icons.chevron_right_rounded,
                   size: 18, color: NestColor.inkFaint),
             ],
           ],
@@ -529,27 +532,26 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     final t = Theme.of(context).textTheme;
 
     return AlertDialog(
-      title: const Text('Delete this account?'),
+      title: Text(tr('Delete this account?')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('This removes, for good:', style: t.titleSmall),
+            Text(tr('This removes, for good:'), style: t.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'Every note, subject, exam and attachment on this phone, and '
-              '${widget.signedInToCloud ? 'your cloud profile, so classmates can no longer find you. Groups you created are deleted for everyone in them, you leave the rest, and notes waiting in either inbox are withdrawn.' : 'this device account.'}',
+              trp('Every note, subject, exam and attachment on this phone, and {0}', [widget.signedInToCloud ? 'your cloud profile, so classmates can no longer find you. Groups you created are deleted for everyone in them, you leave the rest, and notes waiting in either inbox are withdrawn.' : 'this device account.']),
               style: t.bodySmall,
             ),
             const SizedBox(height: 14),
-            Text('This does not remove:', style: t.titleSmall),
+            Text(tr('This does not remove:'), style: t.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'Messages you have already sent, and notes classmates have '
+              tr('Messages you have already sent, and notes classmates have '
               'already accepted. Those are in their copies now, under the '
               'name they were sent with — the same as an email you cannot '
-              'unsend.',
+              'unsend.'),
               style: t.bodySmall,
             ),
             const SizedBox(height: 18),
@@ -558,21 +560,21 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                 controller: _password,
                 obscureText: true,
                 autofillHints: const [AutofillHints.password],
-                decoration: const InputDecoration(labelText: 'Your password'),
+                decoration: InputDecoration(labelText: tr('Your password')),
               )
             else
               Text(
-                'This account signs in with Google, so there is no password to '
+                tr('This account signs in with Google, so there is no password to '
                 'ask for. Google will ask you to pick the account again once '
-                'you confirm — that is the same check, in its own words.',
+                'you confirm — that is the same check, in its own words.'),
                 style: t.bodySmall,
               ),
             const SizedBox(height: 12),
             TextField(
               controller: _confirm,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Type DELETE to confirm',
+              decoration: InputDecoration(
+                labelText: tr('Type DELETE to confirm'),
               ),
             ),
           ],
@@ -581,12 +583,12 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Keep my account'),
+          child: Text(tr('Keep my account')),
         ),
         FilledButton(
           onPressed: _ready ? () => Navigator.pop(context, _password.text) : null,
           style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
-          child: const Text('Delete for ever'),
+          child: Text(tr('Delete for ever')),
         ),
       ],
     );

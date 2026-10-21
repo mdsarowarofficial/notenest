@@ -7,6 +7,7 @@ import '../../models/note.dart';
 import '../../models/note_share.dart';
 import '../../theme/nest_theme.dart';
 import '../chat/message_request.dart';
+import '../../l10n/strings.dart';
 
 /// Sending a note to somebody inside NoteNest, rather than out through a file.
 ///
@@ -109,8 +110,8 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
         _busy = false;
         _found = person;
         _error = person == null
-            ? 'Nobody with that address has a NoteNest cloud account yet. '
-                'Check the spelling, or send it as a file instead.'
+            ? tr('Nobody with that address has a NoteNest cloud account yet. '
+                'Check the spelling, or send it as a file instead.')
             : null;
       });
     } on CloudException catch (e) {
@@ -128,7 +129,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
 
     final person = _found;
     if (person == null) {
-      setState(() => _error = 'Find the person first.');
+      setState(() => _error = tr('Find the person first.'));
       return;
     }
 
@@ -162,10 +163,10 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
             sent == 0
                 // Sending a group note to a group of one — yourself — is not a
                 // failure, but saying "sent" would be a lie.
-                ? 'Nobody to send to: you are the only one in that group.'
+                ? tr('Nobody to send to: you are the only one in that group.')
                 : sent == 1
-                    ? 'Sent. It is waiting for them to accept.'
-                    : 'Sent to $sent people. Each one accepts separately.',
+                    ? tr('Sent. It is waiting for them to accept.')
+                    : trp('Sent to {0} people. Each one accepts separately.', [sent]),
           ),
         ),
       );
@@ -194,9 +195,9 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: NestColor.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 26),
         child: SingleChildScrollView(
@@ -216,13 +217,12 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Send inside NoteNest',
+                tr('Send inside NoteNest'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 4),
               Text(
-                '"${widget.note.title}" lands in their Shared inbox. Nothing '
-                'is copied into their notebook until they accept it.',
+                trp('"{0}" lands in their Shared inbox. Nothing is copied into their notebook until they accept it.', [widget.note.title]),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 18),
@@ -233,11 +233,11 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
               // the group is already the permission. This sheet is for
               // somebody you share no group with, where the note arrives
               // unasked and a choice is the right thing to offer.
-              const _Note(
+              _Note(
                 colour: NestColor.pen,
-                text: 'For a group, post the note in its chat instead — '
+                text: tr('For a group, post the note in its chat instead — '
                     'everybody sees it straight away and keeps it only if '
-                    'they want to.',
+                    'they want to.'),
               ),
               const SizedBox(height: 18),
 
@@ -248,9 +248,9 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
                 controller: _message,
                 maxLength: 200,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'A line with it (optional)',
-                  hintText: 'the one from Tuesday',
+                decoration: InputDecoration(
+                  labelText: tr('A line with it (optional)'),
+                  hintText: tr('the one from Tuesday'),
                   counterText: '',
                 ),
               ),
@@ -262,9 +262,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
                 const SizedBox(height: 14),
                 _Note(
                   colour: NestColor.mint,
-                  text: 'The $_fileCount '
-                      '${_fileCount == 1 ? 'file' : 'files'} '
-                      '(${formatBytes(_fileBytes)}) travel with it.',
+                  text: trp('The {0} {1} ({2}) travel with it.', [_fileCount, _fileCount == 1 ? tr('file') : tr('files'), formatBytes(_fileBytes)]),
                 ),
               ],
 
@@ -283,10 +281,10 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
                   icon: const Icon(Icons.send_rounded, size: 18),
                   label: Text(
                     _measuring
-                        ? 'Measuring…'
+                        ? tr('Measuring…')
                         : _busy
-                            ? 'Sending…'
-                            : 'Send  ·  ${formatBytes(_payload?.length ?? 0)}',
+                            ? tr('Sending…')
+                            : trp('Send  ·  {0}', [formatBytes(_payload?.length ?? 0)]),
                   ),
                 ),
               ),
@@ -307,8 +305,8 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
               controller: _email,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Their email',
+              decoration: InputDecoration(
+                labelText: tr('Their email'),
                 hintText: 'classmate@example.com',
               ),
               onSubmitted: (_) => _lookUp(),
@@ -319,7 +317,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
             height: 48,
             child: OutlinedButton(
               onPressed: _busy ? null : _lookUp,
-              child: const Text('Find'),
+              child: Text(tr('Find')),
             ),
           ),
         ],
@@ -352,7 +350,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
                 ),
                 child: Text(
                   found.initials,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: NestColor.mint,
                   ),
@@ -374,7 +372,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
                   ],
                 ),
               ),
-              const Icon(Icons.check_circle_rounded, color: NestColor.mint),
+              Icon(Icons.check_circle_rounded, color: NestColor.mint),
             ],
           ),
         ),
@@ -386,7 +384,7 @@ class _CloudSendSheetState extends State<_CloudSendSheet> {
           child: TextButton.icon(
             onPressed: _busy ? null : () => _messageInstead(found),
             icon: const Icon(Icons.forum_outlined, size: 17),
-            label: const Text('Message them instead'),
+            label: Text(tr('Message them instead')),
           ),
         ),
       ],

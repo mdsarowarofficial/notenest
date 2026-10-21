@@ -8,6 +8,7 @@ import '../../data/page_renderer.dart';
 import '../../models/doc_text.dart';
 import '../../theme/nest_theme.dart';
 import 'doc_page_sheet.dart';
+import '../../l10n/strings.dart';
 
 /// PDF to Word, and Word to PDF.
 ///
@@ -67,7 +68,7 @@ class _ConvertPageState extends State<ConvertPage> {
     } catch (_) {
       setState(() {
         _busy = false;
-        _error = 'That file could not be read.';
+        _error = tr('That file could not be read.');
       });
     }
   }
@@ -88,7 +89,7 @@ class _ConvertPageState extends State<ConvertPage> {
           await DocumentService.shareDocx(bytes, '${picked.stem}.docx');
       if (!mounted) return;
       setState(() => _busy = false);
-      if (shared) _say('${picked.stem}.docx sent');
+      if (shared) _say(trp('{0}.docx sent', [picked.stem]));
     } on DocumentException catch (e) {
       if (mounted) {
         setState(() {
@@ -100,7 +101,7 @@ class _ConvertPageState extends State<ConvertPage> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = 'The Word file could not be made.';
+          _error = tr('The Word file could not be made.');
         });
       }
     }
@@ -132,7 +133,7 @@ class _ConvertPageState extends State<ConvertPage> {
           await DocumentService.sharePdf(bytes, '${picked.stem}.pdf');
       if (!mounted) return;
       setState(() => _busy = false);
-      if (shared) _say('${picked.stem}.pdf sent');
+      if (shared) _say(trp('{0}.pdf sent', [picked.stem]));
     } on DocumentException catch (e) {
       if (mounted) {
         setState(() {
@@ -146,7 +147,7 @@ class _ConvertPageState extends State<ConvertPage> {
         setState(() {
           _busy = false;
           _rendering = null;
-          _error = 'The PDF could not be made.';
+          _error = tr('The PDF could not be made.');
         });
       }
     }
@@ -171,7 +172,7 @@ class _ConvertPageState extends State<ConvertPage> {
     final sheetIndex = _rendering ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Convert a file')),
+      appBar: AppBar(title: Text(tr('Convert a file'))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
         children: [
@@ -212,8 +213,8 @@ class _ConvertPageState extends State<ConvertPage> {
           if (pages != null && pages.isNotEmpty) ...[
             Text(
               _rendering == null
-                  ? 'PAGE 1 OF ${pages.length}'
-                  : 'RENDERING PAGE ${_rendering! + 1} OF ${pages.length}',
+                  ? trp('PAGE 1 OF {0}', [pages.length])
+                  : trp('RENDERING PAGE {0} OF {1}', [_rendering! + 1, pages.length]),
               style: nestEyebrow,
             ),
             const SizedBox(height: 8),
@@ -250,7 +251,7 @@ class _ConvertPageState extends State<ConvertPage> {
           OutlinedButton.icon(
             onPressed: _busy ? null : _pick,
             icon: const Icon(Icons.folder_open_rounded, size: 18),
-            label: Text(picked == null ? 'Pick a PDF or Word file' : 'Pick another'),
+            label: Text(picked == null ? tr('Pick a PDF or Word file') : tr('Pick another')),
             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
           ),
 
@@ -276,10 +277,10 @@ class _ConvertPageState extends State<ConvertPage> {
                     : const Icon(Icons.ios_share_rounded, size: 18),
                 label: Text(
                   _busy
-                      ? 'Working…'
+                      ? tr('Working…')
                       : picked.kind == PickedKind.pdf
-                          ? 'Save as Word (.docx)'
-                          : 'Save as PDF',
+                          ? tr('Save as Word (.docx)')
+                          : tr('Save as PDF'),
                 ),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 54)),
               ),
@@ -313,23 +314,23 @@ class _WhatThisDoes extends StatelessWidget {
             children: [
               Container(width: 4, height: 16, color: NestColor.pen),
               const SizedBox(width: 8),
-              Text('BOTH WAYS',
+              Text(tr('BOTH WAYS'),
                   style: nestEyebrow.copyWith(color: NestColor.pen)),
             ],
           ),
           const SizedBox(height: 12),
-          const _Direction(
+          _Direction(
             from: 'PDF',
             to: 'Word',
-            line: 'Pulls the text out and gives it back as a .docx you can '
-                'edit. Headings are guessed from how the lines are written.',
+            line: tr('Pulls the text out and gives it back as a .docx you can '
+                'edit. Headings are guessed from how the lines are written.'),
           ),
           const SizedBox(height: 10),
-          const _Direction(
+          _Direction(
             from: 'Word',
             to: 'PDF',
-            line: 'Lays the text out on A4 pages and exports them. You see '
-                'the pages before you export.',
+            line: tr('Lays the text out on A4 pages and exports them. You see '
+                'the pages before you export.'),
           ),
         ],
       ),
@@ -355,7 +356,7 @@ class _Direction extends StatelessWidget {
           children: [
             Text(from, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(width: 4),
-            const Icon(Icons.arrow_right_alt_rounded,
+            Icon(Icons.arrow_right_alt_rounded,
                 size: 16, color: NestColor.inkFaint),
             const SizedBox(width: 4),
             Text(to, style: Theme.of(context).textTheme.titleSmall),
@@ -436,22 +437,22 @@ class _Limits extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const limits = [
-      'Text, headings and lists travel. Tables keep their words but lose '
-          'their shape; images, columns and footnotes are dropped.',
-      'A scanned PDF has no text in it, only pictures of text. Reading those '
+    final limits = [
+      tr('Text, headings and lists travel. Tables keep their words but lose '
+          'their shape; images, columns and footnotes are dropped.'),
+      tr('A scanned PDF has no text in it, only pictures of text. Reading those '
           'needs OCR, which NoteNest does not do — it will say so rather than '
-          'hand back an empty file.',
-      'A Word → PDF export holds each page as an image, which is how Bengali '
-          'comes out right. The text in it cannot be selected.',
-      'An old .doc is a different format from .docx. Open it in Word and save '
-          'it again first.',
+          'hand back an empty file.'),
+      tr('A Word → PDF export holds each page as an image, which is how Bengali '
+          'comes out right. The text in it cannot be selected.'),
+      tr('An old .doc is a different format from .docx. Open it in Word and save '
+          'it again first.'),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('WHAT IT WILL AND WILL NOT DO', style: nestEyebrow),
+        Text(tr('WHAT IT WILL AND WILL NOT DO'), style: nestEyebrow),
         const SizedBox(height: 8),
         for (final line in limits)
           Padding(
@@ -459,8 +460,8 @@ class _Limits extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 5),
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
                   child: Icon(Icons.circle, size: 4, color: NestColor.inkFaint),
                 ),
                 const SizedBox(width: 9),

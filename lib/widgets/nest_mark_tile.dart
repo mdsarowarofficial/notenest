@@ -77,13 +77,13 @@ class MarkTile extends StatelessWidget {
   /// A tool, an action or anything without a status: an icon in indigo.
   factory MarkTile.tool(
     IconData icon, {
-    Color tint = NestColor.tintPen,
-    Color ink = NestColor.pen,
+    Color? tint,
+    Color? ink,
     double size = 38,
   }) {
     return MarkTile(
-      tint: tint,
-      ink: ink,
+      tint: tint ?? NestColor.tintPen,
+      ink: ink ?? NestColor.pen,
       icon: icon,
       size: size,
       radius: size * 0.34,

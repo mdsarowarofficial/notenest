@@ -4,6 +4,7 @@ import '../../data/note_repository.dart';
 import '../../models/exam.dart';
 import '../../theme/nest_theme.dart';
 import 'exam_form.dart';
+import '../../l10n/strings.dart';
 
 /// The academic calendar. Requirement 12, and the Gantt's "academic calendar".
 ///
@@ -56,7 +57,7 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Academic calendar')),
+      appBar: AppBar(title: Text(tr('Academic calendar'))),
       body: ListenableBuilder(
         listenable: _repo,
         builder: (context, _) {
@@ -94,7 +95,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   TextButton.icon(
                     onPressed: _addOnSelected,
                     icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add'),
+                    label: Text(tr('Add')),
                   ),
                 ],
               ),
@@ -108,7 +109,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     borderRadius: BorderRadius.circular(NestRadius.tile),
                   ),
                   child: Text(
-                    'Nothing on this day.',
+                    tr('Nothing on this day.'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 )
@@ -122,7 +123,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   ),
               if (upcoming.isNotEmpty) ...[
                 const SizedBox(height: 26),
-                const Text('COMING UP', style: nestEyebrow),
+                Text(tr('COMING UP'), style: nestEyebrow),
                 const SizedBox(height: 4),
                 for (final exam in upcoming)
                   _ExamRow(
@@ -176,7 +177,7 @@ class _MonthHeader extends StatelessWidget {
         IconButton(
           onPressed: onPrevious,
           icon: const Icon(Icons.chevron_left_rounded),
-          tooltip: 'Previous month',
+          tooltip: tr('Previous month'),
         ),
         Expanded(
           child: GestureDetector(
@@ -192,7 +193,7 @@ class _MonthHeader extends StatelessWidget {
         IconButton(
           onPressed: onNext,
           icon: const Icon(Icons.chevron_right_rounded),
-          tooltip: 'Next month',
+          tooltip: tr('Next month'),
         ),
       ],
     );
@@ -315,7 +316,7 @@ class _DayCell extends StatelessWidget {
                     : null,
               ),
               child: Text(
-                '${day.day}',
+                trp('{0}', [day.day]),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight:
@@ -400,7 +401,7 @@ class _ExamRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
+            Icon(Icons.chevron_right_rounded,
                 size: 18, color: NestColor.inkFaint),
           ],
         ),
@@ -415,5 +416,5 @@ String monthYear(DateTime d) {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
-  return '${months[d.month - 1]} ${d.year}';
+  return localDate('${months[d.month - 1]} ${d.year}');
 }

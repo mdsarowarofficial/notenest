@@ -9,6 +9,7 @@ import '../../models/note_bundle.dart';
 import '../../models/note_share.dart';
 import '../../theme/nest_theme.dart';
 import 'safety_actions.dart';
+import '../../l10n/strings.dart';
 
 /// One conversation — a group's or one person's.
 ///
@@ -140,9 +141,7 @@ class _ChatPageState extends State<ChatPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Posted without its ${bundle.files.length} '
-              '${bundle.files.length == 1 ? 'file' : 'files'} — too big to '
-              'post. Send it as a file to include them.',
+              trp('Posted without its {0} {1} — too big to post. Send it as a file to include them.', [bundle.files.length, bundle.files.length == 1 ? tr('file') : tr('files')]),
             ),
           ),
         );
@@ -188,7 +187,7 @@ class _ChatPageState extends State<ChatPage> {
         actions: [
           if (other.isNotEmpty)
             IconButton(
-              tooltip: 'Report or block',
+              tooltip: tr('Report or block'),
               icon: const Icon(Icons.more_vert_rounded),
               onPressed: () => showSafetySheet(
                 context,
@@ -208,8 +207,7 @@ class _ChatPageState extends State<ChatPage> {
                 if (snap.hasError) {
                   return _Centered(
                     icon: Icons.lock_outline_rounded,
-                    text: 'This conversation could not be opened.\n\n'
-                        '${snap.error}',
+                    text: trp('This conversation could not be opened.\n\n{0}', [snap.error]),
                   );
                 }
                 if (!snap.hasData) {
@@ -222,10 +220,10 @@ class _ChatPageState extends State<ChatPage> {
                     .where((m) => !_cloud.isBlocked(m.fromUid))
                     .toList();
                 if (messages.isEmpty) {
-                  return const _Centered(
+                  return _Centered(
                     icon: Icons.chat_bubble_outline_rounded,
-                    text: 'Nothing here yet.\n'
-                        'Say something, or post a note from your notebook.',
+                    text: tr('Nothing here yet.\n'
+                        'Say something, or post a note from your notebook.'),
                   );
                 }
 
@@ -292,7 +290,7 @@ class _ChatPageState extends State<ChatPage> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: NestColor.card,
                   border: Border(top: BorderSide(color: NestColor.rule)),
                 ),
@@ -300,7 +298,7 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        'You blocked ${widget.title}.',
+                        trp('You blocked {0}.', [widget.title]),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -315,7 +313,7 @@ class _ChatPageState extends State<ChatPage> {
                           );
                         }
                       },
-                      child: const Text('Unblock'),
+                      child: Text(tr('Unblock')),
                     ),
                   ],
                 ),
@@ -354,13 +352,13 @@ class _TypingLine extends StatelessWidget {
       future: CloudService.instance.profilesFor(uids),
       builder: (context, snap) {
         final names = (snap.data ?? const <CloudProfile>[])
-            .map((p) => p.name.trim().isEmpty ? 'Someone' : p.name.trim())
+            .map((p) => p.name.trim().isEmpty ? tr('Someone') : p.name.trim())
             .toList();
         final label = typingLabel(names);
         if (label == null) return const SizedBox.shrink();
         return Text(
           label,
-          style: const TextStyle(fontSize: 12, color: NestColor.mint),
+          style: TextStyle(fontSize: 12, color: NestColor.mint),
         );
       },
     );
@@ -541,13 +539,13 @@ class _NoteCardState extends State<_NoteCard> {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('Saved "${bundle.title}" to your notes')),
+        SnackBar(content: Text(trp('Saved "{0}" to your notes', [bundle.title]))),
       );
     } on BundleException catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('That note could not be read: ${e.message}')),
+        SnackBar(content: Text(trp('That note could not be read: {0}', [e.message]))),
       );
     } on CloudException catch (e) {
       if (!mounted) return;
@@ -557,9 +555,9 @@ class _NoteCardState extends State<_NoteCard> {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('That note could not be saved on this phone. '
-              'Check there is free space and try again.'),
+        SnackBar(
+          content: Text(tr('That note could not be saved on this phone. '
+              'Check there is free space and try again.')),
         ),
       );
     }
@@ -589,7 +587,7 @@ class _NoteCardState extends State<_NoteCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.description_outlined,
                   size: 20,
                   color: NestColor.pen,
@@ -600,7 +598,7 @@ class _NoteCardState extends State<_NoteCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        m.title.trim().isEmpty ? 'A note' : m.title,
+                        m.title.trim().isEmpty ? tr('A note') : m.title,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       Text(
@@ -626,12 +624,12 @@ class _NoteCardState extends State<_NoteCard> {
                   ? OutlinedButton.icon(
                       onPressed: null,
                       icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('In your notes'),
+                      label: Text(tr('In your notes')),
                     )
                   : FilledButton.icon(
                       onPressed: _busy || !m.hasBlob ? null : _save,
                       icon: const Icon(Icons.download_rounded, size: 16),
-                      label: Text(_busy ? 'Saving…' : 'Save to my notes'),
+                      label: Text(_busy ? tr('Saving…') : tr('Save to my notes')),
                     ),
             ),
           ],
@@ -663,7 +661,7 @@ class _Composer extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: NestColor.card,
           border: Border(top: BorderSide(color: NestColor.rule)),
         ),
@@ -671,7 +669,7 @@ class _Composer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             IconButton(
-              tooltip: 'Post a note',
+              tooltip: tr('Post a note'),
               onPressed: sending ? null : onPostNote,
               icon: const Icon(Icons.note_add_outlined),
               color: NestColor.pen,
@@ -684,8 +682,8 @@ class _Composer extends StatelessWidget {
                 maxLines: 5,
                 maxLength: maxMessageLength,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  hintText: 'Message',
+                decoration: InputDecoration(
+                  hintText: tr('Message'),
                   counterText: '',
                   border: InputBorder.none,
                 ),
@@ -742,9 +740,9 @@ class _NotePicker extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: NestColor.paper,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(22, 10, 22, 20),
       child: Column(
@@ -763,13 +761,13 @@ class _NotePicker extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Post a note',
+            tr('Post a note'),
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 4),
           Text(
-            'Everyone here sees it straight away. Each of them decides for '
-            'themselves whether to keep it.',
+            tr('Everyone here sees it straight away. Each of them decides for '
+            'themselves whether to keep it.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 14),
@@ -777,7 +775,7 @@ class _NotePicker extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 30),
               child: Text(
-                'You have no notes to post yet.',
+                tr('You have no notes to post yet.'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -804,7 +802,7 @@ class _NotePicker extends StatelessWidget {
                             children: [
                               Text(
                                 n.title.trim().isEmpty
-                                    ? 'Untitled note'
+                                    ? tr('Untitled note')
                                     : n.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

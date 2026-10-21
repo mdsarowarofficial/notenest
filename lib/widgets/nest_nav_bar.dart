@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 class NestNavItem {
   const NestNavItem({
@@ -39,7 +40,7 @@ class NestNavBar extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     required this.onCapture,
-    this.captureLabel = 'New note',
+    this.captureLabel,
     this.itemKeys,
     this.captureKey,
   });
@@ -54,7 +55,7 @@ class NestNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final VoidCallback onCapture;
-  final String captureLabel;
+  final String? captureLabel;
 
   static const double _pillHeight = 72;
   static const double _sideMargin = 16;
@@ -177,7 +178,7 @@ class NestNavBar extends StatelessWidget {
     return Semantics(
       key: captureKey,
       button: true,
-      label: captureLabel,
+      label: captureLabel ?? tr('New note'),
       child: SizedBox(
         width: 74,
         height: 70,

@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 
 import '../models/doc_text.dart';
+import '../l10n/strings.dart';
 
 /// Why a conversion could not be done, in terms a student can act on.
 enum DocumentError {
@@ -32,26 +33,26 @@ class DocumentException implements Exception {
   String get message {
     switch (error) {
       case DocumentError.cancelled:
-        return 'Nothing was picked.';
+        return tr('Nothing was picked.');
       case DocumentError.unknownType:
-        return 'That is not a PDF or a Word file. Pick a .pdf or a .docx.';
+        return tr('That is not a PDF or a Word file. Pick a .pdf or a .docx.');
       case DocumentError.notDocx:
-        return 'That file is not a Word document NoteNest can read. A .doc '
+        return tr('That file is not a Word document NoteNest can read. A .doc '
             'saved by an old version of Word is a different format — open it '
-            'in Word and save it again as .docx.';
+            'in Word and save it again as .docx.');
       case DocumentError.notPdf:
-        return 'That PDF could not be opened. It may be damaged, or locked '
-            'with a password.';
+        return tr('That PDF could not be opened. It may be damaged, or locked '
+            'with a password.');
       case DocumentError.emptyDocument:
-        return 'There was nothing in that document to convert.';
+        return tr('There was nothing in that document to convert.');
       case DocumentError.noTextInPdf:
-        return 'That PDF has no text in it — it is probably scanned pages, '
+        return tr('That PDF has no text in it — it is probably scanned pages, '
             'which are pictures as far as a computer is concerned. Reading '
-            'the words off a picture needs OCR, which NoteNest does not do.';
+            'the words off a picture needs OCR, which NoteNest does not do.');
       case DocumentError.tooBig:
-        return 'That file is too large to convert on a phone.';
+        return tr('That file is too large to convert on a phone.');
       case DocumentError.failed:
-        return 'The conversion did not finish. Try a different file.';
+        return tr('The conversion did not finish. Try a different file.');
     }
   }
 
@@ -101,7 +102,7 @@ class DocumentService {
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'docx'],
-      dialogTitle: 'Pick a PDF or a Word file',
+      dialogTitle: tr('Pick a PDF or a Word file'),
     );
     if (picked == null) throw const DocumentException(DocumentError.cancelled);
 

@@ -5,6 +5,7 @@ import '../../models/chat.dart';
 import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
 import 'chat_page.dart';
+import '../../l10n/strings.dart';
 
 String _nameOf(CloudProfile p) => p.name.trim().isEmpty ? p.email : p.name;
 
@@ -38,7 +39,7 @@ Future<void> startConversation(
         );
         if (sent == true) {
           messenger.showSnackBar(
-            SnackBar(content: Text('Request sent to ${_nameOf(person)}.')),
+            SnackBar(content: Text(trp('Request sent to {0}.', [_nameOf(person)]))),
           );
         }
       case RequestKind.toAnswer || RequestKind.declinedByMe:
@@ -104,11 +105,10 @@ class _RequestSheetState extends State<_RequestSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Message request', style: t.headlineSmall),
+            Text(tr('Message request'), style: t.headlineSmall),
             const SizedBox(height: 6),
             Text(
-              '${_nameOf(widget.person)} has to accept before you can talk. '
-              'Say who you are and why you are writing.',
+              trp('{0} has to accept before you can talk. Say who you are and why you are writing.', [_nameOf(widget.person)]),
               style: t.bodyMedium,
             ),
             const SizedBox(height: 14),
@@ -118,16 +118,16 @@ class _RequestSheetState extends State<_RequestSheet> {
               maxLength: 500,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Your message'),
+              decoration: InputDecoration(labelText: tr('Your message')),
             ),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: NestColor.redPen)),
+              Text(_error!, style: TextStyle(color: NestColor.redPen)),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
                 onPressed: _busy ? null : _send,
-                child: Text(_busy ? 'Sending…' : 'Send request'),
+                child: Text(_busy ? tr('Sending…') : tr('Send request')),
               ),
             ),
           ],
@@ -146,7 +146,7 @@ class MessageRequestsPage extends StatelessWidget {
     final cloud = CloudService.instance;
     return Scaffold(
       backgroundColor: NestColor.paper,
-      appBar: AppBar(title: const Text('Message requests')),
+      appBar: AppBar(title: Text(tr('Message requests'))),
       body: StreamBuilder<List<MessageRequest>>(
         stream: cloud.watchIncomingRequests(),
         builder: (context, incomingSnap) =>
@@ -167,10 +167,10 @@ class MessageRequestsPage extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (pending.isEmpty && declined.isEmpty && sent.isEmpty) {
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('No message requests.'),
+                  padding: const EdgeInsets.all(32),
+                  child: Text(tr('No message requests.')),
                 ),
               );
             }
@@ -178,21 +178,21 @@ class MessageRequestsPage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               children: [
                 if (pending.isNotEmpty) ...[
-                  const Text('WAITING FOR YOU', style: nestEyebrow),
+                  Text(tr('WAITING FOR YOU'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   for (final r in pending)
                     _RequestCard(request: r, incoming: true),
                   const SizedBox(height: 18),
                 ],
                 if (sent.isNotEmpty) ...[
-                  const Text('YOU ASKED', style: nestEyebrow),
+                  Text(tr('YOU ASKED'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   for (final r in sent)
                     _RequestCard(request: r, incoming: false),
                   const SizedBox(height: 18),
                 ],
                 if (declined.isNotEmpty) ...[
-                  const Text('DECLINED', style: nestEyebrow),
+                  Text(tr('DECLINED'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   for (final r in declined)
                     _RequestCard(request: r, incoming: true),
@@ -241,17 +241,17 @@ class _RequestCardState extends State<_RequestCard> {
       future: cloud.profileFor(other),
       builder: (context, snap) {
         final person = snap.data;
-        final name = person == null ? 'Someone' : _nameOf(person);
+        final name = person == null ? tr('Someone') : _nameOf(person);
         final canAnswer = widget.incoming && r.state != RequestState.accepted;
 
         String status() {
           if (widget.incoming) {
-            return r.state == RequestState.declined ? 'Declined' : '';
+            return r.state == RequestState.declined ? tr('Declined') : '';
           }
           return switch (r.state) {
-            RequestState.pending => 'Waiting for them to accept',
-            RequestState.accepted => 'Accepted. Tap to open.',
-            RequestState.declined => 'Not accepted',
+            RequestState.pending => tr('Waiting for them to accept'),
+            RequestState.accepted => tr('Accepted. Tap to open.'),
+            RequestState.declined => tr('Not accepted'),
           };
         }
 
@@ -289,7 +289,7 @@ class _RequestCardState extends State<_RequestCard> {
                               ? null
                               : () => _run(() =>
                                   cloud.respondToRequest(r, accept: true)),
-                          child: const Text('Accept'),
+                          child: Text(tr('Accept')),
                         ),
                         const SizedBox(width: 8),
                         if (r.state == RequestState.pending)
@@ -298,7 +298,7 @@ class _RequestCardState extends State<_RequestCard> {
                                 ? null
                                 : () => _run(() =>
                                     cloud.respondToRequest(r, accept: false)),
-                            child: const Text('Decline'),
+                            child: Text(tr('Decline')),
                           ),
                       ],
                     ),
@@ -310,7 +310,7 @@ class _RequestCardState extends State<_RequestCard> {
                         onPressed: _busy
                             ? null
                             : () => _run(() => cloud.withdrawRequest(r)),
-                        child: const Text('Withdraw'),
+                        child: Text(tr('Withdraw')),
                       ),
                     ),
                 ],

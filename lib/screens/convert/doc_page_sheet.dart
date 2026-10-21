@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/doc_paginator.dart';
 import '../../data/page_renderer.dart';
 import '../../models/doc_text.dart';
+import '../../l10n/strings.dart';
 
 /// One page of a converted document, drawn exactly as the paginator measured
 /// it.
@@ -62,7 +63,7 @@ class DocPageSheet extends StatelessWidget {
             height: docFooterPt,
             child: Center(
               child: Text(
-                '$pageNumber of $pageCount',
+                trp('{0} of {1}', [pageNumber, pageCount]),
                 style: const TextStyle(
                   fontSize: 8.5,
                   color: Color(0xFF8A8A8A),

@@ -11,6 +11,7 @@ import '../../widgets/note_tile.dart';
 import '../search/search_page.dart';
 import 'note_detail.dart';
 import 'note_editor.dart';
+import '../../l10n/strings.dart';
 
 /// Every note the student owns. Requirement 6.
 ///
@@ -77,12 +78,12 @@ class _NotesPageState extends State<NotesPage> {
         if (all.isEmpty) {
           return NestEmptyState(
             icon: Icons.auto_stories_rounded,
-            title: subject?.name ?? 'Notes',
+            title: subject?.name ?? tr('Notes'),
             message: subject == null
-                ? 'Every note you keep will appear here, grouped by subject '
-                    'and topic.'
-                : 'Nothing filed under ${subject.code} yet.',
-            actionLabel: _repo.hasSubjects ? 'Write a note' : null,
+                ? tr('Every note you keep will appear here, grouped by subject '
+                    'and topic.')
+                : trp('Nothing filed under {0} yet.', [subject.code]),
+            actionLabel: _repo.hasSubjects ? tr('Write a note') : null,
             onAction:
                 _repo.hasSubjects ? () => _write(subject?.id) : null,
           );
@@ -102,16 +103,16 @@ class _NotesPageState extends State<NotesPage> {
                     children: [
                       Text(
                         subject == null
-                            ? 'ALL SUBJECTS'
+                            ? tr('ALL SUBJECTS')
                             : subject.code.toUpperCase(),
                         style: nestEyebrow.copyWith(
                           color: subject?.color ?? NestColor.inkFaint,
-                          letterSpacing: 1.1,
+                          letterSpacing: ls(1.1),
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        subject?.name ?? 'All notes',
+                        subject?.name ?? tr('All notes'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.headlineSmall,
@@ -206,7 +207,7 @@ class _NoMatch extends StatelessWidget {
               color: NestColor.paperDeep,
               borderRadius: BorderRadius.circular(NestRadius.chip),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.filter_alt_off_rounded,
               size: 21,
               color: NestColor.inkSoft,
@@ -215,14 +216,14 @@ class _NoMatch extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             bits.isEmpty
-                ? 'Nothing here right now.'
-                : 'No note here is ${bits.join(' + ')}.',
+                ? tr('Nothing here right now.')
+                : trp('No note here is {0}.', [bits.join(' + ')]),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 6),
           Text(
-            'Clear the filters to see the whole subject, or search across '
-            'every subject instead.',
+            tr('Clear the filters to see the whole subject, or search across '
+            'every subject instead.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
@@ -231,7 +232,7 @@ class _NoMatch extends StatelessWidget {
               Expanded(
                 child: FilledButton(
                   onPressed: onClear,
-                  child: const Text('Clear filters'),
+                  child: Text(tr('Clear filters')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -239,7 +240,7 @@ class _NoMatch extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: onSearch,
                   icon: const Icon(Icons.search_rounded, size: 18),
-                  label: const Text('Search all'),
+                  label: Text(tr('Search all')),
                 ),
               ),
             ],
@@ -276,7 +277,7 @@ class _CountPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            filtered ? '$shown' : '$total',
+            num_(filtered ? shown : total),
             style: TextStyle(
               fontFamily: NestFont.display,
               fontSize: 16,
@@ -287,8 +288,8 @@ class _CountPill extends StatelessWidget {
           ),
           if (filtered)
             Text(
-              ' / $total',
-              style: const TextStyle(
+              trp(' / {0}', [total]),
+              style: TextStyle(
                 fontFamily: NestFont.body,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -300,8 +301,8 @@ class _CountPill extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 5),
               child: Text(
-                total == 1 ? 'note' : 'notes',
-                style: const TextStyle(
+                total == 1 ? tr('note') : tr('notes'),
+                style: TextStyle(
                   fontFamily: NestFont.body,
                   fontSize: 11.5,
                   height: 1,
@@ -348,7 +349,7 @@ class _SubjectChips extends StatelessWidget {
         children: [
           Center(
             child: _SubjectChip(
-              label: 'All',
+              label: tr('All'),
               count: total,
               fill: NestColor.pen,
               selected: selected.isEmpty,
@@ -363,7 +364,7 @@ class _SubjectChips extends StatelessWidget {
                 count: subject.noteCount,
                 // Subject colours are pastels, so a selected chip fills with a
                 // darkened version and keeps white type readable on it.
-                fill: Color.lerp(subject.color, NestColor.ink, 0.42)!,
+                fill: Color.lerp(subject.color, NestColor.onHighlight, 0.42)!,
                 selected: selected == subject.code,
                 onTap: () => onPick(subject.code),
               ),
@@ -426,7 +427,7 @@ class _SubjectChip extends StatelessWidget {
             ),
             const SizedBox(width: 7),
             Text(
-              '$count',
+              trp('{0}', [count]),
               style: TextStyle(
                 fontFamily: NestFont.display,
                 fontSize: 12,

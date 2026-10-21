@@ -13,7 +13,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const _fileName = 'notenest.db';
-  static const _version = 11;
+  static const _version = 14;
 
   Database? _db;
 
@@ -113,6 +113,26 @@ class AppDatabase {
     await _createTasks(db);
     await _createCourseFiles(db);
     await _createDayPlan(db);
+    await _createStudySessions(db);
+  }
+
+  /// Version 13: one row per sitting of the study timer. Private to the
+  /// account and removed with it; deleting a subject keeps the row, unfiled.
+  Future<void> _createStudySessions(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS study_sessions (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        subject_id INTEGER,
+        started_at INTEGER NOT NULL,
+        minutes    INTEGER NOT NULL,
+        FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_study_user ON study_sessions (user_id, started_at)',
+    );
   }
 
   /// Version 11: goals, and a note and star rating for each day of the to-do
@@ -240,6 +260,8 @@ class AppDatabase {
         shared_by    TEXT,
         shared_at    INTEGER,
         share_policy TEXT,
+        next_review_at INTEGER,
+        review_step  INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (user_id)    REFERENCES users (id)    ON DELETE CASCADE,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
       )
@@ -270,6 +292,7 @@ class AppDatabase {
         size_bytes  INTEGER NOT NULL DEFAULT 0,
         page_count  INTEGER,
         duration_ms INTEGER,
+        extracted_text TEXT,
         position    INTEGER NOT NULL DEFAULT 0,
         created_at  INTEGER NOT NULL,
         FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
@@ -327,6 +350,24 @@ class AppDatabase {
     if (from < 11) {
       // Two new tables; nothing existing is touched.
       await _createDayPlan(db);
+    }
+    if (from >= 3 && from < 14) {
+      // The words inside a PDF, for search. Null means "not read yet"; an
+      // empty string means "read, and there is no text" (a scan).
+      await db.execute('ALTER TABLE attachments ADD COLUMN extracted_text TEXT');
+    }
+    if (from < 13) {
+      // A new table only; nothing existing is touched.
+      await _createStudySessions(db);
+    }
+    if (from >= 2 && from < 12) {
+      // Spaced review: when a note is next due, and how many times in a row it
+      // has been remembered. Both start empty, so no existing note is
+      // scheduled until the student marks it Read, Review or Mastered.
+      await db.execute('ALTER TABLE notes ADD COLUMN next_review_at INTEGER');
+      await db.execute(
+        'ALTER TABLE notes ADD COLUMN review_step INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (from < 8) {
       // A new table only; nothing existing is touched. A fresh install gets it

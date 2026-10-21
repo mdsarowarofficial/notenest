@@ -10,6 +10,7 @@ import '../../theme/nest_theme.dart';
 import '../../widgets/audio_player_bar.dart';
 import '../viewer/image_viewer.dart';
 import '../viewer/pdf_viewer.dart';
+import '../../l10n/strings.dart';
 
 /// The files attached to a note, shown as a row of thumbnails.
 ///
@@ -54,20 +55,19 @@ class AttachmentStripState extends State<AttachmentStrip> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Remove this file?'),
+        title: Text(tr('Remove this file?')),
         content: Text(
-          '${attachment.fileName} will be deleted from the note. This cannot '
-          'be undone.',
+          trp('{0} will be deleted from the note. This cannot be undone.', [attachment.fileName]),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(tr('Remove')),
           ),
         ],
       ),
@@ -119,9 +119,9 @@ class AttachmentStripState extends State<AttachmentStrip> {
           children: [
             Row(
               children: [
-                const Text('ATTACHED', style: nestEyebrow),
+                Text(tr('ATTACHED'), style: nestEyebrow),
                 const SizedBox(width: 8),
-                Text('${items.length}', style: nestEyebrow),
+                Text(trp('{0}', [items.length]), style: nestEyebrow),
               ],
             ),
             const SizedBox(height: 10),
@@ -142,7 +142,7 @@ class AttachmentStripState extends State<AttachmentStrip> {
                     if (widget.editable) ...[
                       const SizedBox(width: 6),
                       IconButton(
-                        tooltip: 'Remove recording',
+                        tooltip: tr('Remove recording'),
                         icon: const Icon(Icons.close_rounded, size: 18),
                         color: NestColor.inkSoft,
                         onPressed: () => _remove(recording),
@@ -252,7 +252,7 @@ class _ImageThumb extends StatelessWidget {
           fit: BoxFit.cover,
           width: 96,
           height: 118,
-          errorBuilder: (context, error, stack) => const Center(
+          errorBuilder: (context, error, stack) => Center(
             child: Icon(Icons.broken_image_rounded,
                 color: NestColor.inkFaint),
           ),
@@ -274,7 +274,7 @@ class _PdfThumb extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.picture_as_pdf_rounded,
+          Icon(Icons.picture_as_pdf_rounded,
               size: 30, color: NestColor.redPen),
           const SizedBox(height: 8),
           Text(
@@ -282,7 +282,7 @@ class _PdfThumb extends StatelessWidget {
             maxLines: 2,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10.5, color: NestColor.ink),
+            style: TextStyle(fontSize: 10.5, color: NestColor.ink),
           ),
           const SizedBox(height: 4),
           Text(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/attachment_store.dart';
 import '../../models/attachment.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Full-screen look at photographed pages, with pinch to zoom.
 ///
@@ -51,8 +52,8 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
         elevation: 0,
         title: Text(
           widget.attachments.length == 1
-              ? 'Page'
-              : 'Page ${_index + 1} of ${widget.attachments.length}',
+              ? tr('Page')
+              : trp('Page {0} of {1}', [_index + 1, widget.attachments.length]),
           style: const TextStyle(fontSize: 16, color: Colors.white),
         ),
       ),
@@ -73,10 +74,10 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
                 child: Image.file(
                   File(snapshot.data!),
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stack) => const Center(
+                  errorBuilder: (context, error, stack) => Center(
                     child: Text(
-                      'This page could not be opened.',
-                      style: TextStyle(color: Colors.white70),
+                      tr('This page could not be opened.'),
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ),
                 ),

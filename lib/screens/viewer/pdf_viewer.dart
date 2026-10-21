@@ -6,6 +6,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../data/attachment_store.dart';
 import '../../models/attachment.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Reads a PDF inside the app, with page navigation. Requirement 5.3.
 class PdfViewerPage extends StatefulWidget {
@@ -36,7 +37,7 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
         title: Text(
           widget.attachment.fileName,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, color: NestColor.ink),
+          style: TextStyle(fontSize: 16, color: NestColor.ink),
         ),
       ),
       body: Column(
@@ -64,7 +65,7 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
           if (_pages > 0)
             Container(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: NestColor.card,
                 border: Border(
                   top: BorderSide(color: NestColor.rule),
@@ -75,20 +76,20 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      tooltip: 'Previous page',
+                      tooltip: tr('Previous page'),
                       onPressed:
                           _page > 1 ? _controller.previousPage : null,
                       icon: const Icon(Icons.chevron_left_rounded),
                     ),
                     Expanded(
                       child: Text(
-                        'PAGE $_page OF $_pages',
+                        trp('PAGE {0} OF {1}', [_page, _pages]),
                         textAlign: TextAlign.center,
                         style: nestEyebrow,
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Next page',
+                      tooltip: tr('Next page'),
                       onPressed:
                           _page < _pages ? _controller.nextPage : null,
                       icon: const Icon(Icons.chevron_right_rounded),

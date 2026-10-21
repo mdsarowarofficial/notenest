@@ -14,6 +14,8 @@
 /// "your own" without reading anything.
 library;
 
+import '../l10n/strings.dart';
+
 /// The three things a teacher can put in a class.
 enum PostKind { announcement, material, assignment }
 
@@ -23,11 +25,11 @@ extension PostKindData on PostKind {
   String get label {
     switch (this) {
       case PostKind.announcement:
-        return 'Announcement';
+        return tr('Announcement');
       case PostKind.material:
-        return 'Material';
+        return tr('Material');
       case PostKind.assignment:
-        return 'Assignment';
+        return tr('Assignment');
     }
   }
 
@@ -296,15 +298,15 @@ extension WorkStatusData on WorkStatus {
   String get label {
     switch (this) {
       case WorkStatus.assigned:
-        return 'Assigned';
+        return tr('Assigned');
       case WorkStatus.missing:
-        return 'Missing';
+        return tr('Missing');
       case WorkStatus.turnedIn:
-        return 'Turned in';
+        return tr('Turned in');
       case WorkStatus.late:
-        return 'Turned in late';
+        return tr('Turned in late');
       case WorkStatus.returned:
-        return 'Graded';
+        return tr('Graded');
     }
   }
 }
@@ -331,20 +333,20 @@ String? postProblem({
   final t = title.trim();
   if (kind == PostKind.announcement) {
     if (body.trim().isEmpty && fileCount == 0) {
-      return 'Write something to announce.';
+      return tr('Write something to announce.');
     }
   } else if (t.isEmpty) {
-    return 'Give it a title.';
+    return tr('Give it a title.');
   }
-  if (t.length > maxPostTitle) return 'Keep the title under $maxPostTitle.';
+  if (t.length > maxPostTitle) return trp('Keep the title under {0}.', [maxPostTitle]);
   if (body.length > maxPostBody) {
-    return 'Keep the text under $maxPostBody characters.';
+    return trp('Keep the text under {0} characters.', [maxPostBody]);
   }
   if (points != null && (points < 1 || points > maxPoints)) {
-    return 'Points must be between 1 and $maxPoints.';
+    return trp('Points must be between 1 and {0}.', [maxPoints]);
   }
   if (fileCount > maxFilesPerPost) {
-    return 'At most $maxFilesPerPost files on one post.';
+    return trp('At most {0} files on one post.', [maxFilesPerPost]);
   }
   return null;
 }
@@ -371,10 +373,11 @@ String formatDue(DateTime due, [DateTime? now]) {
   final diff = day.difference(today).inDays;
   final hour = due.hour % 12 == 0 ? 12 : due.hour % 12;
   final time =
-      '$hour:${due.minute.toString().padLeft(2, '0')} ${due.hour < 12 ? 'AM' : 'PM'}';
-  if (diff == 0) return 'Today, $time';
-  if (diff == 1) return 'Tomorrow, $time';
-  if (diff == -1) return 'Yesterday, $time';
+      localDate('$hour:${due.minute.toString().padLeft(2, '0')} ${due.hour < 12 ? 'AM' : 'PM'}');
+  if (diff == 0) return trp('Today, {0}', [time]);
+  if (diff == 1) return trp('Tomorrow, {0}', [time]);
+  if (diff == -1) return trp('Yesterday, {0}', [time]);
   final year = due.year == n.year ? '' : ' ${due.year}';
-  return '${due.day} ${months[due.month - 1]}$year, $time';
+  final date = localDate('${due.day} ${months[due.month - 1]}$year');
+  return '$date, $time';
 }

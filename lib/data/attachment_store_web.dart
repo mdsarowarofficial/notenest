@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../l10n/strings.dart';
 
 /// Stub used when the app is compiled for the browser.
 class AttachmentStore {
@@ -9,16 +10,16 @@ class AttachmentStore {
   static String nameOf(String path) => path;
 
   static Future<String> newFilePath(String extension) =>
-      throw UnsupportedError('Attachments need the mobile app');
+      throw UnsupportedError(tr('Attachments need the mobile app'));
 
   static Future<String> saveFile(String sourcePath, String extension) =>
-      throw UnsupportedError('Attachments need the mobile app');
+      throw UnsupportedError(tr('Attachments need the mobile app'));
 
   static Future<String> saveBytes(Uint8List bytes, String extension) =>
-      throw UnsupportedError('Attachments need the mobile app');
+      throw UnsupportedError(tr('Attachments need the mobile app'));
 
   static Future<String> fullPath(String storedName) =>
-      throw UnsupportedError('Attachments need the mobile app');
+      throw UnsupportedError(tr('Attachments need the mobile app'));
 
   static Future<Uint8List?> readBytes(String storedName) async => null;
 

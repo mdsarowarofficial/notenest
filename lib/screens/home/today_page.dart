@@ -19,6 +19,10 @@ import '../subjects/subject_form.dart';
 import '../tasks/tasks_page.dart';
 import '../courses/course_page.dart';
 import '../courses/courses_page.dart';
+import '../../l10n/strings.dart';
+import '../review/review_page.dart';
+import '../../data/study_timer.dart';
+import '../study/study_timer_page.dart';
 
 /// The landing screen.
 ///
@@ -97,6 +101,13 @@ class TodayPage extends StatelessWidget {
               const SizedBox(height: 12),
             ],
 
+            // Notes that have come round for another look. Shown only when
+            // there are some, so the card is a call to act rather than noise.
+            if (repo.dueCount > 0) ...[
+              _ReviewDueCard(count: repo.dueCount),
+              const SizedBox(height: 12),
+            ],
+
             if (repo.hasSubjects && onOpenCourse != null) ...[
               _CourseCards(onOpen: onOpenCourse!),
               const SizedBox(height: 14),
@@ -106,20 +117,20 @@ class TodayPage extends StatelessWidget {
 
             if (!repo.hasSubjects)
               _StartCard(
-                eyebrow: 'FIRST STEP',
-                title: 'Add a subject',
-                body: 'Subjects give every note a colour and a place to live. '
-                    'You can add more later.',
-                actionLabel: 'Add a subject',
+                eyebrow: tr('FIRST STEP'),
+                title: tr('Add a subject'),
+                body: tr('Subjects give every note a colour and a place to live. '
+                    'You can add more later.'),
+                actionLabel: tr('Add a subject'),
                 onAction: () => showSubjectForm(context),
               )
             else if (!repo.hasNotes) ...[
               _StartCard(
-                eyebrow: 'NEXT STEP',
-                title: 'Write your first note',
-                body: 'Give it a title, pick the subject and topic, and start '
-                    'writing. It saves as you type.',
-                actionLabel: 'Write a note',
+                eyebrow: tr('NEXT STEP'),
+                title: tr('Write your first note'),
+                body: tr('Give it a title, pick the subject and topic, and start '
+                    'writing. It saves as you type.'),
+                actionLabel: tr('Write a note'),
                 onAction: onCapture,
               ),
               const SizedBox(height: 14),
@@ -140,7 +151,7 @@ class TodayPage extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Keep going',
+                      tr('Keep going'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
@@ -151,7 +162,7 @@ class TodayPage extends StatelessWidget {
                       minimumSize: const Size(0, 32),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text('See all'),
+                    child: Text(tr('See all')),
                   ),
                 ],
               ),
@@ -184,10 +195,10 @@ class TodayPage extends StatelessWidget {
 /// evening until 9 pm, and night after that.
 String greetingFor(DateTime at) {
   final hour = at.hour;
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  if (hour < 21) return 'Good evening';
-  return 'Good night';
+  if (hour < 12) return tr('Good morning');
+  if (hour < 17) return tr('Good afternoon');
+  if (hour < 21) return tr('Good evening');
+  return tr('Good night');
 }
 
 class _Greeting extends StatelessWidget {
@@ -238,7 +249,7 @@ class _Greeting extends StatelessWidget {
         Semantics(
           key: avatarKey,
           button: true,
-          label: 'Your profile',
+          label: tr('Your profile'),
           child: GestureDetector(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ProfilePage()),
@@ -297,7 +308,7 @@ class _RevisionCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        done ? 'All caught up' : 'Needs revision',
+                        done ? tr('All caught up') : tr('Needs revision'),
                         style: TextStyle(
                           fontFamily: NestFont.body,
                           fontSize: 12.5,
@@ -333,13 +344,13 @@ class _RevisionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      done ? '$allNotes' : '$total',
-                      style: const TextStyle(
+                      num_(done ? allNotes : total),
+                      style: TextStyle(
                         fontFamily: NestFont.display,
                         fontSize: 46,
                         height: 0.95,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -1.6,
+                        letterSpacing: ls(-1.6),
                         color: Colors.white,
                       ),
                     ),
@@ -349,13 +360,10 @@ class _RevisionCard extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 5),
                         child: Text(
                           done
-                              ? '${allNotes == 1 ? 'note' : 'notes'} '
-                                  'mastered.\nNothing waiting.'
+                              ? trp('{0} mastered.\nNothing waiting.', [allNotes == 1 ? tr('note') : tr('notes')])
                               : subject == null
-                                  ? '${total == 1 ? 'note' : 'notes'} not '
-                                      'yet\nmastered'
-                                  : '${total == 1 ? 'note' : 'notes'} left\n'
-                                      'for $subject',
+                                  ? trp('{0} not yet\nmastered', [total == 1 ? tr('note') : tr('notes')])
+                                  : trp('{0} left\nfor {1}', [total == 1 ? tr('note') : tr('notes'), subject]),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -385,14 +393,14 @@ class _RevisionCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.star_rounded,
                         size: 15,
                         color: NestColor.highlight,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '$important marked important',
+                        trp('{0} marked important', [important]),
                         style: TextStyle(
                           fontFamily: NestFont.body,
                           fontSize: 12,
@@ -418,15 +426,17 @@ class _Tools extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      children: [
+        Row(
       children: [
         Expanded(
           child: _ToolCard(
             icon: Icons.description_outlined,
             tint: NestColor.tintPen,
             colour: NestColor.pen,
-            title: 'Cover page',
-            body: 'Assignment, lab report',
+            title: tr('Cover page'),
+            body: tr('Assignment, lab report'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CoverPageScreen()),
             ),
@@ -438,14 +448,89 @@ class _Tools extends StatelessWidget {
             icon: Icons.swap_horiz_rounded,
             tint: NestColor.tintMint,
             colour: NestColor.mint,
-            title: 'Convert',
-            body: 'Word and PDF',
+            title: tr('Convert'),
+            body: tr('Word and PDF'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ConvertPage()),
             ),
           ),
         ),
       ],
+        ),
+        const SizedBox(height: 12),
+        const _TimerStrip(),
+      ],
+    );
+  }
+}
+
+/// "Study timer": opens the focus timer, and shows it ticking when one is
+/// running.
+class _TimerStrip extends StatelessWidget {
+  const _TimerStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final timer = StudyTimer.instance;
+    return ListenableBuilder(
+      listenable: Listenable.merge([timer, NoteRepository.instance]),
+      builder: (context, _) {
+        final running = timer.running;
+        final left = timer.remaining;
+        final m = left.inMinutes.toString().padLeft(2, '0');
+        final s = left.inSeconds.remainder(60).toString().padLeft(2, '0');
+        final today = NoteRepository.instance.studiedToday;
+        return Container(
+          decoration: BoxDecoration(
+            color: NestColor.card,
+            borderRadius: BorderRadius.circular(NestRadius.tile),
+            boxShadow: NestShadow.resting,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StudyTimerPage()),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                child: Row(
+                  children: [
+                    MarkTile.tool(
+                      Icons.timer_outlined,
+                      tint: NestColor.tintWarm,
+                      ink: NestColor.warmDeep,
+                      size: 40,
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('Study timer'),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          Text(
+                            running
+                                ? trp('Studying · {0}:{1} left', [m, s])
+                                : (today > 0
+                                    ? trp('{0} min studied today', [today])
+                                    : tr('Focus for 25 minutes')),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: NestColor.inkFaint),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -502,7 +587,7 @@ class _ToolCard extends StatelessWidget {
                   body,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: NestFont.body,
                     fontSize: 11.5,
                     color: NestColor.inkFaint,
@@ -520,6 +605,74 @@ class _ToolCard extends StatelessWidget {
 // ---------------------------------------------------------------- reminders
 
 /// A reminder the student asked for, on the screen they open first.
+/// "3 notes to review": opens the spaced-review session.
+class _ReviewDueCard extends StatelessWidget {
+  const _ReviewDueCard({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: NestColor.pen,
+        borderRadius: BorderRadius.circular(NestRadius.tile),
+        boxShadow: NestShadow.glow(NestColor.pen),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ReviewPage()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: NestColor.o(Colors.white, 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.style_rounded, color: Colors.white),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('Review today'),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                            ),
+                      ),
+                      Text(
+                        count == 1
+                            ? tr('1 note to review')
+                            : trp('{0} notes to review', [count]),
+                        style: TextStyle(
+                          fontFamily: NestFont.body,
+                          fontSize: 12.5,
+                          color: NestColor.penPale,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ReminderStrip extends StatelessWidget {
   const _ReminderStrip({required this.exam, required this.onTap});
 
@@ -570,7 +723,7 @@ class _ReminderStrip extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: NestColor.inkFaint,
                 ),
@@ -664,11 +817,11 @@ class _SemesterStrip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${semesterLabelFor(number)} has started',
+                Text(trp('{0} has started', [shownSemester(semesterLabelFor(number))]),
                     style: t.titleSmall),
                 const SizedBox(height: 2),
                 Text(
-                  'Your courses so far stay where they are.',
+                  tr('Your courses so far stay where they are.'),
                   style: t.bodySmall,
                 ),
               ],
@@ -681,7 +834,7 @@ class _SemesterStrip extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               minimumSize: const Size(0, 38),
             ),
-            child: const Text('Move'),
+            child: Text(tr('Move')),
           ),
         ],
       ),
@@ -726,7 +879,7 @@ class _TeacherToday extends StatelessWidget {
             Expanded(
               child: _QuickAction(
                 icon: Icons.assignment_add,
-                label: 'Post to a class',
+                label: tr('Post to a class'),
                 onTap: onPost,
                 primary: true,
               ),
@@ -735,7 +888,7 @@ class _TeacherToday extends StatelessWidget {
             Expanded(
               child: _QuickAction(
                 icon: Icons.add_rounded,
-                label: 'New class',
+                label: tr('New class'),
                 onTap: () => showCreateClassSheet(context),
               ),
             ),
@@ -744,20 +897,20 @@ class _TeacherToday extends StatelessWidget {
         const SizedBox(height: 24),
         Row(
           children: [
-            Expanded(child: Text('Your classes', style: t.titleMedium)),
+            Expanded(child: Text(tr('Your classes'), style: t.titleMedium)),
             if (onOpenClasses != null)
               TextButton(
-                  onPressed: onOpenClasses, child: const Text('See all')),
+                  onPressed: onOpenClasses, child: Text(tr('See all'))),
           ],
         ),
         const SizedBox(height: 6),
         if (!cloud.isSignedIn)
           _StartCard(
-            eyebrow: 'FIRST STEP',
-            title: 'Connect a cloud account',
-            body: 'Classes live where your students\' phones can see them, so '
-                'they need an account. Your own notes work either way.',
-            actionLabel: 'Open Classes',
+            eyebrow: tr('FIRST STEP'),
+            title: tr('Connect a cloud account'),
+            body: tr('Classes live where your students\' phones can see them, so '
+                'they need an account. Your own notes work either way.'),
+            actionLabel: tr('Open Classes'),
             onAction: onOpenClasses ?? () {},
           )
         else
@@ -776,11 +929,11 @@ class _TeacherToday extends StatelessWidget {
               }
               if (mine.isEmpty) {
                 return _StartCard(
-                  eyebrow: 'FIRST STEP',
-                  title: 'Make your first class',
-                  body: 'Give it a name, then share its six-letter code with '
-                      'your students so they can join.',
-                  actionLabel: 'New class',
+                  eyebrow: tr('FIRST STEP'),
+                  title: tr('Make your first class'),
+                  body: tr('Give it a name, then share its six-letter code with '
+                      'your students so they can join.'),
+                  actionLabel: tr('New class'),
                   onAction: () => showCreateClassSheet(context),
                 );
               }
@@ -803,10 +956,7 @@ class _TeacherToday extends StatelessWidget {
                           leading: MarkTile.tool(Icons.co_present_rounded),
                           title: Text(c.name, style: t.titleSmall),
                           subtitle: Text(
-                            '${c.subject.isEmpty ? '' : '${c.subject} · '}'
-                            '${c.memberCount - 1} '
-                            '${c.memberCount - 1 == 1 ? 'student' : 'students'}'
-                            ' · code ${prettyJoinCode(c.joinCode)}',
+                            trp('{0}{1} {2} · code {3}', [c.subject.isEmpty ? '' : '${c.subject} · ', c.memberCount - 1, c.memberCount - 1 == 1 ? tr('student') : tr('students'), prettyJoinCode(c.joinCode)]),
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => openClass(context, c),
@@ -882,14 +1032,14 @@ class _CourseCards extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Your courses', style: t.titleMedium)),
+            Expanded(child: Text(tr('Your courses'), style: t.titleMedium)),
             TextButton(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => CoursesPage(onSeeNotes: onOpen),
                 ),
               ),
-              child: const Text('All courses'),
+              child: Text(tr('All courses')),
             ),
           ],
         ),
@@ -910,7 +1060,7 @@ class _CourseCards extends StatelessWidget {
                   .length;
               return Semantics(
                 button: true,
-                label: '${s.code}, ${s.name}',
+                label: trp('{0}, {1}', [s.code, s.name]),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => Navigator.of(context).push(
@@ -940,7 +1090,7 @@ class _CourseCards extends StatelessWidget {
                           child: Text(
                             s.code.toUpperCase(),
                             style: t.labelSmall
-                                ?.copyWith(color: NestColor.ink),
+                                ?.copyWith(color: NestColor.onHighlight),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -952,8 +1102,7 @@ class _CourseCards extends StatelessWidget {
                         ),
                         const Spacer(),
                         Text(
-                          '${s.noteCount} ${s.noteCount == 1 ? 'note' : 'notes'}'
-                          '${open > 0 ? ' · $open to do' : ''}',
+                          trp('{0} {1}{2}', [num_(s.noteCount), (s.noteCount == 1 ? tr('note') : tr('notes')), open > 0 ? trp(' · {0} to do', [open]) : '']),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: t.bodySmall,

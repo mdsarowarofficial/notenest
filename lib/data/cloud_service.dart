@@ -13,6 +13,8 @@ import '../models/note_share.dart';
 import '../models/study_group.dart';
 import 'auth_repository.dart';
 import 'google_identity.dart';
+import '../l10n/strings.dart';
+import 'push_service.dart';
 
 /// Everything that talks to Firebase.
 ///
@@ -136,9 +138,9 @@ class CloudService extends ChangeNotifier {
       // Now the attempt carries on behind the notebook and the cloud switches
       // on by itself when it lands.
       if (!_ready) {
-        _startupError = 'Firebase is taking longer than usual to answer. The '
+        _startupError = tr('Firebase is taking longer than usual to answer. The '
             'cloud will switch on by itself as soon as it does; everything '
-            'stored on this device works meanwhile.';
+            'stored on this device works meanwhile.');
       }
       unawaited(connecting.then(
         (_) {
@@ -147,9 +149,7 @@ class CloudService extends ChangeNotifier {
         },
         onError: (Object e) {
           if (!_ready) {
-            _startupError = 'Firebase could not start. Everything that works '
-                'on this device still works; only the cloud features are '
-                'off.\n\n$e';
+            _startupError = trp('Firebase could not start. Everything that works on this device still works; only the cloud features are off.\n\n{0}', [e]);
           }
           notifyListeners();
         },
@@ -161,8 +161,7 @@ class CloudService extends ChangeNotifier {
       // profile read, offline — leaves Firebase usable, and calling it "off"
       // would hide a working cloud behind an error screen.
       if (!_ready) {
-        _startupError = 'Firebase could not start. Everything that works on '
-            'this device still works; only the cloud features are off.\n\n$e';
+        _startupError = trp('Firebase could not start. Everything that works on this device still works; only the cloud features are off.\n\n{0}', [e]);
       }
       notifyListeners();
       return;
@@ -221,10 +220,10 @@ class CloudService extends ChangeNotifier {
   // ------------------------------------------------------------- binding
 
   /// What the screen says when a cloud account is not the device account's.
-  static const accountMismatchMessage =
-      'That cloud account uses a different email from the account signed in '
+  static String get accountMismatchMessage =>
+      tr('That cloud account uses a different email from the account signed in '
       'on this device. Connect the cloud account for this email, or sign out '
-      'and sign in as the other person.';
+      'and sign in as the other person.');
 
   /// True when a cloud account on [cloudEmail] may run alongside the device
   /// account signed in now.
@@ -240,6 +239,9 @@ class CloudService extends ChangeNotifier {
 
   /// Signs out of Firebase and Google without touching the device account.
   Future<void> _dropSession() async {
+    // First, while still signed in: this phone's push address is removed from
+    // the account, which needs the sign-in the next line ends.
+    await PushService.instance.detach();
     try {
       await FirebaseAuth.instance.signOut();
       await GoogleAccounts.instance.signOut();
@@ -315,11 +317,11 @@ class CloudService extends ChangeNotifier {
   }
 
   /// Why someone is being reported. The keys are what the rules accept.
-  static const reportReasons = <String, String>{
-    'harassment': 'Bullying or harassment',
-    'inappropriate': 'Inappropriate or offensive content',
-    'spam': 'Spam or scam',
-    'other': 'Something else',
+  static Map<String, String> get reportReasons => <String, String>{
+    'harassment': tr('Bullying or harassment'),
+    'inappropriate': tr('Inappropriate or offensive content'),
+    'spam': tr('Spam or scam'),
+    'other': tr('Something else'),
   };
 
   /// Sends a report for the project owner to review in the Firebase console.
@@ -415,7 +417,7 @@ class CloudService extends ChangeNotifier {
     // Before anything is created: an account made on the wrong address would
     // exist in Firebase whether or not it is then refused here.
     if (!_belongsToDevice(email)) {
-      throw const CloudException(accountMismatchMessage);
+      throw CloudException(accountMismatchMessage);
     }
     await _run(() async {
       final credential =
@@ -465,7 +467,7 @@ class CloudService extends ChangeNotifier {
   }) async {
     _requireReady();
     if (!_belongsToDevice(email)) {
-      throw const CloudException(accountMismatchMessage);
+      throw CloudException(accountMismatchMessage);
     }
     await _run(() async {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -542,7 +544,7 @@ class CloudService extends ChangeNotifier {
       // comes after the sign in and undoes it when it fails.
       if (!_belongsToDevice(user.email)) {
         await _dropSession();
-        throw const CloudException(accountMismatchMessage);
+        throw CloudException(accountMismatchMessage);
       }
       await _loadProfile(user.uid);
     });
@@ -1578,7 +1580,7 @@ class CloudService extends ChangeNotifier {
             kind: kind,
             text: text,
             title: title,
-          ).preview,
+          ).storedPreview,
           'lastFromUid': id,
           'lastFromName': me.name,
           'lastAt': now.millisecondsSinceEpoch,
@@ -1705,17 +1707,17 @@ class RequestRequired extends CloudException {
   static String _messageOf(RequestKind k) {
     switch (k) {
       case RequestKind.none:
-        return 'Send a message request first.';
+        return tr('Send a message request first.');
       case RequestKind.waiting:
-        return 'Your request is waiting for them to accept.';
+        return tr('Your request is waiting for them to accept.');
       case RequestKind.toAnswer:
-        return 'They have sent you a request. Accept it to start talking.';
+        return tr('They have sent you a request. Accept it to start talking.');
       case RequestKind.declinedByThem:
-        return 'This person is not taking messages from you.';
+        return tr('This person is not taking messages from you.');
       case RequestKind.declinedByMe:
-        return 'You declined their request. Accept it to start talking.';
+        return tr('You declined their request. Accept it to start talking.');
       case RequestKind.accepted:
-        return 'Try again.';
+        return tr('Try again.');
     }
   }
 }

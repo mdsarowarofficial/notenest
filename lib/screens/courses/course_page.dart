@@ -17,6 +17,7 @@ import '../notes/note_editor.dart';
 import '../subjects/subject_form.dart';
 import '../tasks/tasks_page.dart';
 import '../viewer/pdf_viewer.dart';
+import '../../l10n/strings.dart';
 
 /// One course in one place: its notes, its tasks and its files.
 ///
@@ -48,7 +49,7 @@ class _CoursePageState extends State<CoursePage> {
     setState(() => _uploading = true);
     try {
       final picked = await FilePicker.pickFiles(
-        dialogTitle: 'Add to this course',
+        dialogTitle: tr('Add to this course'),
         type: FileType.custom,
         allowedExtensions: courseFileExtensions,
       );
@@ -64,16 +65,15 @@ class _CoursePageState extends State<CoursePage> {
         );
         messenger.showSnackBar(SnackBar(
           content: Text(added.driveId != null
-              ? '${added.fileName} saved to your Google Drive.'
-              : '${added.fileName} is on this phone. It will go to Google '
-                  'Drive when Drive is connected.'),
+              ? trp('{0} saved to your Google Drive.', [added.fileName])
+              : trp('{0} is on this phone. It will go to Google Drive when Drive is connected.', [added.fileName])),
         ));
       }
     } on String catch (message) {
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('That file could not be added.')),
+        SnackBar(content: Text(tr('That file could not be added.'))),
       );
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -104,7 +104,7 @@ class _CoursePageState extends State<CoursePage> {
         final path = await AttachmentStore.fullPath(file.storedName);
         if (!await File(path).exists()) {
           messenger.showSnackBar(
-            const SnackBar(content: Text('That file is missing.')),
+            SnackBar(content: Text(tr('That file is missing.'))),
           );
           return;
         }
@@ -117,18 +117,17 @@ class _CoursePageState extends State<CoursePage> {
       }
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('That file could not be opened.')),
+        SnackBar(content: Text(tr('That file could not be opened.'))),
       );
     }
   }
 
   Future<void> _removeFile(CourseFile file) async {
     final ok = await _confirm(
-      'Remove this file?',
+      tr('Remove this file?'),
       file.driveId != null
-          ? '"${file.fileName}" will be deleted from this phone and from '
-              'your Google Drive.'
-          : '"${file.fileName}" will be deleted from this phone.',
+          ? trp('"{0}" will be deleted from this phone and from your Google Drive.', [file.fileName])
+          : trp('"{0}" will be deleted from this phone.', [file.fileName]),
       'Remove',
     );
     if (ok) await _repo.removeCourseFile(file);
@@ -144,7 +143,7 @@ class _CoursePageState extends State<CoursePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
@@ -160,8 +159,8 @@ class _CoursePageState extends State<CoursePage> {
   Future<void> _archive(Subject course) async {
     final ok = await _confirm(
       'Archive ${course.code}?',
-      'It is hidden from your course lists. Its notes, tasks and files are '
-          'kept, and you can restore it from All courses.',
+      tr('It is hidden from your course lists. Its notes, tasks and files are '
+          'kept, and you can restore it from All courses.'),
       'Archive',
     );
     if (!ok) return;
@@ -178,7 +177,7 @@ class _CoursePageState extends State<CoursePage> {
         if (course == null) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(child: Text('This course no longer exists.')),
+            body: Center(child: Text(tr('This course no longer exists.'))),
           );
         }
         final t = Theme.of(context).textTheme;
@@ -194,13 +193,13 @@ class _CoursePageState extends State<CoursePage> {
             title: Text(course.code.toUpperCase()),
             actions: [
               IconButton(
-                tooltip: 'Edit course',
+                tooltip: tr('Edit course'),
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => showSubjectForm(context, existing: course),
               ),
               if (!course.archived)
                 IconButton(
-                  tooltip: 'Archive course',
+                  tooltip: tr('Archive course'),
                   icon: const Icon(Icons.archive_outlined),
                   onPressed: () => _archive(course),
                 ),
@@ -213,7 +212,7 @@ class _CoursePageState extends State<CoursePage> {
               if (course.archived)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Archived', style: t.bodySmall),
+                  child: Text(tr('Archived'), style: t.bodySmall),
                 ),
               const SizedBox(height: 14),
               Row(
@@ -227,7 +226,7 @@ class _CoursePageState extends State<CoursePage> {
                         ),
                       ),
                       icon: const Icon(Icons.edit_note_rounded, size: 18),
-                      label: const Text('Note'),
+                      label: Text(tr('Note')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -236,7 +235,7 @@ class _CoursePageState extends State<CoursePage> {
                       onPressed: () =>
                           showTaskForm(context, subjectId: course.id),
                       icon: const Icon(Icons.add_task_rounded, size: 18),
-                      label: const Text('Task'),
+                      label: Text(tr('Task')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -244,7 +243,7 @@ class _CoursePageState extends State<CoursePage> {
                     child: OutlinedButton.icon(
                       onPressed: _uploading ? null : _addFile,
                       icon: const Icon(Icons.upload_file_rounded, size: 18),
-                      label: Text(_uploading ? 'Adding…' : 'File'),
+                      label: Text(_uploading ? tr('Adding…') : tr('File')),
                     ),
                   ),
                 ],
@@ -253,7 +252,7 @@ class _CoursePageState extends State<CoursePage> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Notes (${notes.length})',
+                    child: Text(trp('Notes ({0})', [notes.length]),
                         style: t.titleMedium),
                   ),
                   if (widget.onSeeNotes != null && notes.length > 4)
@@ -262,13 +261,13 @@ class _CoursePageState extends State<CoursePage> {
                         widget.onSeeNotes!(course.code);
                         Navigator.pop(context);
                       },
-                      child: const Text('See all'),
+                      child: Text(tr('See all')),
                     ),
                 ],
               ),
               const SizedBox(height: 8),
               if (notes.isEmpty)
-                Text('No notes in this course yet.', style: t.bodySmall)
+                Text(tr('No notes in this course yet.'), style: t.bodySmall)
               else
                 for (final n in notes.take(4)) ...[
                   NoteRow(
@@ -282,14 +281,14 @@ class _CoursePageState extends State<CoursePage> {
                   const SizedBox(height: 10),
                 ],
               const SizedBox(height: 14),
-              Text('To do (${tasks.length})', style: t.titleMedium),
+              Text(trp('To do ({0})', [tasks.length]), style: t.titleMedium),
               const SizedBox(height: 8),
               if (tasks.isEmpty)
-                Text('Nothing to do for this course.', style: t.bodySmall)
+                Text(tr('Nothing to do for this course.'), style: t.bodySmall)
               else
                 for (final task in tasks) TaskTile(task: task),
               const SizedBox(height: 14),
-              Text('Files', style: t.titleMedium),
+              Text(tr('Files'), style: t.titleMedium),
               const SizedBox(height: 8),
               FutureBuilder<List<CourseFile>>(
                 // The repository notifies on every add and remove, which
@@ -300,9 +299,9 @@ class _CoursePageState extends State<CoursePage> {
                   if (files.isEmpty) {
                     return Text(
                       AttachmentStore.isSupported
-                          ? 'Add slides, handouts or past papers (PDF, Word, '
-                              'PowerPoint, Excel, text, images up to 25 MB).'
-                          : 'Files need the phone app.',
+                          ? tr('Add slides, handouts or past papers (PDF, Word, '
+                              'PowerPoint, Excel, text, images up to 25 MB).')
+                          : tr('Files need the phone app.'),
                       style: t.bodySmall,
                     );
                   }
@@ -323,7 +322,7 @@ class _CoursePageState extends State<CoursePage> {
                             subtitle: Text(formatSize(f.sizeBytes)),
                             onTap: () => _open(f),
                             trailing: IconButton(
-                              tooltip: 'Remove file',
+                              tooltip: tr('Remove file'),
                               icon: const Icon(Icons.delete_outline_rounded),
                               onPressed: () => _removeFile(f),
                             ),

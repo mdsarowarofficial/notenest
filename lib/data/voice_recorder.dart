@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 
 import 'attachment_store.dart';
+import '../l10n/strings.dart';
 
 /// Why a recording could not start. Kept as a value so the screen decides the
 /// wording and this file stays free of UI text.
@@ -13,14 +14,14 @@ extension RecorderErrorMessage on RecorderError {
   String get message {
     switch (this) {
       case RecorderError.noPermission:
-        return 'NoteNest needs permission to use the microphone. Allow it in '
-            'your phone settings and try again.';
+        return tr('NoteNest needs permission to use the microphone. Allow it in '
+            'your phone settings and try again.');
       case RecorderError.notSupported:
-        return 'Recording saves a file, so it needs the phone app. The browser '
-            'build cannot keep attachments.';
+        return tr('Recording saves a file, so it needs the phone app. The browser '
+            'build cannot keep attachments.');
       case RecorderError.failed:
-        return 'The microphone could not be started. Close anything else that '
-            'might be using it and try again.';
+        return tr('The microphone could not be started. Close anything else that '
+            'might be using it and try again.');
     }
   }
 }
@@ -50,14 +51,18 @@ class VoiceRecorder extends ChangeNotifier {
 
   bool _recording = false;
   bool _paused = false;
-  Duration _elapsed = Duration.zero;
+
+  /// Counts only the time spent recording. A stopwatch rather than a number
+  /// bumped on every timer tick: a tick that fires late (a busy phone, an
+  /// emulator) would otherwise leave the clock short of the real audio.
+  final _watch = Stopwatch();
   double _level = 0;
   String? _path;
 
   bool get isRecording => _recording;
   bool get isPaused => _paused;
   bool get isActive => _recording || _paused;
-  Duration get elapsed => _elapsed;
+  Duration get elapsed => _watch.elapsed;
 
   /// Microphone loudness from 0 (silence) to 1 (as loud as it gets), ready to
   /// drive a meter. The plugin reports dBFS, which is negative and logarithmic.
@@ -97,7 +102,9 @@ class VoiceRecorder extends ChangeNotifier {
 
     _recording = true;
     _paused = false;
-    _elapsed = Duration.zero;
+    _watch
+      ..reset()
+      ..start();
     history.clear();
     _startTicker();
     _listenToLevels();
@@ -108,6 +115,7 @@ class VoiceRecorder extends ChangeNotifier {
   Future<void> pause() async {
     if (!_recording) return;
     await _recorder.pause();
+    _watch.stop();
     _recording = false;
     _paused = true;
     _ticker?.cancel();
@@ -118,6 +126,7 @@ class VoiceRecorder extends ChangeNotifier {
   Future<void> resume() async {
     if (!_paused) return;
     await _recorder.resume();
+    _watch.start();
     _recording = true;
     _paused = false;
     _startTicker();
@@ -129,7 +138,8 @@ class VoiceRecorder extends ChangeNotifier {
   Future<Recording?> stop() async {
     if (!isActive) return null;
 
-    final length = _elapsed;
+    _watch.stop();
+    final length = _watch.elapsed;
     await _recorder.stop();
     await _stopWatchers();
 
@@ -182,7 +192,9 @@ class VoiceRecorder extends ChangeNotifier {
     _recording = false;
     _paused = false;
     _level = 0;
-    _elapsed = Duration.zero;
+    _watch
+      ..stop()
+      ..reset();
     _path = null;
     if (path != null) {
       await AttachmentStore.delete(AttachmentStore.nameOf(path));
@@ -191,10 +203,10 @@ class VoiceRecorder extends ChangeNotifier {
 
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      _elapsed += const Duration(milliseconds: 200);
-      notifyListeners();
-    });
+    _ticker = Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => notifyListeners(),
+    );
   }
 
   void _listenToLevels() {

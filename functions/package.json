@@ -1,0 +1,14 @@
+{
+  "name": "notenest-functions",
+  "private": true,
+  "description": "Push notifications for NoteNest (Firebase Cloud Functions).",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

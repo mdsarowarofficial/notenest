@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import '../models/user_account.dart';
 import 'app_database.dart';
+import '../l10n/strings.dart';
 
 /// Why a sign-in or sign-up attempt failed.
 enum AuthError {
@@ -24,19 +25,19 @@ extension AuthErrorMessage on AuthError {
   String get message {
     switch (this) {
       case AuthError.emailTaken:
-        return 'An account already uses this email on this device';
+        return tr('An account already uses this email on this device');
       case AuthError.emailNotFound:
-        return 'No account found for this email';
+        return tr('No account found for this email');
       case AuthError.wrongPassword:
-        return 'That password does not match';
+        return tr('That password does not match');
       case AuthError.weakPassword:
-        return 'Password needs 6+ characters, a capital letter and a symbol';
+        return tr('Password needs 6+ characters, a capital letter and a symbol');
       case AuthError.invalidEmail:
-        return 'Enter a valid email address';
+        return tr('Enter a valid email address');
       case AuthError.emptyName:
-        return 'Enter your name';
+        return tr('Enter your name');
       case AuthError.googleAccount:
-        return 'This account signs in with Google, so it has no password here';
+        return tr('This account signs in with Google, so it has no password here');
     }
   }
 }
@@ -571,6 +572,21 @@ class AuthRepository extends ChangeNotifier {
   /// database has on because `PRAGMA foreign_keys = ON` is set when it opens.
   /// Files on disk are not rows and do not cascade: the caller clears those
   /// first.
+  /// Whether [password] is the signed-in account's password. False for a
+  /// Google account, which has none. Used to let someone who forgot their app
+  /// lock PIN prove who they are.
+  Future<bool> checkPassword(String password) async {
+    final user = _current;
+    if (user?.id == null) return false;
+    final rows = await _db.db
+        .query('users', where: 'id = ?', whereArgs: [user!.id], limit: 1);
+    if (rows.isEmpty) return false;
+    final row = rows.first;
+    if (_isGoogleOnly(row['password_hash'] as String)) return false;
+    return _verify(password, row['password_salt'] as String,
+        row['password_hash'] as String);
+  }
+
   Future<AuthError?> deleteAccount({required String password}) async {
     final user = _current;
     if (user?.id == null) return AuthError.emailNotFound;

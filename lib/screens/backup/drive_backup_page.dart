@@ -5,6 +5,7 @@ import '../../data/drive_service.dart';
 import '../../data/note_repository.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_mark_tile.dart';
+import '../../l10n/strings.dart';
 
 /// Back up the notebook to Google Drive, and bring it back on another phone.
 class DriveBackupPage extends StatefulWidget {
@@ -58,43 +59,40 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
     }
   }
 
-  Future<void> _connect() => _run('Connecting…', () async {
+  Future<void> _connect() => _run(tr('Connecting…'), () async {
         await _drive.connect();
         if (mounted) setState(() => _connected = true);
-        return 'Google Drive connected.';
+        return tr('Google Drive connected.');
       });
 
-  Future<void> _backUp() => _run('Backing up…', () async {
+  Future<void> _backUp() => _run(tr('Backing up…'), () async {
         await DriveBackup.backUp();
         if (mounted) setState(() => _connected = true);
-        return 'Backed up to Google Drive.';
+        return tr('Backed up to Google Drive.');
       });
 
-  Future<void> _restore() => _run('Looking for a backup…', () async {
+  Future<void> _restore() => _run(tr('Looking for a backup…'), () async {
         final file = await DriveBackup.latest();
         if (!mounted) return null;
         if (file == null) {
-          return 'No backup for this account in Google Drive yet.';
+          return tr('No backup for this account in Google Drive yet.');
         }
         final when = file.modifiedTime;
         final yes = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Restore from Drive?'),
+            title: Text(tr('Restore from Drive?')),
             content: Text(
-              'The backup from '
-              '${when == null ? 'Drive' : _date(when.toLocal())} is added to '
-              'this phone. Nothing here is deleted or replaced — notes that '
-              'are already on this phone are left as they are.',
+              trp('The backup from {0} is added to this phone. Nothing here is deleted or replaced — notes that are already on this phone are left as they are.', [when == null ? tr('Drive') : _date(when.toLocal())]),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(tr('Cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Restore'),
+                child: Text(tr('Restore')),
               ),
             ],
           ),
@@ -112,7 +110,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
     ];
     final h = d.hour.toString().padLeft(2, '0');
     final m = d.minute.toString().padLeft(2, '0');
-    return '${d.day} ${months[d.month - 1]} ${d.year}, $h:$m';
+    return localDate('${d.day} ${months[d.month - 1]} ${d.year}, $h:$m');
   }
 
   @override
@@ -120,7 +118,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Google Drive backup')),
+      appBar: AppBar(title: Text(tr('Google Drive backup'))),
       body: ListenableBuilder(
         listenable: _repo,
         builder: (context, _) => ListView(
@@ -152,18 +150,17 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
                       children: [
                         Text(
                           _connected == null
-                              ? 'Checking Google Drive…'
+                              ? tr('Checking Google Drive…')
                               : _connected!
-                                  ? 'Google Drive is connected'
-                                  : 'Google Drive is not connected',
+                                  ? tr('Google Drive is connected')
+                                  : tr('Google Drive is not connected'),
                           style: t.titleSmall,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           _repo.lastBackupAt == null
-                              ? 'No backup made from this phone yet.'
-                              : 'Last backup: '
-                                  '${_date(_repo.lastBackupAt!)}',
+                              ? tr('No backup made from this phone yet.')
+                              : trp('Last backup: {0}', [_date(_repo.lastBackupAt!)]),
                           style: t.bodySmall,
                         ),
                       ],
@@ -175,8 +172,8 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
             const SizedBox(height: 18),
             if (!_drive.isSupported)
               Text(
-                'Google Drive backup works in the NoteNest app on a phone, '
-                'not in a browser.',
+                tr('Google Drive backup works in the NoteNest app on a phone, '
+                'not in a browser.'),
                 style: t.bodySmall,
               )
             else ...[
@@ -186,7 +183,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
                   child: OutlinedButton.icon(
                     onPressed: _busy == null ? _connect : null,
                     icon: const Icon(Icons.link_rounded),
-                    label: const Text('Connect Google Drive'),
+                    label: Text(tr('Connect Google Drive')),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -196,7 +193,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
                 child: FilledButton.icon(
                   onPressed: _busy == null ? _backUp : null,
                   icon: const Icon(Icons.cloud_upload_rounded),
-                  label: const Text('Back up now'),
+                  label: Text(tr('Back up now')),
                 ),
               ),
               const SizedBox(height: 10),
@@ -205,7 +202,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
                 child: OutlinedButton.icon(
                   onPressed: _busy == null ? _restore : null,
                   icon: const Icon(Icons.cloud_download_rounded),
-                  label: const Text('Restore from Drive'),
+                  label: Text(tr('Restore from Drive')),
                 ),
               ),
               const SizedBox(height: 8),
@@ -218,9 +215,9 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
                         await _repo.saveBackupState(auto: on);
                         if (on && _connected != true) await _connect();
                       },
-                title: const Text('Back up every day'),
-                subtitle: const Text(
-                  'Once a day, when you open NoteNest with a connection.',
+                title: Text(tr('Back up every day')),
+                subtitle: Text(
+                  tr('Once a day, when you open NoteNest with a connection.'),
                 ),
               ),
             ],
@@ -242,14 +239,14 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
               const SizedBox(height: 14),
               Text(
                 _error!,
-                style: const TextStyle(color: NestColor.redPen, fontSize: 13.5),
+                style: TextStyle(color: NestColor.redPen, fontSize: 13.5),
               ),
             ],
             const SizedBox(height: 26),
-            Text('What is saved', style: t.titleSmall),
+            Text(tr('What is saved'), style: t.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'Every subject, note, task, exam date and setting on this '
+              tr('Every subject, note, task, exam date and setting on this '
               'account, and every file attached to a note — PDFs, '
               'photographed pages and recordings. It goes in one file in your '
               'own Google Drive, in the NoteNest → Backups folder, so it is '
@@ -261,7 +258,7 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
               'some space.\n\n'
               'On a new phone, sign in with the same account and tap Restore '
               'from Drive. NoteNest can only see the files it saved itself — '
-              'never the rest of your Drive.',
+              'never the rest of your Drive.'),
               style: t.bodySmall,
             ),
           ],

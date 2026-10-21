@@ -6,6 +6,7 @@
 library;
 
 import 'note.dart';
+import '../l10n/strings.dart';
 
 /// What is on the date. Quizzes and assignments share the countdown and the
 /// calendar with exams; only the wording changes.
@@ -17,13 +18,13 @@ extension ExamKindData on ExamKind {
   String get label {
     switch (this) {
       case ExamKind.exam:
-        return 'Exam';
+        return tr('Exam');
       case ExamKind.quiz:
-        return 'Quiz';
+        return tr('Quiz');
       case ExamKind.assignment:
-        return 'Assignment';
+        return tr('Assignment');
       case ExamKind.other:
-        return 'Other';
+        return tr('Other');
     }
   }
 
@@ -149,10 +150,10 @@ class Exam {
 const reminderChoices = <int>[1, 3, 7];
 
 String reminderLabel(int? days) {
-  if (days == null) return 'Off';
-  if (days == 1) return '1 day before';
-  if (days == 7) return '1 week before';
-  return '$days days before';
+  if (days == null) return tr('Off');
+  if (days == 1) return tr('1 day before');
+  if (days == 7) return tr('1 week before');
+  return trp('{0} days before', [days]);
 }
 
 /// Strips the time off a date, so two dates on the same day compare equal.
@@ -174,11 +175,11 @@ int daysUntil(DateTime date, {DateTime? from}) {
 
 /// "Today", "Tomorrow", "in 6 days", "2 days ago".
 String countdownLabel(int days) {
-  if (days == 0) return 'Today';
-  if (days == 1) return 'Tomorrow';
-  if (days == -1) return 'Yesterday';
-  if (days > 0) return 'in $days days';
-  return '${-days} days ago';
+  if (days == 0) return tr('Today');
+  if (days == 1) return tr('Tomorrow');
+  if (days == -1) return tr('Yesterday');
+  if (days > 0) return trp('in {0} days', [days]);
+  return trp('{0} days ago', [-days]);
 }
 
 /// Orders notes by what deserves attention first before an exam.
@@ -263,15 +264,15 @@ String revisionVerdict({
   required int daysLeft,
   required int total,
 }) {
-  if (total == 0) return 'No notes in this subject yet.';
-  if (remaining == 0) return 'Everything here is marked Mastered.';
+  if (total == 0) return tr('No notes in this subject yet.');
+  if (remaining == 0) return tr('Everything here is marked Mastered.');
 
   final perDay = dailyTarget(remaining: remaining, daysLeft: daysLeft);
 
-  if (daysLeft < 0) return '$remaining still not mastered.';
+  if (daysLeft < 0) return trp('{0} still not mastered.', [remaining]);
   if (daysLeft == 0) {
-    return '$remaining left and the exam is today.';
+    return trp('{0} left and the exam is today.', [remaining]);
   }
-  if (perDay == 1) return 'One note a day clears this in time.';
-  return '$perDay notes a day clears this in time.';
+  if (perDay == 1) return tr('One note a day clears this in time.');
+  return trp('{0} notes a day clears this in time.', [perDay]);
 }

@@ -6,6 +6,8 @@
 /// without a network or an emulator.
 library;
 
+import '../l10n/strings.dart';
+
 /// What a group is for.
 ///
 /// Both are the same shape — a name, an owner, a list of members — because a
@@ -18,11 +20,11 @@ extension GroupKindData on GroupKind {
   String get key => this == GroupKind.classroom ? 'class' : 'study';
 
   String get label =>
-      this == GroupKind.classroom ? 'Class' : 'Study group';
+      this == GroupKind.classroom ? tr('Class') : tr('Study group');
 
   String get blurb => this == GroupKind.classroom
-      ? 'A teacher sets assignments here. Students hand work in.'
-      : 'Classmates share notes and talk about them.';
+      ? tr('A teacher sets assignments here. Students hand work in.')
+      : tr('Classmates share notes and talk about them.');
 
   /// Unknown keys fall back to a study group, which is the one that can do
   /// less. A group written by a newer version of the app should not quietly
@@ -78,7 +80,7 @@ class StudyGroup {
   bool canLeave(String? uid) => hasMember(uid) && !isOwner(uid);
 
   String get memberLabel =>
-      memberCount == 1 ? '1 member' : '$memberCount members';
+      memberCount == 1 ? tr('1 member') : trp('{0} members', [memberCount]);
 
   /// Initials for the group avatar: at most two words, so "Data Structures
   /// Lab" shows DL rather than DSL.
@@ -196,9 +198,9 @@ String normaliseJoinCode(String raw) {
 /// What is wrong with a typed join code, or null when nothing is.
 String? joinCodeProblem(String raw) {
   final code = normaliseJoinCode(raw);
-  if (code.isEmpty) return 'Type the group code.';
+  if (code.isEmpty) return tr('Type the group code.');
   if (code.length != joinCodeLength) {
-    return 'A group code is $joinCodeLength characters.';
+    return trp('A group code is {0} characters.', [joinCodeLength]);
   }
   return null;
 }
@@ -229,9 +231,9 @@ const maxGroupSubject = 60;
 /// What is wrong with a group name, or null when nothing is.
 String? groupNameProblem(String raw) {
   final name = raw.trim();
-  if (name.isEmpty) return 'Give the group a name.';
+  if (name.isEmpty) return tr('Give the group a name.');
   if (name.length > maxGroupName) {
-    return 'Keep the name under $maxGroupName characters.';
+    return trp('Keep the name under {0} characters.', [maxGroupName]);
   }
   return null;
 }

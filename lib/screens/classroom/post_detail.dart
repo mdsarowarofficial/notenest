@@ -11,6 +11,7 @@ import '../../theme/nest_theme.dart';
 import '../../widgets/nest_mark_tile.dart';
 import 'class_files.dart';
 import 'classroom_page.dart' show StatusPill;
+import '../../l10n/strings.dart';
 
 /// One post, opened. For an assignment this is also where work is handed in
 /// (a student) or collected and graded (the teacher).
@@ -38,23 +39,23 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete this ${post.kind.label.toLowerCase()}?'),
+        title: Text(trp('Delete this {0}?', [post.kind.label.toLowerCase()])),
         content: Text(
           post.isAssignment
-              ? 'Students\' handed-in work for it is removed from the class '
+              ? tr('Students\' handed-in work for it is removed from the class '
                   'too. Their files stay in their own Google Drive, and yours '
-                  'stay in yours.'
-              : 'Your files stay in your Google Drive.',
+                  'stay in yours.')
+              : tr('Your files stay in your Google Drive.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep it'),
+            child: Text(tr('Keep it')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: Text(tr('Delete')),
           ),
         ],
       ),
@@ -78,7 +79,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
       initialDate: start.isBefore(now) ? now : start,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 730)),
-      helpText: 'New due date',
+      helpText: tr('New due date'),
     );
     if (day == null || !mounted) return;
     final time = await showTimePicker(
@@ -95,7 +96,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         post,
         dueAt: DateTime(day.year, day.month, day.day, t.hour, t.minute),
       );
-      messenger.showSnackBar(const SnackBar(content: Text('Deadline moved.')));
+      messenger.showSnackBar(SnackBar(content: Text(tr('Deadline moved.'))));
     } on CloudException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     }
@@ -113,7 +114,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             body: Center(
               child: snap.connectionState == ConnectionState.waiting
                   ? const CircularProgressIndicator()
-                  : const Text('This post was removed.'),
+                  : Text(tr('This post was removed.')),
             ),
           );
         }
@@ -131,9 +132,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   },
                   itemBuilder: (_) => [
                     if (post.isAssignment)
-                      const PopupMenuItem(
-                          value: 'due', child: Text('Change the deadline')),
-                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      PopupMenuItem(
+                          value: 'due', child: Text(tr('Change the deadline'))),
+                    PopupMenuItem(value: 'delete', child: Text(tr('Delete'))),
                   ],
                 ),
             ],
@@ -143,7 +144,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             children: [
               Text(
                 post.kind == PostKind.announcement
-                    ? (post.authorName.isEmpty ? 'Teacher' : post.authorName)
+                    ? (post.authorName.isEmpty ? tr('Teacher') : post.authorName)
                     : post.title,
                 style: t.headlineSmall,
               ),
@@ -156,7 +157,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       post.kind != PostKind.announcement)
                     Text(post.authorName, style: t.bodySmall),
                   if (post.points != null)
-                    Text('${post.points} points', style: t.bodySmall),
+                    Text(trp('{0} points', [post.points]), style: t.bodySmall),
                   if (post.topic.isNotEmpty)
                     Text(post.topic, style: t.bodySmall),
                 ],
@@ -184,8 +185,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '${post.isPastDue() ? 'Was due' : 'Due'} '
-                          '${formatDue(post.dueAt!)}',
+                          trp('{0} {1}', [tr(post.isPastDue() ? tr('Was due') : tr('Due')), formatDue(post.dueAt!)]),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: post.isPastDue()
@@ -201,7 +201,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             post,
                             className: widget.classGroup.name,
                           ),
-                          child: const Text('Add to Exam'),
+                          child: Text(tr('Add to Exam')),
                         ),
                     ],
                   ),
@@ -213,7 +213,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               ],
               if (post.files.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                const Text('ATTACHED', style: nestEyebrow),
+                Text(tr('ATTACHED'), style: nestEyebrow),
                 const SizedBox(height: 8),
                 for (final f in post.files)
                   ClassFileTile(
@@ -222,13 +222,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         ? null
                         : (post.files.length == 1
                             ? post.title
-                            : '${post.title} — ${f.name}'),
+                            : trp('{0} — {1}', [post.title, f.name])),
                     saveTopic: post.topic.isEmpty ? null : post.topic,
                   ),
                 if (!_teaching)
                   Text(
-                    'Tip: ⋮ → Save to my notes keeps a copy on your phone, '
-                    'so you can read it offline.',
+                    tr('Tip: ⋮ → Save to my notes keeps a copy on your phone, '
+                    'so you can read it offline.'),
                     style: t.bodySmall,
                   ),
               ],
@@ -300,19 +300,19 @@ class _MyWorkState extends State<_MyWork> {
       final go = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Hand in with nothing attached?'),
-          content: const Text(
-            'Your teacher will see it marked as done, with no file and no '
-            'answer. Use this only if the work was handed in some other way.',
+          title: Text(tr('Hand in with nothing attached?')),
+          content: Text(
+            tr('Your teacher will see it marked as done, with no file and no '
+            'answer. Use this only if the work was handed in some other way.'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(tr('Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Mark as done'),
+              child: Text(tr('Mark as done')),
             ),
           ],
         ),
@@ -321,7 +321,7 @@ class _MyWorkState extends State<_MyWork> {
     }
 
     setState(() {
-      _busy = _pending.isEmpty ? 'Saving…' : 'Uploading to Google Drive…';
+      _busy = _pending.isEmpty ? tr('Saving…') : tr('Uploading to Google Drive…');
       _error = null;
     });
     final messenger = ScaffoldMessenger.of(context);
@@ -342,7 +342,7 @@ class _MyWorkState extends State<_MyWork> {
         turnIn: turnIn,
       );
       messenger.showSnackBar(SnackBar(
-        content: Text(turnIn ? 'Handed in.' : 'Saved — not handed in yet.'),
+        content: Text(turnIn ? tr('Handed in.') : tr('Saved — not handed in yet.')),
       ));
     } on DriveException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -354,7 +354,7 @@ class _MyWorkState extends State<_MyWork> {
   }
 
   Future<void> _unsubmit() async {
-    setState(() => _busy = 'Taking it back…');
+    setState(() => _busy = tr('Taking it back…'));
     try {
       await ClassroomService.instance.saveMyWork(
         classId: widget.classGroup.id,
@@ -399,7 +399,7 @@ class _MyWorkState extends State<_MyWork> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text('Your work', style: t.titleMedium)),
+                  Expanded(child: Text(tr('Your work'), style: t.titleMedium)),
                   StatusPill(status: status),
                 ],
               ),
@@ -416,10 +416,9 @@ class _MyWorkState extends State<_MyWork> {
                     children: [
                       Text(
                         mine!.grade == null
-                            ? 'Returned'
-                            : 'Grade: ${mine.grade}'
-                                '${widget.post.points == null ? '' : ' / ${widget.post.points}'}',
-                        style: const TextStyle(
+                            ? tr('Returned')
+                            : trp('Grade: {0}{1}', [mine.grade, widget.post.points == null ? '' : ' / ${widget.post.points}']),
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color: NestColor.mintDeep,
                           fontSize: 16,
@@ -436,8 +435,7 @@ class _MyWorkState extends State<_MyWork> {
               if (handedIn && mine?.submittedAt != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Handed in ${formatDue(mine!.submittedAt!)}'
-                  '${mine.isLateFor(widget.post) ? ' — late' : ''}',
+                  trp('Handed in {0}{1}', [formatDue(mine!.submittedAt!), mine.isLateFor(widget.post) ? tr(' — late') : '']),
                   style: t.bodySmall,
                 ),
               ],
@@ -468,8 +466,8 @@ class _MyWorkState extends State<_MyWork> {
                   minLines: 2,
                   maxLines: 8,
                   maxLength: maxPostBody,
-                  decoration: const InputDecoration(
-                    labelText: 'Answer or note to your teacher (optional)',
+                  decoration: InputDecoration(
+                    labelText: tr('Answer or note to your teacher (optional)'),
                     alignLabelWithHint: true,
                     counterText: '',
                   ),
@@ -478,7 +476,7 @@ class _MyWorkState extends State<_MyWork> {
                 OutlinedButton.icon(
                   onPressed: busy ? null : _attach,
                   icon: const Icon(Icons.attach_file_rounded),
-                  label: const Text('Add a file'),
+                  label: Text(tr('Add a file')),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -486,13 +484,13 @@ class _MyWorkState extends State<_MyWork> {
                   child: FilledButton(
                     onPressed: busy ? null : () => _save(turnIn: true),
                     child: Text(
-                      widget.post.isPastDue() ? 'Hand in late' : 'Hand in',
+                      widget.post.isPastDue() ? tr('Hand in late') : tr('Hand in'),
                     ),
                   ),
                 ),
                 TextButton(
                   onPressed: busy ? null : () => _save(turnIn: false),
-                  child: const Text('Save without handing in'),
+                  child: Text(tr('Save without handing in')),
                 ),
               ] else ...[
                 if (mine?.text.isNotEmpty ?? false)
@@ -502,7 +500,7 @@ class _MyWorkState extends State<_MyWork> {
                   ),
                 OutlinedButton(
                   onPressed: busy ? null : _unsubmit,
-                  child: const Text('Unsubmit to change it'),
+                  child: Text(tr('Unsubmit to change it')),
                 ),
               ],
               if (_busy != null) ...[
@@ -521,12 +519,12 @@ class _MyWorkState extends State<_MyWork> {
               ],
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: NestColor.redPen)),
+                Text(_error!, style: TextStyle(color: NestColor.redPen)),
               ],
               const SizedBox(height: 6),
               Text(
-                'Files you hand in are saved in your Google Drive and shared '
-                'by link with your teacher.',
+                tr('Files you hand in are saved in your Google Drive and shared '
+                'by link with your teacher.'),
                 style: t.bodySmall,
               ),
             ],
@@ -567,7 +565,7 @@ class _TeacherWorkState extends State<_TeacherWork> {
         missingCount: missing,
       );
       messenger.showSnackBar(
-        const SnackBar(content: Text('Reminder posted in the class chat.')),
+        SnackBar(content: Text(tr('Reminder posted in the class chat.'))),
       );
     } on CloudException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -626,14 +624,14 @@ class _TeacherWorkState extends State<_TeacherWork> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Student work', style: t.titleMedium),
+              Text(tr('Student work'), style: t.titleMedium),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  _Count(label: 'Handed in', value: handedIn),
-                  _Count(label: 'Graded', value: graded),
+                  _Count(label: tr('Handed in'), value: handedIn),
+                  _Count(label: tr('Graded'), value: graded),
                   _Count(
-                    label: widget.post.isPastDue() ? 'Missing' : 'Not yet',
+                    label: widget.post.isPastDue() ? tr('Missing') : tr('Not yet'),
                     value: notYet,
                     warn: widget.post.isPastDue() && notYet > 0,
                   ),
@@ -645,14 +643,14 @@ class _TeacherWorkState extends State<_TeacherWork> {
                   onPressed: _reminding ? null : () => _remind(notYet),
                   icon: const Icon(Icons.notifications_active_outlined),
                   label: Text(
-                    'Remind the $notYet who have not handed in',
+                    trp('Remind the {0} who have not handed in', [notYet]),
                   ),
                 ),
               ],
               const SizedBox(height: 12),
               if (students.isEmpty)
                 Text(
-                  'No students in this class yet.',
+                  tr('No students in this class yet.'),
                   style: t.bodySmall,
                 ),
               for (final p in students)
@@ -665,8 +663,7 @@ class _TeacherWorkState extends State<_TeacherWork> {
                   ),
                   title: Text(p.name.isEmpty ? p.email : p.name),
                   subtitle: byUid[p.uid]?.grade != null
-                      ? Text('Grade ${byUid[p.uid]!.grade}'
-                          '${widget.post.points == null ? '' : ' / ${widget.post.points}'}')
+                      ? Text(trp('Grade {0}{1}', [byUid[p.uid]!.grade, widget.post.points == null ? '' : ' / ${widget.post.points}']))
                       : null,
                   trailing: StatusPill(status: statuses[p.uid]!),
                   onTap: byUid[p.uid] == null || !byUid[p.uid]!.isTurnedIn
@@ -718,7 +715,7 @@ class _Count extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              '$value',
+              trp('{0}', [value]),
               style: TextStyle(
                 fontFamily: NestFont.display,
                 fontSize: 22,
@@ -770,12 +767,12 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     final raw = _grade.text.trim();
     final grade = raw.isEmpty ? null : int.tryParse(raw);
     if (raw.isNotEmpty && grade == null) {
-      setState(() => _error = 'The grade must be a whole number.');
+      setState(() => _error = tr('The grade must be a whole number.'));
       return;
     }
     final max = widget.post.points ?? maxPoints;
     if (grade != null && (grade < 0 || grade > max)) {
-      setState(() => _error = 'The grade must be between 0 and $max.');
+      setState(() => _error = trp('The grade must be between 0 and {0}.', [max]));
       return;
     }
     setState(() {
@@ -818,8 +815,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             Text(widget.student.name, style: t.headlineSmall),
             if (w.submittedAt != null)
               Text(
-                'Handed in ${formatDue(w.submittedAt!)}'
-                '${w.isLateFor(widget.post) ? ' — late' : ''}',
+                trp('Handed in {0}{1}', [formatDue(w.submittedAt!), w.isLateFor(widget.post) ? tr(' — late') : '']),
                 style: t.bodySmall,
               ),
             const SizedBox(height: 14),
@@ -836,13 +832,13 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             ],
             for (final f in w.files) ClassFileTile(file: f),
             if (w.files.isEmpty && w.text.isEmpty)
-              Text('Marked as done with nothing attached.', style: t.bodySmall),
+              Text(tr('Marked as done with nothing attached.'), style: t.bodySmall),
             const SizedBox(height: 14),
             TextField(
               controller: _grade,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Grade',
+                labelText: tr('Grade'),
                 suffixText: widget.post.points == null
                     ? null
                     : '/ ${widget.post.points}',
@@ -854,15 +850,15 @@ class _ReviewSheetState extends State<_ReviewSheet> {
               minLines: 2,
               maxLines: 6,
               maxLength: maxFeedback,
-              decoration: const InputDecoration(
-                labelText: 'Private feedback (only this student sees it)',
+              decoration: InputDecoration(
+                labelText: tr('Private feedback (only this student sees it)'),
                 alignLabelWithHint: true,
                 counterText: '',
               ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: NestColor.redPen)),
+              Text(_error!, style: TextStyle(color: NestColor.redPen)),
             ],
             const SizedBox(height: 14),
             SizedBox(
@@ -870,8 +866,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
               child: FilledButton(
                 onPressed: _busy ? null : _return,
                 child: Text(w.state == SubmissionState.returned
-                    ? 'Update and return'
-                    : 'Return to student'),
+                    ? tr('Update and return')
+                    : tr('Return to student')),
               ),
             ),
           ],

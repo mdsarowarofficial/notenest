@@ -5,6 +5,7 @@ import '../../data/cloud_service.dart';
 import '../../data/note_repository.dart';
 import '../../models/cloud_profile.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Connecting this device's account to the cloud.
 ///
@@ -59,7 +60,7 @@ class _CloudPageState extends State<CloudPage> {
     // Checked here so an obvious typo gets an instant answer instead of a
     // round trip to Firebase and a code.
     if (!looksLikeEmail(email)) {
-      setState(() => _error = 'That address does not look right.');
+      setState(() => _error = tr('That address does not look right.'));
       return;
     }
     final passwordIssue = passwordProblem(password);
@@ -68,7 +69,7 @@ class _CloudPageState extends State<CloudPage> {
       return;
     }
     if (_creating && _name.text.trim().isEmpty) {
-      setState(() => _error = 'Type the name classmates will see.');
+      setState(() => _error = tr('Type the name classmates will see.'));
       return;
     }
 
@@ -92,8 +93,8 @@ class _CloudPageState extends State<CloudPage> {
       if (!mounted) return;
       _password.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connected to the cloud'),
+        SnackBar(
+          content: Text(tr('Connected to the cloud')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -101,7 +102,7 @@ class _CloudPageState extends State<CloudPage> {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'That did not work. Try again in a moment.');
+        setState(() => _error = tr('That did not work. Try again in a moment.'));
       }
     }
   }
@@ -111,20 +112,20 @@ class _CloudPageState extends State<CloudPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Disconnect from the cloud?'),
-        content: const Text(
-          'Your notes, subjects and exams are stored on this device and are '
-          'not touched. Only the cloud features stop until you connect again.',
+        title: Text(tr('Disconnect from the cloud?')),
+        content: Text(
+          tr('Your notes, subjects and exams are stored on this device and are '
+          'not touched. Only the cloud features stop until you connect again.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Disconnect'),
+            child: Text(tr('Disconnect')),
           ),
         ],
       ),
@@ -135,7 +136,7 @@ class _CloudPageState extends State<CloudPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cloud account')),
+      appBar: AppBar(title: Text(tr('Cloud account'))),
       body: ListenableBuilder(
         listenable: _cloud,
         builder: (context, _) {
@@ -153,16 +154,16 @@ class _CloudPageState extends State<CloudPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 30),
       children: [
-        const _Banner(
+        _Banner(
           icon: Icons.cloud_off_rounded,
           colour: NestColor.redPen,
-          title: 'The cloud is not available',
-          body: 'Everything stored on this device still works — notes, '
+          title: tr('The cloud is not available'),
+          body: tr('Everything stored on this device still works — notes, '
               'subjects, exams, cover pages, conversions. Only sharing, chat '
-              'and assignments need the cloud.',
+              'and assignments need the cloud.'),
         ),
         const SizedBox(height: 18),
-        const Text('WHAT FIREBASE SAID', style: nestEyebrow),
+        Text(tr('WHAT FIREBASE SAID'), style: nestEyebrow),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -172,7 +173,7 @@ class _CloudPageState extends State<CloudPage> {
             borderRadius: BorderRadius.circular(NestRadius.tile),
           ),
           child: SelectableText(
-            _cloud.startupError ?? 'Firebase did not start.',
+            _cloud.startupError ?? tr('Firebase did not start.'),
             style: const TextStyle(fontSize: 12, height: 1.5),
           ),
         ),
@@ -207,7 +208,7 @@ class _CloudPageState extends State<CloudPage> {
                 ),
                 child: Text(
                   profile?.initials ?? '?',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                     color: NestColor.mint,
@@ -221,11 +222,11 @@ class _CloudPageState extends State<CloudPage> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.cloud_done_rounded,
+                        Icon(Icons.cloud_done_rounded,
                             size: 15, color: NestColor.mint),
                         const SizedBox(width: 6),
                         Text(
-                          'CONNECTED',
+                          tr('CONNECTED'),
                           style: nestEyebrow.copyWith(color: NestColor.mint),
                         ),
                       ],
@@ -234,7 +235,7 @@ class _CloudPageState extends State<CloudPage> {
                     Text(
                       profile?.name.isNotEmpty == true
                           ? profile!.name
-                          : 'No name set',
+                          : tr('No name set'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(
@@ -253,10 +254,8 @@ class _CloudPageState extends State<CloudPage> {
           _Banner(
             icon: Icons.mark_email_unread_rounded,
             colour: NestColor.redPen,
-            title: 'Confirm your email',
-            body: 'We sent a link to ${profile?.email ?? 'your address'}. '
-                'Until you open it, classmates cannot find you by email. '
-                'Check spam as well.',
+            title: tr('Confirm your email'),
+            body: trp('We sent a link to {0}. Until you open it, classmates cannot find you by email. Check spam as well.', [profile?.email ?? tr('your address')]),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -265,18 +264,18 @@ class _CloudPageState extends State<CloudPage> {
             children: [
               FilledButton(
                 onPressed: _cloud.isBusy ? null : _checkVerified,
-                child: const Text('I have confirmed it'),
+                child: Text(tr('I have confirmed it')),
               ),
               OutlinedButton(
                 onPressed: _cloud.isBusy ? null : _resendVerification,
-                child: const Text('Send the link again'),
+                child: Text(tr('Send the link again')),
               ),
             ],
           ),
         ],
 
         const SizedBox(height: 20),
-        const Text('YOU ARE HERE AS', style: nestEyebrow),
+        Text(tr('YOU ARE HERE AS'), style: nestEyebrow),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -297,39 +296,39 @@ class _CloudPageState extends State<CloudPage> {
         ),
 
         const SizedBox(height: 24),
-        const Text('WHAT THIS UNLOCKS', style: nestEyebrow),
+        Text(tr('WHAT THIS UNLOCKS'), style: nestEyebrow),
         const SizedBox(height: 10),
-        const _Unlock(
+        _Unlock(
           icon: Icons.send_rounded,
-          title: 'Send a note to a classmate',
-          body: 'Straight into their Shared inbox, with an Accept step — no '
-              'file to save and find.',
+          title: tr('Send a note to a classmate'),
+          body: tr('Straight into their Shared inbox, with an Accept step — no '
+              'file to save and find.'),
         ),
-        const _Unlock(
+        _Unlock(
           icon: Icons.forum_rounded,
-          title: 'Chat',
-          body: 'One to one, and in a study group.',
+          title: tr('Chat'),
+          body: tr('One to one, and in a study group.'),
         ),
-        const _Unlock(
+        _Unlock(
           icon: Icons.groups_rounded,
-          title: 'Study groups',
-          body: 'A group that lives somewhere both phones can see.',
+          title: tr('Study groups'),
+          body: tr('A group that lives somewhere both phones can see.'),
         ),
-        const _Unlock(
+        _Unlock(
           icon: Icons.assignment_rounded,
-          title: 'Assignments',
-          body: 'A teacher sets one with a deadline; students hand work in.',
+          title: tr('Assignments'),
+          body: tr('A teacher sets one with a deadline; students hand work in.'),
         ),
         const SizedBox(height: 10),
         Text(
-          'These arrive in the next step. This screen is the account they '
-          'will all run on.',
+          tr('These arrive in the next step. This screen is the account they '
+          'will all run on.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
 
         if (_cloud.blockedUids.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const Text('BLOCKED', style: nestEyebrow),
+          Text(tr('BLOCKED'), style: nestEyebrow),
           const SizedBox(height: 8),
           _BlockedList(uids: _cloud.blockedUids.toList()..sort()),
         ],
@@ -338,7 +337,7 @@ class _CloudPageState extends State<CloudPage> {
         OutlinedButton.icon(
           onPressed: _cloud.isBusy ? null : _disconnect,
           icon: const Icon(Icons.logout_rounded, size: 18),
-          label: const Text('Disconnect'),
+          label: Text(tr('Disconnect')),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 52),
             foregroundColor: NestColor.redPen,
@@ -359,8 +358,8 @@ class _CloudPageState extends State<CloudPage> {
     try {
       final verified = await _cloud.refreshVerification();
       _say(verified
-          ? 'Email confirmed. Classmates can find you now.'
-          : 'Not confirmed yet. Open the link in the email, then try again.');
+          ? tr('Email confirmed. Classmates can find you now.')
+          : tr('Not confirmed yet. Open the link in the email, then try again.'));
     } on CloudException catch (e) {
       _say(e.message);
     }
@@ -369,7 +368,7 @@ class _CloudPageState extends State<CloudPage> {
   Future<void> _resendVerification() async {
     try {
       await _cloud.sendVerificationEmail();
-      _say('Sent. It can take a minute to arrive.');
+      _say(tr('Sent. It can take a minute to arrive.'));
     } on CloudException catch (e) {
       _say(e.message);
     }
@@ -398,19 +397,19 @@ class _CloudPageState extends State<CloudPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 30),
       children: [
-        const _Banner(
+        _Banner(
           icon: Icons.cloud_queue_rounded,
           colour: NestColor.pen,
-          title: 'The cloud is optional',
-          body: 'NoteNest works without it. Connect only if you want to send '
-              'notes to classmates, chat, or hand work in to a teacher.',
+          title: tr('The cloud is optional'),
+          body: tr('NoteNest works without it. Connect only if you want to send '
+              'notes to classmates, chat, or hand work in to a teacher.'),
         ),
         const SizedBox(height: 20),
 
         SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: true, label: Text('Create')),
-            ButtonSegment(value: false, label: Text('Sign in')),
+          segments: [
+            ButtonSegment(value: true, label: Text(tr('Create'))),
+            ButtonSegment(value: false, label: Text(tr('Sign in'))),
           ],
           selected: {_creating},
           onSelectionChanged: (set) => setState(() {
@@ -422,7 +421,7 @@ class _CloudPageState extends State<CloudPage> {
 
         if (_creating) ...[
           _Field(
-            label: 'Name classmates will see',
+            label: tr('Name classmates will see'),
             controller: _name,
             capitalize: TextCapitalization.words,
           ),
@@ -430,7 +429,7 @@ class _CloudPageState extends State<CloudPage> {
         ],
 
         _Field(
-          label: 'Email',
+          label: tr('Email'),
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           capitalize: TextCapitalization.none,
@@ -442,7 +441,7 @@ class _CloudPageState extends State<CloudPage> {
         const SizedBox(height: 14),
 
         _Field(
-          label: 'Password',
+          label: tr('Password'),
           controller: _password,
           obscure: _hidePassword,
           capitalize: TextCapitalization.none,
@@ -459,12 +458,11 @@ class _CloudPageState extends State<CloudPage> {
         if (_creating) ...[
           const SizedBox(height: 4),
           Text(
-            'At least $minPasswordLength characters. This is a separate '
-            'password from the one you use to open the app.',
+            trp('At least {0} characters. This is a separate password from the one you use to open the app.', [minPasswordLength]),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 18),
-          const Text('I AM A', style: nestEyebrow),
+          Text(tr('I AM A'), style: nestEyebrow),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -511,10 +509,10 @@ class _CloudPageState extends State<CloudPage> {
             style: FilledButton.styleFrom(minimumSize: const Size(0, 54)),
             child: Text(
               _cloud.isBusy
-                  ? 'Working…'
+                  ? tr('Working…')
                   : _creating
-                      ? 'Create cloud account'
-                      : 'Sign in',
+                      ? tr('Create cloud account')
+                      : tr('Sign in'),
             ),
           ),
         ),
@@ -523,10 +521,10 @@ class _CloudPageState extends State<CloudPage> {
         // shown before people can post. Short on purpose: a wall of terms is
         // a wall nobody reads.
         Text(
-          'By connecting you agree not to send anything abusive, hateful, '
+          tr('By connecting you agree not to send anything abusive, hateful, '
           'sexual or illegal. Hold any message to report or block its sender; '
           'reported content is reviewed and accounts that break these rules '
-          'are removed.',
+          'are removed.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -561,13 +559,13 @@ class _BlockedList extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   children: [
-                    const Icon(Icons.block_rounded,
+                    Icon(Icons.block_rounded,
                         size: 16, color: NestColor.inkFaint),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         // A deleted account has no profile left to name it.
-                        names[id] ?? 'A former account',
+                        names[id] ?? tr('A former account'),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
@@ -584,7 +582,7 @@ class _BlockedList extends StatelessWidget {
                                 );
                               }
                             },
-                      child: const Text('Unblock'),
+                      child: Text(tr('Unblock')),
                     ),
                   ],
                 ),
@@ -696,7 +694,7 @@ class _Field extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: NestColor.inkSoft,

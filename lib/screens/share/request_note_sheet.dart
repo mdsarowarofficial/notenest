@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../data/share_service.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Asking a classmate for a note. Requirement 9.3.
 ///
@@ -64,18 +65,16 @@ class _RequestSheetState extends State<_RequestSheet> {
         _subjectId == null ? null : _repo.subjectById(_subjectId!);
     final topic = _topic.text.trim();
     final name = _repo.userName.trim();
-    final who = name.isEmpty ? 'A classmate' : name;
+    final who = name.isEmpty ? tr('A classmate') : name;
 
     final about = [
       if (subject != null) subject.code,
       if (topic.isNotEmpty) topic,
     ].join(' — ');
 
-    final what = about.isEmpty ? 'your notes' : 'your notes on $about';
+    final what = about.isEmpty ? tr('your notes') : trp('your notes on {0}', [about]);
 
-    return '$who is asking for $what.\n\n'
-        'If you use NoteNest, open the note, tap Share, and send the file '
-        'back here.';
+    return trp('{0} is asking for {1}.\n\nIf you use NoteNest, open the note, tap Share, and send the file back here.', [who, what]);
   }
 
   Future<void> _send() async {
@@ -123,18 +122,18 @@ class _RequestSheetState extends State<_RequestSheet> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Ask for a note',
+                tr('Ask for a note'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 6),
               Text(
-                'NoteNest writes the message. You send it wherever your class '
-                'already talks.',
+                tr('NoteNest writes the message. You send it wherever your class '
+                'already talks.'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 18),
               if (subjects.isNotEmpty) ...[
-                const Text('SUBJECT', style: nestEyebrow),
+                Text(tr('SUBJECT'), style: nestEyebrow),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -148,10 +147,10 @@ class _RequestSheetState extends State<_RequestSheet> {
                       isExpanded: true,
                       borderRadius: BorderRadius.circular(NestRadius.tile),
                       items: [
-                        const DropdownMenuItem<int?>(
+                        DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Any subject',
-                              style: TextStyle(fontSize: 14)),
+                          child: Text(tr('Any subject'),
+                              style: const TextStyle(fontSize: 14)),
                         ),
                         for (final s in subjects)
                           DropdownMenuItem<int?>(
@@ -184,7 +183,7 @@ class _RequestSheetState extends State<_RequestSheet> {
                 ),
                 const SizedBox(height: 16),
               ],
-              const Text('TOPIC', style: nestEyebrow),
+              Text(tr('TOPIC'), style: nestEyebrow),
               const SizedBox(height: 6),
               TextField(
                 controller: _topic,
@@ -204,7 +203,7 @@ class _RequestSheetState extends State<_RequestSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('WHAT THEY WILL SEE', style: nestEyebrow),
+              Text(tr('WHAT THEY WILL SEE'), style: nestEyebrow),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -216,7 +215,7 @@ class _RequestSheetState extends State<_RequestSheet> {
                 ),
                 child: Text(
                   _message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     height: 1.55,
                     color: NestColor.ink,
@@ -229,7 +228,7 @@ class _RequestSheetState extends State<_RequestSheet> {
                 child: FilledButton.icon(
                   onPressed: _sending ? null : _send,
                   icon: const Icon(Icons.ios_share_rounded, size: 18),
-                  label: Text(_sending ? 'Opening…' : 'Send the request'),
+                  label: Text(_sending ? tr('Opening…') : tr('Send the request')),
                 ),
               ),
             ],

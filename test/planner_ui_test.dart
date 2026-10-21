@@ -86,9 +86,9 @@ void main() {
     await t.pumpWidget(MaterialApp(
       theme: nestTheme(),
       debugShowCheckedModeBanner: false,
-      home: const Scaffold(
+      home: Scaffold(
         backgroundColor: NestColor.ground,
-        body: TasksPage(embedded: true),
+        body: const TasksPage(embedded: true),
       ),
     ));
     await _settle(t);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/cloud_service.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Report and block — the two things Google Play requires an app to offer
 /// wherever people can send each other things.
@@ -20,7 +21,7 @@ Future<void> showSafetySheet(
 }) async {
   final cloud = CloudService.instance;
   if (targetUid.isEmpty || targetUid == cloud.uid) return;
-  final name = targetName.trim().isEmpty ? 'this person' : targetName.trim();
+  final name = targetName.trim().isEmpty ? tr('this person') : targetName.trim();
   final blocked = cloud.isBlocked(targetUid);
 
   final choice = await showModalBottomSheet<String>(
@@ -36,11 +37,11 @@ Future<void> showSafetySheet(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.flag_outlined, color: NestColor.redPen),
+              leading: Icon(Icons.flag_outlined, color: NestColor.redPen),
               title: Text(messageId.isNotEmpty || shareId.isNotEmpty
-                  ? 'Report this'
-                  : 'Report $name'),
-              subtitle: const Text('Sent to the NoteNest team to review.'),
+                  ? tr('Report this')
+                  : trp('Report {0}', [name])),
+              subtitle: Text(tr('Sent to the NoteNest team to review.')),
               onTap: () => Navigator.pop(sheetContext, 'report'),
             ),
             ListTile(
@@ -48,10 +49,10 @@ Future<void> showSafetySheet(
                 blocked ? Icons.lock_open_rounded : Icons.block_rounded,
                 color: NestColor.redPen,
               ),
-              title: Text(blocked ? 'Unblock $name' : 'Block $name'),
+              title: Text(blocked ? trp('Unblock {0}', [name]) : trp('Block {0}', [name])),
               subtitle: Text(blocked
-                  ? 'Their messages and notes will show again.'
-                  : 'Hide their messages and notes. They are not told.'),
+                  ? tr('Their messages and notes will show again.')
+                  : tr('Hide their messages and notes. They are not told.')),
               onTap: () =>
                   Navigator.pop(sheetContext, blocked ? 'unblock' : 'block'),
             ),
@@ -84,19 +85,19 @@ Future<void> showSafetySheet(
           },
         );
         if (sent) {
-          messenger.showSnackBar(const SnackBar(
-            content: Text('Thank you. The report has been sent.'),
+          messenger.showSnackBar(SnackBar(
+            content: Text(tr('Thank you. The report has been sent.')),
           ));
         }
       case 'block':
         if (!context.mounted) return;
         if (await confirmBlock(context, name)) {
           await cloud.block(targetUid);
-          messenger.showSnackBar(SnackBar(content: Text('$name is blocked.')));
+          messenger.showSnackBar(SnackBar(content: Text(trp('{0} is blocked.', [name]))));
         }
       case 'unblock':
         await cloud.unblock(targetUid);
-        messenger.showSnackBar(SnackBar(content: Text('$name is unblocked.')));
+        messenger.showSnackBar(SnackBar(content: Text(trp('{0} is unblocked.', [name]))));
     }
   } on CloudException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -109,21 +110,21 @@ Future<bool> confirmBlock(BuildContext context, String name) async {
     context: context,
     builder: (dialogContext) => AlertDialog(
       backgroundColor: NestColor.card,
-      title: Text('Block $name?'),
-      content: const Text(
-        'You will not see their messages, in private or in groups, and notes '
+      title: Text(trp('Block {0}?', [name])),
+      content: Text(
+        tr('You will not see their messages, in private or in groups, and notes '
         'they send you will be dropped. They cannot message you privately. '
-        'They are not told. You can unblock them from the Cloud screen.',
+        'They are not told. You can unblock them from the Cloud screen.'),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+          child: Text(tr('Cancel')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Block'),
+          child: Text(tr('Block')),
         ),
       ],
     ),
@@ -200,7 +201,7 @@ class _ReportDialogState extends State<_ReportDialog> {
 
     return AlertDialog(
       backgroundColor: NestColor.card,
-      title: const Text('What is wrong?'),
+      title: Text(tr('What is wrong?')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -229,8 +230,8 @@ class _ReportDialogState extends State<_ReportDialog> {
               maxLength: 500,
               maxLines: 3,
               minLines: 1,
-              decoration: const InputDecoration(
-                labelText: 'Anything else we should know (optional)',
+              decoration: InputDecoration(
+                labelText: tr('Anything else we should know (optional)'),
               ),
             ),
             if (widget.offerBlock)
@@ -239,13 +240,13 @@ class _ReportDialogState extends State<_ReportDialog> {
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 controlAffinity: ListTileControlAffinity.leading,
-                title: Text('Also block ${widget.name}'),
+                title: Text(trp('Also block {0}', [widget.name])),
                 onChanged: _sending
                     ? null
                     : (v) => setState(() => _alsoBlock = v ?? false),
               ),
             Text(
-              'The person is not told who reported them.',
+              tr('The person is not told who reported them.'),
               style: t.bodySmall,
             ),
             if (_error != null) ...[
@@ -261,12 +262,12 @@ class _ReportDialogState extends State<_ReportDialog> {
       actions: [
         TextButton(
           onPressed: _sending ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(tr('Cancel')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
           onPressed: _sending || _reason == null ? null : _submit,
-          child: Text(_sending ? 'Sending…' : 'Send report'),
+          child: Text(_sending ? tr('Sending…') : tr('Send report')),
         ),
       ],
     );

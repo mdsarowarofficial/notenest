@@ -4,6 +4,7 @@ import '../data/note_repository.dart';
 import '../models/note.dart';
 import '../theme/nest_theme.dart';
 import 'nest_mark_tile.dart';
+import '../l10n/strings.dart';
 
 /// A note as one compact line: a coloured mark, a title, and a line of meta.
 ///
@@ -59,11 +60,11 @@ class NoteRow extends StatelessWidget {
                     children: [
                       Text(
                         note.title.trim().isEmpty
-                            ? 'Untitled note'
+                            ? tr('Untitled note')
                             : note.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: NestFont.display,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -76,7 +77,7 @@ class NoteRow extends StatelessWidget {
                         meta,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: NestFont.body,
                           fontSize: 11.5,
                           color: NestColor.inkMeta,
@@ -86,8 +87,8 @@ class NoteRow extends StatelessWidget {
                   ),
                 ),
                 if (note.important)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
                     child: Icon(
                       Icons.star_rounded,
                       size: 17,

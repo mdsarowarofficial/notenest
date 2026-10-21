@@ -7,6 +7,7 @@ import '../data/attachment_store.dart';
 import '../models/attachment.dart';
 import '../models/transcript.dart';
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 /// Plays back a recording attached to a note.
 ///
@@ -76,7 +77,7 @@ class _AudioPlayerBarState extends State<AudioPlayerBar> {
     }
 
     if (!AttachmentStore.isSupported) {
-      setState(() => _error = 'Playback needs the phone app.');
+      setState(() => _error = tr('Playback needs the phone app.'));
       return;
     }
 
@@ -89,7 +90,7 @@ class _AudioPlayerBarState extends State<AudioPlayerBar> {
       await _player.play(DeviceFileSource(path));
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'This recording could not be played.');
+        setState(() => _error = tr('This recording could not be played.'));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -155,7 +156,7 @@ class _AudioPlayerBarState extends State<AudioPlayerBar> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.mic_rounded,
+                        Icon(Icons.mic_rounded,
                             size: 13, color: NestColor.inkFaint),
                         const SizedBox(width: 5),
                         Expanded(
@@ -170,9 +171,8 @@ class _AudioPlayerBarState extends State<AudioPlayerBar> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${formatClock(_position)} / ${formatClock(length)}'
-                      '${widget.attachment.readableSize.isEmpty ? '' : '  ·  ${widget.attachment.readableSize}'}',
-                      style: nestEyebrow.copyWith(letterSpacing: 0.3),
+                      trp('{0} / {1}{2}', [formatClock(_position), formatClock(length), widget.attachment.readableSize.isEmpty ? '' : '  ·  ${widget.attachment.readableSize}']),
+                      style: nestEyebrow.copyWith(letterSpacing: ls(0.3)),
                     ),
                   ],
                 ),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/page_renderer.dart';
 import '../../models/cover_spec.dart';
+import '../../l10n/strings.dart';
 
 /// The cover page as it will be printed.
 ///
@@ -268,7 +269,7 @@ Widget _dateLine(CoverSpec spec, {TextAlign align = TextAlign.center}) {
   final on = spec.submittedOn;
   if (on == null) return const SizedBox.shrink();
   return Text(
-    'Date of submission: ${coverDateLabel(on)}',
+    trp('Date of submission: {0}', [coverDateLabel(on)]),
     style: _dateStyle,
     textAlign: align,
   );
@@ -322,7 +323,7 @@ class _Classic extends StatelessWidget {
           children: [
             Expanded(
               child: _PersonBlock(
-                heading: 'Submitted by',
+                heading: tr('Submitted by'),
                 rows: spec.submittedBy,
                 accent: accent,
               ),
@@ -330,7 +331,7 @@ class _Classic extends StatelessWidget {
             const SizedBox(width: 24),
             Expanded(
               child: _PersonBlock(
-                heading: 'Submitted to',
+                heading: tr('Submitted to'),
                 rows: spec.submittedTo,
                 accent: accent,
               ),
@@ -416,7 +417,7 @@ class _Ruled extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _PersonBlock(
-                        heading: 'Submitted by',
+                        heading: tr('Submitted by'),
                         rows: spec.submittedBy,
                         accent: accent,
                       ),
@@ -424,7 +425,7 @@ class _Ruled extends StatelessWidget {
                     const SizedBox(width: 24),
                     Expanded(
                       child: _PersonBlock(
-                        heading: 'Submitted to',
+                        heading: tr('Submitted to'),
                         rows: spec.submittedTo,
                         accent: accent,
                       ),
@@ -544,14 +545,14 @@ class _Crest extends StatelessWidget {
         ],
         const Spacer(flex: 3),
         _PersonBlock(
-          heading: 'Submitted by',
+          heading: tr('Submitted by'),
           rows: spec.submittedBy,
           accent: accent,
           align: CrossAxisAlignment.center,
         ),
         const SizedBox(height: 20),
         _PersonBlock(
-          heading: 'Submitted to',
+          heading: tr('Submitted to'),
           rows: spec.submittedTo,
           accent: accent,
           align: CrossAxisAlignment.center,
@@ -662,7 +663,7 @@ class _Minimal extends StatelessWidget {
           children: [
             Expanded(
               child: _PersonBlock(
-                heading: 'Submitted by',
+                heading: tr('Submitted by'),
                 rows: spec.submittedBy,
                 accent: accent,
                 showRule: false,
@@ -671,7 +672,7 @@ class _Minimal extends StatelessWidget {
             const SizedBox(width: 24),
             Expanded(
               child: _PersonBlock(
-                heading: 'Submitted to',
+                heading: tr('Submitted to'),
                 rows: spec.submittedTo,
                 accent: accent,
                 showRule: false,
@@ -799,10 +800,10 @@ class _Framed extends StatelessWidget {
                           spec.courseTitle.trim().isNotEmpty) ...[
                         SizedBox(height: 10 * g),
                         if (spec.courseCode.trim().isNotEmpty)
-                          _Line('Course Code', spec.courseCode.trim()),
+                          _Line(tr('Course Code'), spec.courseCode.trim()),
                         if (spec.courseTitle.trim().isNotEmpty) ...[
                           SizedBox(height: 4 * g),
-                          _Line('Course Title', spec.courseTitle.trim()),
+                          _Line(tr('Course Title'), spec.courseTitle.trim()),
                         ],
                       ],
                     ],
@@ -854,7 +855,7 @@ class _Framed extends StatelessWidget {
                 SizedBox(height: 10 * g),
                 if (spec.submittedOn != null)
                   Text(
-                    'Submission date: ${coverDateLabel(spec.submittedOn!)}',
+                    trp('Submission date: {0}', [coverDateLabel(spec.submittedOn!)]),
                     textAlign: TextAlign.center,
                     style: _dateStyle.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -887,13 +888,13 @@ class _Signatures extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final to = _SignatureBlock(
-      heading: 'Submitted to',
+      heading: tr('Submitted to'),
       rows: spec.submittedTo,
       accent: accent,
       gap: gap,
     );
     final by = _SignatureBlock(
-      heading: 'Submitted by',
+      heading: tr('Submitted by'),
       rows: spec.submittedBy,
       accent: accent,
       gap: gap,
@@ -954,7 +955,7 @@ class _Line extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text('$label: ',
+        Text(trp('{0}: ', [label]),
             style: _course.copyWith(color: const Color(0xFF5A5A5A))),
         Flexible(
           child: Text(
@@ -1050,7 +1051,7 @@ class _SignatureBlock extends StatelessWidget {
           for (final row in rest) ...[
             SizedBox(height: 3 * gap),
             Text(
-              '${row.label}: ${row.value}',
+              trp('{0}: {1}', [row.label, row.value]),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

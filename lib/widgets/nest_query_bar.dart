@@ -4,6 +4,7 @@ import '../models/note.dart';
 import '../models/note_query.dart';
 import '../theme/nest_theme.dart';
 import 'note_tile.dart';
+import '../l10n/strings.dart';
 
 /// The filter and sort strip above a list of notes. Requirement 6.2.
 ///
@@ -35,19 +36,18 @@ class NestQueryBar extends StatelessWidget {
   final bool showTypes;
   final bool showStatuses;
 
-  /// Voice is left out until lecture recording is actually built, so the bar
-  /// never offers a filter that can only ever return nothing.
   static const _types = <_TypeChoice>[
     _TypeChoice(NoteType.text, Icons.notes_rounded),
     _TypeChoice(NoteType.image, Icons.photo_rounded),
     _TypeChoice(NoteType.pdf, Icons.picture_as_pdf_rounded),
+    _TypeChoice(NoteType.voice, Icons.mic_rounded),
   ];
 
   @override
   Widget build(BuildContext context) {
     final chips = <Widget>[
       _QueryChip(
-        label: 'Important',
+        label: tr('Important'),
         icon: Icons.star_rounded,
         accent: NestColor.redPen,
         active: query.importantOnly,
@@ -77,14 +77,14 @@ class NestQueryBar extends StatelessWidget {
           ),
       for (final tag in tags)
         _QueryChip(
-          label: '#$tag',
+          label: trp('#{0}', [tag]),
           accent: NestColor.pen,
           active: query.tag != null && normalizeTag(query.tag!) == tag,
           onTap: () => onChanged(query.toggleTag(tag)),
         ),
       if (query.activeFilters > 0)
         _QueryChip(
-          label: 'Clear',
+          label: tr('Clear'),
           icon: Icons.close_rounded,
           accent: NestColor.inkSoft,
           active: false,
@@ -100,12 +100,22 @@ class NestQueryBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
-              itemCount: chips.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 7),
-              itemBuilder: (_, i) => Center(child: chips[i]),
+            // The last chips scroll in from the right. Fading that edge shows
+            // the strip carries on, where a hard cut next to the sort button
+            // looked like a chip that had been cropped by mistake.
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => const LinearGradient(
+                colors: [Colors.black, Colors.black, Colors.transparent],
+                stops: [0, 0.9, 1],
+              ).createShader(rect),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(right: 18),
+                itemCount: chips.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 7),
+                itemBuilder: (_, i) => Center(child: chips[i]),
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -224,7 +234,7 @@ class _SortButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<NoteSort>(
-      tooltip: 'Sort notes',
+      tooltip: tr('Sort notes'),
       initialValue: sort,
       onSelected: onPick,
       color: NestColor.card,
@@ -270,12 +280,12 @@ class _SortButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.swap_vert_rounded,
+            Icon(Icons.swap_vert_rounded,
                 size: 15, color: NestColor.inkSoft),
             const SizedBox(width: 5),
             Text(
               sort.shortLabel,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: NestFont.body,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,

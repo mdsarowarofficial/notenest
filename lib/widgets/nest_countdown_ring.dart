@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/nest_theme.dart';
+import '../l10n/strings.dart';
 
 /// The exam dial: days left in the middle, revision progress around the edge.
 ///
@@ -15,7 +16,7 @@ class NestCountdownRing extends StatelessWidget {
     required this.days,
     required this.progress,
     this.diameter = 96,
-    this.accent = NestColor.pen,
+    this.accent,
   });
 
   /// Whole days until the exam. Negative once it has passed.
@@ -25,7 +26,7 @@ class NestCountdownRing extends StatelessWidget {
   final double progress;
 
   final double diameter;
-  final Color accent;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +34,12 @@ class NestCountdownRing extends StatelessWidget {
 
     final figure = days == 0 ? '' : '${days.abs()}';
     final label = days < 0
-        ? 'AGO'
+        ? tr('AGO')
         : days == 0
-            ? 'TODAY'
+            ? tr('TODAY')
             : days == 1
-                ? 'DAY'
-                : 'DAYS';
+                ? tr('DAY')
+                : tr('DAYS');
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: target),
@@ -48,7 +49,7 @@ class NestCountdownRing extends StatelessWidget {
         width: diameter,
         height: diameter,
         child: CustomPaint(
-          painter: _RingPainter(progress: value, accent: accent),
+          painter: _RingPainter(progress: value, accent: accent ?? NestColor.pen),
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -61,7 +62,7 @@ class NestCountdownRing extends StatelessWidget {
                       fontSize: diameter * 0.32,
                       height: 1,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -1,
+                      letterSpacing: ls(-1),
                       color: NestColor.ink,
                     ),
                   ),

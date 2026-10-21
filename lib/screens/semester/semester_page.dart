@@ -9,6 +9,7 @@ import '../../widgets/nest_empty_state.dart';
 import '../../widgets/nest_mark_tile.dart';
 import '../notes/note_detail.dart';
 import 'degree_sheet.dart';
+import '../../l10n/strings.dart';
 
 /// The degree, term by term: which courses each semester had, and what is
 /// filed under them.
@@ -28,7 +29,7 @@ class SemesterPage extends StatelessWidget {
     final repo = NoteRepository.instance;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Semesters')),
+      appBar: AppBar(title: Text(tr('Semesters'))),
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {
@@ -41,12 +42,12 @@ class SemesterPage extends StatelessWidget {
               padding: const EdgeInsets.all(22),
               child: NestEmptyState(
                 icon: Icons.school_rounded,
-                title: 'Tell the app about your degree',
-                message: 'When it started and how your university divides the '
+                title: tr('Tell the app about your degree'),
+                message: tr('When it started and how your university divides the '
                     'year. After that it works out which semester you are in '
                     'by itself, and every course you add is filed under the '
-                    'term you took it in.',
-                actionLabel: 'Set up my degree',
+                    'term you took it in.'),
+                actionLabel: tr('Set up my degree'),
                 onAction: () => showDegreeSheet(context),
               ),
             );
@@ -110,7 +111,7 @@ class _DegreeCard extends StatelessWidget {
                 child: Text(
                   plan.university?.isNotEmpty == true
                       ? plan.university!
-                      : 'Your degree',
+                      : tr('Your degree'),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -125,7 +126,7 @@ class _DegreeCard extends StatelessWidget {
                 onPressed: () => showDegreeSheet(context),
                 icon: const Icon(Icons.edit_outlined,
                     size: 18, color: Colors.white),
-                tooltip: 'Edit degree dates',
+                tooltip: tr('Edit degree dates'),
               ),
             ],
           ),
@@ -134,13 +135,13 @@ class _DegreeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                current == null ? '—' : '$current',
-                style: const TextStyle(
+                current == null ? '—' : num_(current!),
+                style: TextStyle(
                   fontFamily: NestFont.display,
                   fontSize: 44,
                   fontWeight: FontWeight.w700,
                   height: 0.95,
-                  letterSpacing: -1.4,
+                  letterSpacing: ls(-1.4),
                   color: Colors.white,
                 ),
               ),
@@ -149,9 +150,9 @@ class _DegreeCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 5),
                 child: Text(
                   current == null
-                      ? 'no semester set'
-                      : 'of ${plan.count}\nsemesters',
-                  style: const TextStyle(
+                      ? tr('no semester set')
+                      : trp('of {0}\nsemesters', [plan.count]),
+                  style: TextStyle(
                     fontFamily: NestFont.body,
                     fontSize: 13,
                     height: 1.35,
@@ -165,7 +166,7 @@ class _DegreeCard extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               _span(plan),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: NestFont.body,
                 fontSize: 12,
                 color: NestColor.penPale,
@@ -184,8 +185,7 @@ class _DegreeCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'You set this yourself. By the dates it would be '
-                      'semester $computed.',
+                      trp('You set this yourself. By the dates it would be semester {0}.', [computed]),
                       style: const TextStyle(
                         fontFamily: NestFont.body,
                         fontSize: 12,
@@ -203,7 +203,7 @@ class _DegreeCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       minimumSize: const Size(0, 34),
                     ),
-                    child: const Text('Use the dates'),
+                    child: Text(tr('Use the dates')),
                   ),
                 ],
               ),
@@ -212,7 +212,7 @@ class _DegreeCard extends StatelessWidget {
           if (!plan.isDated) ...[
             const SizedBox(height: 14),
             Text(
-              'No start date yet, so the semester cannot move on its own.',
+              tr('No start date yet, so the semester cannot move on its own.'),
               style: t.bodySmall?.copyWith(color: NestColor.penPale),
             ),
           ],
@@ -227,13 +227,13 @@ class _DegreeCard extends StatelessWidget {
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
       ];
-      return '${names[d.month - 1]} ${d.year}';
+      return localDate('${names[d.month - 1]} ${d.year}');
     }
 
     final from = plan.start;
     final to = plan.end;
     if (from == null) return '';
-    if (to == null) return 'Started ${month(from)}';
+    if (to == null) return trp('Started {0}', [month(from)]);
     return '${month(from)} — ${month(to)}';
   }
 }
@@ -259,14 +259,14 @@ class _LooseCourses extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${courses.length} course${courses.length == 1 ? '' : 's'} with no semester',
+            trp('{0} course{1} with no semester', [courses.length, courses.length == 1 ? '' : 's']),
             style: t.titleSmall,
           ),
           const SizedBox(height: 6),
           Text(
-            'These were added before the app knew about your degree, so it '
+            tr('These were added before the app knew about your degree, so it '
             'does not know which term they belong to. It will not guess — '
-            'put them where they go.',
+            'put them where they go.'),
             style: t.bodySmall,
           ),
           const SizedBox(height: 14),
@@ -284,7 +284,7 @@ class _LooseCourses extends StatelessWidget {
                   ),
                   child: Text(
                     c.code,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: NestFont.body,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -304,13 +304,12 @@ class _LooseCourses extends StatelessWidget {
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Filed $moved course${moved == 1 ? '' : 's'} under '
-                      'semester $into.',
+                      trp('Filed {0} course{1} under semester {2}.', [moved, moved == 1 ? '' : 's', into]),
                     ),
                   ),
                 );
               },
-              child: Text('File them all under semester $into'),
+              child: Text(trp('File them all under semester {0}', [into])),
             ),
           ],
         ],
@@ -353,7 +352,7 @@ class _SemesterBlock extends StatelessWidget {
           childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
           title: Row(
             children: [
-              Text(semesterLabelFor(number), style: t.titleMedium),
+              Text(shownSemester(semesterLabelFor(number)), style: t.titleMedium),
               if (isCurrent) ...[
                 const SizedBox(width: 9),
                 Container(
@@ -363,13 +362,13 @@ class _SemesterBlock extends StatelessWidget {
                     color: NestColor.tintPen,
                     borderRadius: BorderRadius.circular(NestRadius.pill),
                   ),
-                  child: const Text(
-                    'NOW',
+                  child: Text(
+                    tr('NOW'),
                     style: TextStyle(
                       fontFamily: NestFont.body,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
+                      letterSpacing: ls(0.6),
                       color: NestColor.penDeep,
                     ),
                   ),
@@ -381,10 +380,9 @@ class _SemesterBlock extends StatelessWidget {
             padding: const EdgeInsets.only(top: 3),
             child: Text(
               courses.isEmpty
-                  ? 'No courses yet'
-                  : '${courses.length} course${courses.length == 1 ? '' : 's'} · '
-                      '$notes note${notes == 1 ? '' : 's'}',
-              style: const TextStyle(
+                  ? tr('No courses yet')
+                  : trp('{0} course{1} · {2} note{3}', [courses.length, courses.length == 1 ? '' : 's', notes, notes == 1 ? '' : 's']),
+              style: TextStyle(
                 fontFamily: NestFont.body,
                 fontSize: 12,
                 color: NestColor.inkMeta,
@@ -396,7 +394,7 @@ class _SemesterBlock extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Add a subject and it will be filed here.',
+                  tr('Add a subject and it will be filed here.'),
                   style: t.bodySmall,
                 ),
               )
@@ -433,9 +431,8 @@ class _CourseRow extends StatelessWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         subtitle: Text(
-          '${course.code} · ${notes.length} note${notes.length == 1 ? '' : 's'}'
-          '${course.archived ? ' · archived' : ''}',
-          style: const TextStyle(
+          trp('{0} · {1} note{2}{3}', [course.code, notes.length, notes.length == 1 ? '' : 's', course.archived ? tr(' · archived') : '']),
+          style: TextStyle(
             fontFamily: NestFont.body,
             fontSize: 11.5,
             color: NestColor.inkMeta,
@@ -446,7 +443,7 @@ class _CourseRow extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Nothing filed under this course.',
+                tr('Nothing filed under this course.'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             )
@@ -473,11 +470,11 @@ class _CourseRow extends StatelessWidget {
                       Expanded(
                         child: Text(
                           note.title.trim().isEmpty
-                              ? 'Untitled note'
+                              ? tr('Untitled note')
                               : note.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: NestFont.body,
                             fontSize: 13,
                             color: NestColor.ink,

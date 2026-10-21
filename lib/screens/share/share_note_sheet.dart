@@ -7,6 +7,7 @@ import '../../models/note.dart';
 import '../../models/note_bundle.dart';
 import '../../theme/nest_theme.dart';
 import 'cloud_send_sheet.dart';
+import '../../l10n/strings.dart';
 
 /// Hands one note over to a classmate. Requirement 9.1.
 ///
@@ -101,8 +102,8 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
       if (!mounted) return;
       setState(() {
         _working = false;
-        _error = 'The note could not be prepared for sharing. Try again, or '
-            'share it without its files.';
+        _error = tr('The note could not be prepared for sharing. Try again, or '
+            'share it without its files.');
       });
     }
   }
@@ -140,37 +141,34 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Share this note',
+                tr('Share this note'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 6),
               Text(
                 subject == null
-                    ? 'It will arrive without a subject.'
-                    : 'It will arrive under ${subject.code} — '
-                        '${subject.name}.',
+                    ? tr('It will arrive without a subject.')
+                    : trp('It will arrive under {0} — {1}.', [subject.code, subject.name]),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 18),
               if (_fileCount > 0)
                 _Toggle(
-                  title: 'Send the $_fileCount '
-                      '${_fileCount == 1 ? 'file' : 'files'} too',
+                  title: trp('Send the {0} {1} too', [_fileCount, _fileCount == 1 ? tr('file') : tr('files')]),
                   subtitle: _withFiles
-                      ? 'Photos and PDFs travel inside the note, so it arrives '
-                          'complete. Adds ${readableBytes(_fileBytes)}.'
-                      : 'Only the text is sent. Much smaller, but the photos '
-                          'and PDFs will be missing.',
+                      ? trp('Photos and PDFs travel inside the note, so it arrives complete. Adds {0}.', [readableBytes(_fileBytes)])
+                      : tr('Only the text is sent. Much smaller, but the photos '
+                          'and PDFs will be missing.'),
                   value: _withFiles,
                   onChanged: (v) => setState(() => _withFiles = v),
                 )
               else
                 Text(
-                  'This note has no files attached, so only its text is sent.',
+                  tr('This note has no files attached, so only its text is sent.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               const SizedBox(height: 18),
-              const Text('WHAT YOU ARE ASKING FOR', style: nestEyebrow),
+              Text(tr('WHAT YOU ARE ASKING FOR'), style: nestEyebrow),
               const SizedBox(height: 8),
               for (final policy in SharePolicy.values)
                 Padding(
@@ -185,9 +183,9 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
               // Said once, plainly. A label that looks like a lock but is not
               // one is worse than no label at all.
               Text(
-                'NoteNest cannot enforce this. Once the file is sent, the copy '
+                tr('NoteNest cannot enforce this. Once the file is sent, the copy '
                 'belongs to whoever has it — this travels with the note as a '
-                'request, the way you would ask in person.',
+                'request, the way you would ask in person.'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_error != null) ...[
@@ -197,7 +195,7 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                   decoration: BoxDecoration(
                     color: NestColor.o(NestColor.redPen, 0.08),
                     borderRadius: BorderRadius.circular(NestRadius.tile),
-                    border: const Border(
+                    border: Border(
                       left: BorderSide(color: NestColor.redPen, width: 3),
                     ),
                   ),
@@ -215,10 +213,10 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                   icon: const Icon(Icons.ios_share_rounded, size: 18),
                   label: Text(
                     _working
-                        ? 'Preparing…'
+                        ? tr('Preparing…')
                         : _preview == null
-                            ? 'Measuring…'
-                            : 'Send as a file  ·  ${readableBytes(total)}',
+                            ? tr('Measuring…')
+                            : trp('Send as a file  ·  {0}', [readableBytes(total)]),
                   ),
                 ),
               ),
@@ -240,14 +238,14 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                             showCloudSendSheet(context, widget.note);
                           },
                     icon: const Icon(Icons.send_rounded, size: 18),
-                    label: const Text('Send inside NoteNest'),
+                    label: Text(tr('Send inside NoteNest')),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Straight to a classmate or a whole group, with an Accept '
+                  tr('Straight to a classmate or a whole group, with an Accept '
                   'step at their end. Large files may not fit this way — it '
-                  'will say so before sending.',
+                  'will say so before sending.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

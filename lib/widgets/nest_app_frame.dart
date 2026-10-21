@@ -40,9 +40,9 @@ class NestAppFrame extends StatelessWidget {
         child: SizedBox(
           width: maxWidth,
           child: DecoratedBox(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: NestColor.ground,
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                   color: Color(0x1A1B1E2B),
                   blurRadius: 40,

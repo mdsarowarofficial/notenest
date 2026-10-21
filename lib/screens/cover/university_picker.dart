@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/university_directory.dart';
 import '../../models/university.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Picks an institution from the list that ships with the app.
 ///
@@ -85,7 +86,7 @@ class _UniversityPickerState extends State<_UniversityPicker> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Find your university',
+                      tr('Find your university'),
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 10),
@@ -95,7 +96,7 @@ class _UniversityPickerState extends State<_UniversityPicker> {
                       textCapitalization: TextCapitalization.words,
                       style: const TextStyle(fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Type a name — "daffodil", "city"…',
+                        hintText: tr('Type a name — "daffodil", "city"…'),
                         prefixIcon: const Icon(Icons.search_rounded, size: 20),
                         filled: true,
                         fillColor: NestColor.paper,
@@ -167,14 +168,14 @@ class _NotListed extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Not in the list',
+            tr('Not in the list'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'The list holds about ten thousand institutions, but it is not '
+            tr('The list holds about ten thousand institutions, but it is not '
             'every one, and new ones open each year. Close this and type the '
-            'name into the field — it works exactly the same on the page.',
+            'name into the field — it works exactly the same on the page.'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           if (query.trim().isNotEmpty) ...[
@@ -184,7 +185,7 @@ class _NotListed extends StatelessWidget {
                 context,
                 University(name: query.trim(), countryCode: ''),
               ),
-              child: Text('Use "${query.trim()}"'),
+              child: Text(trp('Use "{0}"', [query.trim()])),
             ),
           ],
         ],

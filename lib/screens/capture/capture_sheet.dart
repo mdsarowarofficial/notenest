@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/attachment_store.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// The ways a note can start. Requirement 5 and Requirement 8.
 ///
@@ -39,37 +40,37 @@ class _CaptureSheet extends StatelessWidget {
     final filesWork = AttachmentStore.isSupported;
 
     final options = <_CaptureOption>[
-      const _CaptureOption(
+      _CaptureOption(
         CaptureKind.text,
-        'Write a note',
-        'Start with a blank page',
+        tr('Write a note'),
+        tr('Start with a blank page'),
         Icons.edit_rounded,
       ),
       _CaptureOption(
         CaptureKind.photo,
-        'Photograph handwriting',
-        'Crop and straighten a page',
+        tr('Photograph handwriting'),
+        tr('Crop and straighten a page'),
         Icons.photo_camera_rounded,
         badge: filesWork ? null : 'PHONE',
       ),
       _CaptureOption(
         CaptureKind.pdf,
-        'Add a PDF',
-        'Slides, books, question papers',
+        tr('Add a PDF'),
+        tr('Slides, books, question papers'),
         Icons.picture_as_pdf_rounded,
         badge: filesWork ? null : 'PHONE',
       ),
       _CaptureOption(
         CaptureKind.record,
-        'Record the lecture',
-        'Keeps the audio to play back later',
+        tr('Record the lecture'),
+        tr('Keeps the audio to play back later'),
         Icons.mic_rounded,
         badge: filesWork ? null : 'PHONE',
       ),
-      const _CaptureOption(
+      _CaptureOption(
         CaptureKind.dictate,
-        'Dictate into text',
-        'Speak and it becomes a study note',
+        tr('Dictate into text'),
+        tr('Speak and it becomes a study note'),
         Icons.graphic_eq_rounded,
       ),
     ];
@@ -99,7 +100,7 @@ class _CaptureSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'Add to your notebook',
+              tr('Add to your notebook'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 18),
@@ -170,7 +171,7 @@ class _CaptureSheet extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded,
+                        Icon(Icons.chevron_right_rounded,
                             color: NestColor.inkFaint),
                       ],
                     ),

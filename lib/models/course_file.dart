@@ -6,6 +6,7 @@
 library;
 
 import 'dart:typed_data';
+import '../l10n/strings.dart';
 
 const maxCourseFileBytes = 25 * 1024 * 1024;
 
@@ -35,12 +36,12 @@ bool _startsWith(Uint8List b, List<int> magic) {
 String? checkCourseFile(String name, Uint8List bytes) {
   final ext = extensionOf(name);
   if (!courseFileExtensions.contains(ext)) {
-    return 'This type of file is not supported. Use PDF, Word, PowerPoint, '
-        'Excel, text or an image.';
+    return tr('This type of file is not supported. Use PDF, Word, PowerPoint, '
+        'Excel, text or an image.');
   }
-  if (bytes.isEmpty) return 'That file is empty.';
+  if (bytes.isEmpty) return tr('That file is empty.');
   if (bytes.length > maxCourseFileBytes) {
-    return 'That file is larger than 25 MB.';
+    return tr('That file is larger than 25 MB.');
   }
   final ok = switch (ext) {
     'pdf' => _startsWith(bytes, [0x25, 0x50, 0x44, 0x46]), // %PDF

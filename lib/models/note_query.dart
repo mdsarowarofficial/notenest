@@ -1,4 +1,5 @@
 import 'note.dart';
+import '../l10n/strings.dart';
 
 /// How a list of notes is ordered. Requirement 6.2.
 enum NoteSort { newest, oldest, titleAZ, recentlyOpened }
@@ -7,13 +8,13 @@ extension NoteSortData on NoteSort {
   String get label {
     switch (this) {
       case NoteSort.newest:
-        return 'Newest first';
+        return tr('Newest first');
       case NoteSort.oldest:
-        return 'Oldest first';
+        return tr('Oldest first');
       case NoteSort.titleAZ:
-        return 'Title A–Z';
+        return tr('Title A–Z');
       case NoteSort.recentlyOpened:
-        return 'Recently opened';
+        return tr('Recently opened');
     }
   }
 
@@ -21,13 +22,13 @@ extension NoteSortData on NoteSort {
   String get shortLabel {
     switch (this) {
       case NoteSort.newest:
-        return 'Newest';
+        return tr('Newest');
       case NoteSort.oldest:
-        return 'Oldest';
+        return tr('Oldest');
       case NoteSort.titleAZ:
         return 'A–Z';
       case NoteSort.recentlyOpened:
-        return 'Opened';
+        return tr('Opened');
     }
   }
 

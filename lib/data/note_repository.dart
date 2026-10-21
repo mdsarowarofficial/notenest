@@ -19,6 +19,11 @@ import 'attachment_store.dart';
 import 'brand_store.dart';
 import 'auth_repository.dart';
 import 'drive_service.dart';
+import '../l10n/strings.dart';
+import '../models/review_schedule.dart';
+import '../models/study_session.dart';
+import 'pdf_index.dart';
+import 'dart:async';
 
 /// SQLite treats `%` and `_` inside LIKE as wildcards, so a student searching
 /// for "50%" would otherwise match every note. Each needle escapes them with a
@@ -199,7 +204,10 @@ class NoteRepository extends ChangeNotifier {
     await _reloadExams();
     await _reloadTasks();
     await _reloadDayPlan();
+    await _reloadSessions();
     notifyListeners();
+    // PDFs added before this existed, or restored from a backup, get read now.
+    unawaited(PdfIndex.indexPending(_db.db));
   }
 
   /// Clears in-memory state on sign out.
@@ -209,6 +217,7 @@ class NoteRepository extends ChangeNotifier {
     _notes = const [];
     _exams = const [];
     _tasks = const [];
+    _sessions = const [];
     _goals = const [];
     _dayLogs = const {};
     _hiddenChats = const {};
@@ -708,9 +717,18 @@ class NoteRepository extends ChangeNotifier {
 
   int get importantCount => _notes.where((n) => n.important).length;
 
+  /// Every note column, plus how long its recordings run. A subquery rather
+  /// than a join, so a note with two recordings is still one row.
+  static const _noteColumns = [
+    '*',
+    '(SELECT SUM(duration_ms) FROM attachments '
+        "WHERE note_id = notes.id AND type = 'audio') AS audio_ms",
+  ];
+
   Future<void> _reloadNotes() async {
     final rows = await _db.db.query(
       'notes',
+      columns: _noteColumns,
       where: 'user_id = ? AND deleted_at IS NULL',
       whereArgs: [_auth.requireUserId],
       orderBy: 'updated_at DESC',
@@ -756,8 +774,71 @@ class NoteRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setStatus(Note note, StudyStatus status) =>
-      updateNote(note.copyWith(status: status));
+  /// Changes a note's study status and keeps its review schedule in step:
+  /// Read comes round again in two days, Review straight away (it is the
+  /// student saying "I need to look at this again"), Mastered only after a
+  /// long gap, and New is not scheduled at all.
+  Future<void> setStatus(Note note, StudyStatus status) {
+    final now = DateTime.now();
+    switch (status) {
+      case StudyStatus.newNote:
+        return updateNote(
+          note.copyWith(status: status, clearReview: true, reviewStep: 0),
+        );
+      case StudyStatus.read:
+        return updateNote(note.copyWith(
+          status: status,
+          nextReviewAt: note.nextReviewAt ?? dueDay(now, 2),
+        ));
+      case StudyStatus.review:
+        final soon = dueDay(now, 0);
+        final at = note.nextReviewAt;
+        return updateNote(note.copyWith(
+          status: status,
+          reviewStep: note.status == StudyStatus.mastered ? 0 : note.reviewStep,
+          nextReviewAt: (at == null || at.isAfter(soon)) ? soon : at,
+        ));
+      case StudyStatus.mastered:
+        return updateNote(note.copyWith(
+          status: status,
+          reviewStep: masteredStep,
+          nextReviewAt: dueDay(now, masteredGap),
+        ));
+    }
+  }
+
+  /// Notes due to be looked at again on [at] (now, by default): scheduled, not
+  /// in Trash, and not later than that. Starred ones first, then the longest
+  /// overdue.
+  List<Note> dueForReview([DateTime? at]) {
+    final now = at ?? DateTime.now();
+    final due = _notes.where((n) => isDue(n.nextReviewAt, now)).toList()
+      ..sort((a, b) {
+        if (a.important != b.important) return a.important ? -1 : 1;
+        return a.nextReviewAt!.compareTo(b.nextReviewAt!);
+      });
+    return due;
+  }
+
+  int get dueCount => dueForReview().length;
+
+  /// Records how well a note was remembered, and schedules the next look.
+  Future<ReviewResult> recordRecall(Note note, Recall recall) async {
+    final result = applyRecall(note.reviewStep, DateTime.now(), recall);
+    final status = recall == Recall.good
+        ? (result.mastered
+            ? StudyStatus.mastered
+            : (note.status == StudyStatus.newNote
+                ? StudyStatus.read
+                : note.status))
+        : StudyStatus.review;
+    await updateNote(note.copyWith(
+      status: status,
+      reviewStep: result.step,
+      nextReviewAt: result.nextAt,
+    ));
+    return result;
+  }
 
   Future<void> toggleImportant(Note note) =>
       updateNote(note.copyWith(important: !note.important));
@@ -791,6 +872,30 @@ class NoteRepository extends ChangeNotifier {
   /// Free text is split into words and each word must appear in the title, the
   /// body, the topic or the tags, so the order the student types them in does
   /// not matter.
+  /// For search results: the notes among [noteIds] that matched only through
+  /// a PDF, each with a short stretch of the PDF around the match, so the
+  /// student can see why it came back.
+  Future<Map<int, String>> pdfSnippets(
+    List<int> noteIds,
+    List<String> terms,
+  ) async {
+    if (noteIds.isEmpty || terms.isEmpty) return const {};
+    final marks = List.filled(noteIds.length, '?').join(',');
+    final rows = await _db.db.rawQuery(
+      'SELECT note_id, file_name, extracted_text FROM attachments '
+      "WHERE note_id IN ($marks) AND IFNULL(extracted_text, '') <> ''",
+      noteIds,
+    );
+    final out = <int, String>{};
+    for (final r in rows) {
+      final noteId = r['note_id'] as int;
+      if (out.containsKey(noteId)) continue;
+      final snippet = pdfSnippet(r['extracted_text'] as String, terms);
+      if (snippet != null) out[noteId] = '${r['file_name']}: $snippet';
+    }
+    return out;
+  }
+
   Future<List<Note>> searchNotes(NoteQuery query, {int limit = 300}) async {
     if (!_auth.isSignedIn) return const [];
 
@@ -824,14 +929,18 @@ class NoteRepository extends ChangeNotifier {
         '(title LIKE ? $_likeEscape '
         'OR body LIKE ? $_likeEscape '
         "OR IFNULL(topic, '') LIKE ? $_likeEscape "
-        'OR tags LIKE ? $_likeEscape)',
+        'OR tags LIKE ? $_likeEscape '
+        // ...or the words inside one of its PDFs.
+        'OR id IN (SELECT note_id FROM attachments '
+        "WHERE IFNULL(extracted_text, '') LIKE ? $_likeEscape))",
       );
       final needle = '%${_escapeLike(term)}%';
-      args.addAll([needle, needle, needle, needle]);
+      args.addAll([needle, needle, needle, needle, needle]);
     }
 
     final rows = await _db.db.query(
       'notes',
+      columns: _noteColumns,
       where: where.join(' AND '),
       whereArgs: args,
       orderBy: query.sort.orderBy,
@@ -1140,6 +1249,10 @@ class NoteRepository extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
     final id = await _db.db.insert('attachments', attachment.toMap());
+    // Read the words out of a PDF in the background so it can be searched.
+    if (type == AttachmentType.pdf) {
+      unawaited(PdfIndex.indexOne(_db.db, id, storedName));
+    }
 
     // A note takes the kind of its first attachment, so lists can show what
     // the material actually is.
@@ -1193,6 +1306,7 @@ class NoteRepository extends ChangeNotifier {
   Future<List<Note>> trashedNotes() async {
     final rows = await _db.db.query(
       'notes',
+      columns: _noteColumns,
       where: 'user_id = ? AND deleted_at IS NOT NULL',
       whereArgs: [_auth.requireUserId],
       orderBy: 'deleted_at DESC',
@@ -1401,6 +1515,45 @@ class NoteRepository extends ChangeNotifier {
 
   List<Task> get tasksDueToday =>
       _tasks.where((t) => t.isDueToday() && !t.isOverdue()).toList();
+
+  // ------------------------------------------------------- study sessions
+
+  List<StudySession> _sessions = const [];
+
+  List<StudySession> studySessions() => List.unmodifiable(_sessions);
+
+  Future<void> _reloadSessions() async {
+    final rows = await _db.db.query(
+      'study_sessions',
+      where: 'user_id = ?',
+      whereArgs: [_auth.requireUserId],
+      orderBy: 'started_at DESC',
+    );
+    _sessions = rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Records a finished sitting of the study timer.
+  Future<void> addStudySession({
+    required DateTime startedAt,
+    required int minutes,
+    int? subjectId,
+  }) async {
+    if (minutes < 1) return;
+    await _db.db.insert(
+      'study_sessions',
+      StudySession(
+        userId: _auth.requireUserId,
+        subjectId: subjectId,
+        startedAt: startedAt,
+        minutes: minutes,
+      ).toMap(),
+    );
+    await _reloadSessions();
+    notifyListeners();
+  }
+
+  int get studiedToday => minutesOn(_sessions, DateTime.now());
+  int get studyStreakDays => studyStreak(_sessions, DateTime.now());
 
   Future<void> _reloadTasks() async {
     final rows = await _db.db.query(
@@ -1726,30 +1879,35 @@ class NoteRepository extends ChangeNotifier {
   /// They are four views of one subject — other people — so they are now four
   /// things you can reach from the People tab, one tap away on the bar you can
   /// already see, instead of behind a hamburger you have to know to open.
-  List<NestDrawerLink> drawerLinks() => const [
+  List<NestDrawerLink> drawerLinks() => [
         NestDrawerLink(
           id: 'cloud',
-          label: 'Cloud account',
+          label: tr('Cloud account'),
           icon: Icons.cloud_queue_rounded,
         ),
         NestDrawerLink(
           id: 'cover',
-          label: 'Cover page',
+          label: tr('Cover page'),
           icon: Icons.description_outlined,
         ),
         NestDrawerLink(
+          id: 'timer',
+          label: tr('Study timer'),
+          icon: Icons.timer_outlined,
+        ),
+        NestDrawerLink(
           id: 'convert',
-          label: 'Convert a file',
+          label: tr('Convert a file'),
           icon: Icons.swap_horiz_rounded,
         ),
         NestDrawerLink(
           id: 'semesters',
-          label: 'Semesters',
+          label: tr('Semesters'),
           icon: Icons.school_outlined,
         ),
         NestDrawerLink(
           id: 'trash',
-          label: 'Trash',
+          label: tr('Trash'),
           icon: Icons.delete_outline_rounded,
         ),
       ];
@@ -1781,5 +1939,5 @@ String todayLabel([DateTime? date]) {
     'NOVEMBER',
     'DECEMBER',
   ];
-  return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}';
+  return localDate('${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}');
 }

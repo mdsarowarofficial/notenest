@@ -268,6 +268,24 @@ async function openDm(db) {
     { kind: 'direct', memberUids: ['alice', 'bob'] }, { merge: true });
 }
 
+test('pushTokens: private to their owner, and held to the two fields', async () => {
+  const a = as('alice', 'alice@uni.edu');
+  await assertSucceeds(setDoc(doc(a, 'pushTokens/alice'),
+    { tokens: ['t1'], updatedAt: now() }));
+  await assertSucceeds(getDoc(doc(a, 'pushTokens/alice')));
+  const b = as('bob', 'bob@uni.edu');
+  await assertFails(getDoc(doc(b, 'pushTokens/alice')));
+  await assertFails(setDoc(doc(b, 'pushTokens/alice'),
+    { tokens: ['x'], updatedAt: now() }));
+  await assertFails(setDoc(doc(a, 'pushTokens/alice'),
+    { tokens: ['t1'], updatedAt: now(), extra: 1 }));
+  await assertFails(setDoc(doc(a, 'pushTokens/alice'),
+    { tokens: ['1', '2', '3', '4', '5', '6'], updatedAt: now() }));
+  await assertFails(setDoc(doc(a, 'pushTokens/alice'),
+    { tokens: 'not-a-list', updatedAt: now() }));
+  await assertSucceeds(deleteDoc(doc(a, 'pushTokens/alice')));
+});
+
 test('blocks: private to their owner', async () => {
   const a = as('alice', 'alice@uni.edu');
   await assertSucceeds(setDoc(doc(a, 'blocks/alice'),

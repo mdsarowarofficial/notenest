@@ -1,3 +1,4 @@
+import '../l10n/strings.dart';
 /// Where a note sits in the revision cycle. Exam Mode orders notes by this.
 enum StudyStatus { newNote, read, review, mastered }
 
@@ -5,13 +6,13 @@ extension StudyStatusData on StudyStatus {
   String get label {
     switch (this) {
       case StudyStatus.newNote:
-        return 'New';
+        return tr('New');
       case StudyStatus.read:
-        return 'Read';
+        return tr('Read');
       case StudyStatus.review:
-        return 'Review';
+        return tr('Review');
       case StudyStatus.mastered:
-        return 'Mastered';
+        return tr('Mastered');
     }
   }
 
@@ -55,13 +56,13 @@ extension NoteTypeData on NoteType {
   String get label {
     switch (this) {
       case NoteType.text:
-        return 'Written';
+        return tr('Written');
       case NoteType.image:
-        return 'Photo';
+        return tr('Photo');
       case NoteType.pdf:
         return 'PDF';
       case NoteType.voice:
-        return 'Voice';
+        return tr('Voice');
     }
   }
 
@@ -94,18 +95,18 @@ extension SharePolicyData on SharePolicy {
   String get label {
     switch (this) {
       case SharePolicy.open:
-        return 'Free to edit and pass on';
+        return tr('Free to edit and pass on');
       case SharePolicy.reference:
-        return 'Please keep as reference';
+        return tr('Please keep as reference');
     }
   }
 
   String get shortLabel {
     switch (this) {
       case SharePolicy.open:
-        return 'OPEN';
+        return tr('OPEN');
       case SharePolicy.reference:
-        return 'REFERENCE';
+        return tr('REFERENCE');
     }
   }
 
@@ -133,6 +134,9 @@ class Note {
     this.sharedBy,
     this.sharedAt,
     this.sharePolicy,
+    this.audioMs = 0,
+    this.nextReviewAt,
+    this.reviewStep = 0,
   });
 
   final int? id;
@@ -167,6 +171,17 @@ class Note {
   /// What the sender asked for. Null for the student's own notes.
   final SharePolicy? sharePolicy;
 
+  /// When the note is next due to be looked at again, or null if it is not
+  /// scheduled. See review_schedule.dart.
+  final DateTime? nextReviewAt;
+
+  /// How many times in a row the note has been remembered.
+  final int reviewStep;
+
+  /// Total length of the recordings attached, in milliseconds. Worked out by
+  /// the query that loads the note, not stored on it.
+  final int audioMs;
+
   bool get isDeleted => deletedAt != null;
 
   bool get isShared => sharedBy != null && sharedBy!.isNotEmpty;
@@ -191,6 +206,9 @@ class Note {
     String? sharedBy,
     DateTime? sharedAt,
     SharePolicy? sharePolicy,
+    DateTime? nextReviewAt,
+    bool clearReview = false,
+    int? reviewStep,
   }) =>
       Note(
         id: id ?? this.id,
@@ -210,15 +228,35 @@ class Note {
         sharedBy: sharedBy ?? this.sharedBy,
         sharedAt: sharedAt ?? this.sharedAt,
         sharePolicy: sharePolicy ?? this.sharePolicy,
+        audioMs: audioMs,
+        nextReviewAt: clearReview ? null : (nextReviewAt ?? this.nextReviewAt),
+        reviewStep: reviewStep ?? this.reviewStep,
       );
+
+  /// Android reads a database row through a 2 MB window and the whole notebook
+  /// is loaded at launch, so one enormous note would make every launch fail.
+  /// 200,000 characters is about a hundred pages of typing and stays under
+  /// 1 MB even when every character is Bangla or an emoji.
+  static const maxBody = 200000;
+  static const maxTitle = 300;
+  static const maxTopic = 200;
+
+  static String _clip(String s, int max) {
+    if (s.length <= max) return s;
+    var end = max;
+    // Do not cut an emoji in half.
+    final last = s.codeUnitAt(end - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) end--;
+    return s.substring(0, end);
+  }
 
   Map<String, Object?> toMap() => {
         if (id != null) 'id': id,
         'user_id': userId,
         'subject_id': subjectId,
-        'topic': topic,
-        'title': title,
-        'body': body,
+        'topic': topic == null ? null : _clip(topic!, maxTopic),
+        'title': _clip(title, maxTitle),
+        'body': _clip(body, maxBody),
         'tags': tags.join(','),
         'type': type.key,
         'important': important ? 1 : 0,
@@ -230,6 +268,8 @@ class Note {
         'shared_by': sharedBy,
         'shared_at': sharedAt?.millisecondsSinceEpoch,
         'share_policy': sharePolicy?.key,
+        'next_review_at': nextReviewAt?.millisecondsSinceEpoch,
+        'review_step': reviewStep,
       };
 
   factory Note.fromMap(Map<String, Object?> m) {
@@ -262,6 +302,11 @@ class Note {
           : DateTime.fromMillisecondsSinceEpoch(m['shared_at'] as int),
       sharePolicy:
           policy == null ? null : SharePolicyData.fromKey(policy),
+      audioMs: (m['audio_ms'] as num?)?.toInt() ?? 0,
+      nextReviewAt: m['next_review_at'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(m['next_review_at'] as int),
+      reviewStep: (m['review_step'] as int?) ?? 0,
     );
   }
 }
@@ -273,16 +318,16 @@ String relativeDay(DateTime when) {
   final that = DateTime(when.year, when.month, when.day);
   final days = today.difference(that).inDays;
 
-  if (days <= 0) return 'Today';
-  if (days == 1) return 'Yesterday';
-  if (days < 7) return '$days days ago';
+  if (days <= 0) return tr('Today');
+  if (days == 1) return tr('Yesterday');
+  if (days < 7) return trp('{0} days ago', [days]);
   if (days < 30) {
     final weeks = (days / 7).floor();
-    return weeks == 1 ? 'Last week' : '$weeks weeks ago';
+    return weeks == 1 ? tr('Last week') : trp('{0} weeks ago', [weeks]);
   }
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
-  return '${when.day} ${months[when.month - 1]}';
+  return localDate('${when.day} ${months[when.month - 1]}');
 }

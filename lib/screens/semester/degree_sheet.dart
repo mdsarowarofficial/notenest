@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/note_repository.dart';
 import '../../models/semester.dart';
 import '../../theme/nest_theme.dart';
+import '../../l10n/strings.dart';
 
 /// Where the degree is, when it runs, and how the year is divided.
 ///
@@ -59,7 +60,7 @@ class _DegreeSheetState extends State<_DegreeSheet> {
       // ahead, narrow enough that a mis-tap cannot land in 1800.
       firstDate: DateTime(now.year - 15),
       lastDate: DateTime(now.year + 15),
-      helpText: isStart ? 'When did your degree start?' : 'When should it end?',
+      helpText: isStart ? tr('When did your degree start?') : tr('When should it end?'),
     );
     if (picked == null) return;
     setState(() {
@@ -108,12 +109,12 @@ class _DegreeSheetState extends State<_DegreeSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your degree', style: t.headlineSmall),
+            Text(tr('Your degree'), style: t.headlineSmall),
             const SizedBox(height: 6),
             Text(
-              'Once the app knows when your degree runs it keeps the semester '
+              tr('Once the app knows when your degree runs it keeps the semester '
               'current by itself, and files each course under the term you '
-              'took it in.',
+              'took it in.'),
               style: t.bodySmall,
             ),
             const SizedBox(height: 20),
@@ -121,14 +122,14 @@ class _DegreeSheetState extends State<_DegreeSheet> {
             TextField(
               controller: _university,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'University',
+              decoration: InputDecoration(
+                labelText: tr('University'),
                 hintText: 'City University',
               ),
             ),
             const SizedBox(height: 16),
 
-            const Text('HOW THE YEAR IS DIVIDED', style: nestEyebrow),
+            Text(tr('HOW THE YEAR IS DIVIDED'), style: nestEyebrow),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -170,16 +171,16 @@ class _DegreeSheetState extends State<_DegreeSheet> {
             const SizedBox(height: 20),
 
             _DateRow(
-              label: 'Started',
+              label: tr('Started'),
               value: _start,
-              hint: 'Required',
+              hint: tr('Required'),
               onTap: () => _pick(isStart: true),
             ),
             const SizedBox(height: 10),
             _DateRow(
-              label: 'Expected finish',
+              label: tr('Expected finish'),
               value: _end,
-              hint: 'Optional',
+              hint: tr('Optional'),
               onTap: () => _pick(isStart: false),
               onClear: _end == null ? null : () => setState(() => _end = null),
             ),
@@ -195,10 +196,8 @@ class _DegreeSheetState extends State<_DegreeSheet> {
                   borderRadius: BorderRadius.circular(NestRadius.tile),
                 ),
                 child: Text(
-                  'By these dates you are in semester $wouldBe of '
-                  '${plan.count}, and each one runs about '
-                  '${(plan.semesterLengthDays / 30.44).round()} months.',
-                  style: const TextStyle(
+                  trp('By these dates you are in semester {0} of {1}, and each one runs about {2} months.', [wouldBe, plan.count, (plan.semesterLengthDays / 30.44).round()]),
+                  style: TextStyle(
                     fontFamily: NestFont.body,
                     fontSize: 13,
                     height: 1.45,
@@ -221,7 +220,7 @@ class _DegreeSheetState extends State<_DegreeSheet> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: _save,
-                child: const Text('Save'),
+                child: Text(tr('Save')),
               ),
             ),
           ],
@@ -255,7 +254,7 @@ class _DateRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final shown = value == null
         ? hint
-        : '${_months[value!.month - 1]} ${value!.year}';
+        : localDate('${_months[value!.month - 1]} ${value!.year}');
 
     return Material(
       color: NestColor.paper,
@@ -269,7 +268,7 @@ class _DateRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: NestFont.body,
                   fontSize: 13.5,
                   color: NestColor.inkSoft,
@@ -290,12 +289,12 @@ class _DateRow extends StatelessWidget {
                 IconButton(
                   onPressed: onClear,
                   icon: const Icon(Icons.close_rounded, size: 17),
-                  tooltip: 'Clear',
+                  tooltip: tr('Clear'),
                   color: NestColor.inkFaint,
                 )
               else
-                const Padding(
-                  padding: EdgeInsets.only(left: 8, right: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 6),
                   child: Icon(Icons.chevron_right_rounded,
                       size: 18, color: NestColor.inkFaint),
                 ),

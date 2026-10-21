@@ -11,6 +11,7 @@ import '../setup/setup_flow.dart';
 import '../shell/home_shell.dart';
 import 'google_sign_in_button.dart';
 import 'register_page.dart';
+import '../../l10n/strings.dart';
 
 /// Sign in to an account stored on this device. Requirement 2.
 ///
@@ -104,18 +105,18 @@ class _LoginPageState extends State<LoginPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Forgot your password'),
+        title: Text(tr('Forgot your password')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               cloudReady
-                  ? 'We will email you a link to set a new one. Sign in here '
+                  ? tr('We will email you a link to set a new one. Sign in here '
                       'with the new password afterwards and this device will '
-                      'catch up on its own.'
-                  : 'The cloud is not available right now, so no email can be '
-                      'sent. Check your connection and try again.',
+                      'catch up on its own.')
+                  : tr('The cloud is not available right now, so no email can be '
+                      'sent. Check your connection and try again.'),
               style: Theme.of(dialogContext).textTheme.bodySmall,
             ),
             const SizedBox(height: 14),
@@ -124,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
               autofocus: true,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
-              decoration: const InputDecoration(labelText: 'Your email'),
+              decoration: InputDecoration(labelText: tr('Your email')),
             ),
             const SizedBox(height: 14),
             Text(
@@ -139,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             onPressed: !cloudReady
@@ -151,12 +152,12 @@ class _LoginPageState extends State<LoginPage> {
                       await CloudService.instance
                           .sendPasswordReset(controller.text);
                       messenger.showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text(
-                            'If that address has a cloud account, a reset '
-                            'link is on its way. Check spam as well.',
+                            tr('If that address has a cloud account, a reset '
+                            'link is on its way. Check spam as well.'),
                           ),
-                          duration: Duration(seconds: 6),
+                          duration: const Duration(seconds: 6),
                         ),
                       );
                     } on CloudException catch (e) {
@@ -165,7 +166,7 @@ class _LoginPageState extends State<LoginPage> {
                       );
                     }
                   },
-            child: const Text('Send the link'),
+            child: Text(tr('Send the link')),
           ),
         ],
       ),
@@ -187,9 +188,9 @@ class _LoginPageState extends State<LoginPage> {
       case GoogleOutcome.cancelled:
         setState(() => _busy = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(googleCancelledNotice),
-            duration: Duration(seconds: 7),
+            duration: const Duration(seconds: 7),
           ),
         );
         return;
@@ -278,19 +279,19 @@ class _LoginPageState extends State<LoginPage> {
 
     if (_passwordCaughtUp) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password updated on this device too.'),
+        SnackBar(
+          content: Text(tr('Password updated on this device too.')),
         ),
       );
     } else if (_restoredFromCloud) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Signed in from your cloud account. Notes from another phone '
+            tr('Signed in from your cloud account. Notes from another phone '
             'are not here yet — if you backed them up, use Settings → '
-            'Google Drive backup → Restore.',
+            'Google Drive backup → Restore.'),
           ),
-          duration: Duration(seconds: 6),
+          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -313,9 +314,9 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RiseIn(
-                      delay: Duration(milliseconds: 60),
-                      child: _Eyebrow('WELCOME BACK'),
+                    RiseIn(
+                      delay: const Duration(milliseconds: 60),
+                      child: _Eyebrow(tr('WELCOME BACK')),
                     ),
                     const SizedBox(height: 6),
                     PenWordmark(
@@ -326,8 +327,8 @@ class _LoginPageState extends State<LoginPage> {
                     RiseIn(
                       delay: const Duration(milliseconds: 900),
                       child: Text(
-                        'Write it, photograph it, record it. Revise what the '
-                        'exam needs first.',
+                        tr('Write it, photograph it, record it. Revise what the '
+                        'exam needs first.'),
                         style: t.bodySmall,
                       ),
                     ),
@@ -337,7 +338,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: AuthCard(
                         children: [
                           AuthField(
-                            label: 'EMAIL',
+                            label: tr('EMAIL'),
                             hint: 'you@university.edu',
                             controller: _email,
                             keyboardType: TextInputType.emailAddress,
@@ -345,8 +346,8 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 18),
                           AuthField(
-                            label: 'PASSWORD',
-                            hint: 'Your password',
+                            label: tr('PASSWORD'),
+                            hint: tr('Your password'),
                             controller: _password,
                             obscure: _obscure,
                             accent: NestColor.tabs[1],
@@ -358,7 +359,7 @@ class _LoginPageState extends State<LoginPage> {
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: _busy ? null : _forgotPassword,
-                              child: const Text('Forgot your password?'),
+                              child: Text(tr('Forgot your password?')),
                             ),
                           ),
                           if (_error != null) ...[
@@ -371,7 +372,7 @@ class _LoginPageState extends State<LoginPage> {
                             child: FilledButton(
                               onPressed: _busy ? null : _submit,
                               child: Text(
-                                _busy ? 'Opening your notebook...' : 'Sign in',
+                                _busy ? tr('Opening your notebook...') : tr('Sign in'),
                               ),
                             ),
                           ),
@@ -395,7 +396,7 @@ class _LoginPageState extends State<LoginPage> {
                                       builder: (_) => const RegisterPage(),
                                     ),
                                   ),
-                          child: const Text('New here? Create an account'),
+                          child: Text(tr('New here? Create an account')),
                         ),
                       ),
                     ),
@@ -502,7 +503,7 @@ class AuthField extends StatefulWidget {
     this.keyboardType,
     this.capitalization = TextCapitalization.none,
     this.helper,
-    this.accent = NestColor.highlight,
+    this.accent,
   });
 
   final String label;
@@ -515,7 +516,7 @@ class AuthField extends StatefulWidget {
   final String? helper;
 
   /// The colour of the underline that sweeps in on focus.
-  final Color accent;
+  final Color? accent;
 
   @override
   State<AuthField> createState() => _AuthFieldState();
@@ -559,7 +560,7 @@ class _AuthFieldState extends State<AuthField> {
           obscureText: widget.obscure,
           keyboardType: widget.keyboardType,
           textCapitalization: widget.capitalization,
-          style: const TextStyle(fontSize: 15, color: NestColor.ink),
+          style: TextStyle(fontSize: 15, color: NestColor.ink),
           decoration: InputDecoration(
             hintText: widget.hint,
             filled: true,
@@ -606,7 +607,7 @@ class _AuthFieldState extends State<AuthField> {
                 child: Container(
                   height: 3,
                   decoration: BoxDecoration(
-                    color: NestColor.o(widget.accent, t),
+                    color: NestColor.o(widget.accent ?? NestColor.highlight, t),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(2),
                       bottomRight: Radius.circular(3),
@@ -639,19 +640,19 @@ class AuthErrorLine extends StatelessWidget {
       decoration: BoxDecoration(
         color: NestColor.o(NestColor.redPen, 0.08),
         borderRadius: BorderRadius.circular(NestRadius.tile),
-        border: const Border(
+        border: Border(
           left: BorderSide(color: NestColor.redPen, width: 3),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded,
+          Icon(Icons.error_outline_rounded,
               size: 18, color: NestColor.redPen),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontSize: 13, color: NestColor.redPen),
+              style: TextStyle(fontSize: 13, color: NestColor.redPen),
             ),
           ),
         ],

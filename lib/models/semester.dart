@@ -6,6 +6,8 @@
 /// app can offer the right numbers and write them the same way every time.
 library;
 
+import '../l10n/strings.dart';
+
 enum SemesterSystem {
   /// Two a year: eight across a four-year degree.
   bi,
@@ -24,11 +26,11 @@ extension SemesterSystemData on SemesterSystem {
   String get label {
     switch (this) {
       case SemesterSystem.bi:
-        return 'Bi-semester';
+        return tr('Bi-semester');
       case SemesterSystem.tri:
-        return 'Tri-semester';
+        return tr('Tri-semester');
       case SemesterSystem.custom:
-        return 'Something else';
+        return tr('Something else');
     }
   }
 
@@ -47,11 +49,11 @@ extension SemesterSystemData on SemesterSystem {
   String get blurb {
     switch (this) {
       case SemesterSystem.bi:
-        return 'Two a year — 8 across four years.';
+        return tr('Two a year — 8 across four years.');
       case SemesterSystem.tri:
-        return 'Three a year — 12 across four years.';
+        return tr('Three a year — 12 across four years.');
       case SemesterSystem.custom:
-        return 'Write it however your university does.';
+        return tr('Write it however your university does.');
     }
   }
 
@@ -71,7 +73,7 @@ extension SemesterSystemData on SemesterSystem {
 }
 
 /// The one way a numbered semester is written down.
-String semesterLabelFor(int number) => 'Semester $number';
+String semesterLabelFor(int number) => trp('Semester {0}', [number]);
 
 /// The number inside a stored label, when there is one.
 ///
@@ -97,8 +99,8 @@ bool semesterNumberFits(SemesterSystem system, int number) {
 /// What is wrong with a typed semester, or null when nothing is.
 String? semesterProblem(String raw) {
   final text = raw.trim();
-  if (text.isEmpty) return 'Name the semester these notes belong to.';
-  if (text.length > 40) return 'Keep it under 40 characters.';
+  if (text.isEmpty) return tr('Name the semester these notes belong to.');
+  if (text.length > 40) return tr('Keep it under 40 characters.');
   return null;
 }
 
@@ -235,10 +237,10 @@ class SemesterPlan {
 
 /// What is wrong with a pair of degree dates, or null when nothing is.
 String? programmeDatesProblem(DateTime? start, DateTime? end) {
-  if (start == null) return 'Pick the month your degree started.';
+  if (start == null) return tr('Pick the month your degree started.');
   if (end == null) return null;
-  if (!end.isAfter(start)) return 'The finish has to come after the start.';
+  if (!end.isAfter(start)) return tr('The finish has to come after the start.');
   final years = end.difference(start).inDays / 365.25;
-  if (years > 12) return 'That is more than twelve years — check the dates.';
+  if (years > 12) return tr('That is more than twelve years — check the dates.');
   return null;
 }

@@ -15,6 +15,7 @@ import '../chat/message_request.dart';
 import '../chat/safety_actions.dart';
 import '../share/import_page.dart';
 import '../share/request_note_sheet.dart';
+import '../../l10n/strings.dart';
 
 /// The Shared inbox — everything classmates have sent. Requirement 9.
 ///
@@ -50,11 +51,11 @@ class SharedPage extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 30),
                 child: NestEmptyState(
                   icon: Icons.move_to_inbox_rounded,
-                  title: 'Nothing shared yet',
-                  message: 'When a classmate sends you a NoteNest note it '
+                  title: tr('Nothing shared yet'),
+                  message: tr('When a classmate sends you a NoteNest note it '
                       'lands here and joins your own subjects — with their '
-                      'name still on it.',
-                  actionLabel: 'Import a note',
+                      'name still on it.'),
+                  actionLabel: tr('Import a note'),
                   onAction: () => _import(context),
                 ),
               )
@@ -83,18 +84,16 @@ class SharedPage extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Shared with you',
+              tr('Shared with you'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
           ),
-          Text('${notes.length}', style: nestEyebrow),
+          Text(trp('{0}', [notes.length]), style: nestEyebrow),
         ],
       ),
       const SizedBox(height: 4),
       Text(
-        '${sharers.length} '
-        '${sharers.length == 1 ? 'classmate' : 'classmates'} '
-        'have sent you notes.',
+        trp('{0} {1} have sent you notes.', [sharers.length, sharers.length == 1 ? tr('classmate') : tr('classmates')]),
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 16),
@@ -104,7 +103,7 @@ class SharedPage extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _import(context),
               icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Import'),
+              label: Text(tr('Import')),
             ),
           ),
           const SizedBox(width: 12),
@@ -112,7 +111,7 @@ class SharedPage extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => showRequestNoteSheet(context),
               icon: const Icon(Icons.waving_hand_outlined, size: 18),
-              label: const Text('Ask for one'),
+              label: Text(tr('Ask for one')),
             ),
           ),
         ],
@@ -132,7 +131,7 @@ class SharedPage extends StatelessWidget {
               ),
               child: Text(
                 _initial(who),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: NestColor.pen,
@@ -148,7 +147,7 @@ class SharedPage extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
-            Text('${sharers[who] ?? 0}', style: nestEyebrow),
+            Text(trp('{0}', [sharers[who] ?? 0]), style: nestEyebrow),
           ],
         ),
         const SizedBox(height: 2),
@@ -236,12 +235,12 @@ class _PendingBandState extends State<_PendingBand> {
             Expanded(
               child: Text(
                 waiting.length == 1
-                    ? '1 note waiting'
-                    : '${waiting.length} notes waiting',
+                    ? tr('1 note waiting')
+                    : trp('{0} notes waiting', [waiting.length]),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
             ),
-            const Icon(
+            Icon(
               Icons.mark_email_unread_outlined,
               color: NestColor.pen,
             ),
@@ -249,13 +248,13 @@ class _PendingBandState extends State<_PendingBand> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Nothing is added to your notebook until you accept it.',
+          tr('Nothing is added to your notebook until you accept it.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
         for (final share in waiting) _PendingTile(share: share),
         const SizedBox(height: 22),
-        const Divider(color: NestColor.rule),
+        Divider(color: NestColor.rule),
         const SizedBox(height: 8),
       ],
     );
@@ -294,13 +293,13 @@ class _PendingTileState extends State<_PendingTile> {
           .respondToShare(widget.share, accept: true);
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Added "${bundle.title}" to your notes')),
+        SnackBar(content: Text(trp('Added "{0}" to your notes', [bundle.title]))),
       );
     } on BundleException catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('That note could not be read: ${e.message}')),
+        SnackBar(content: Text(trp('That note could not be read: {0}', [e.message]))),
       );
     } on CloudException catch (e) {
       // The note is already in the notebook at this point; only the answer
@@ -309,8 +308,7 @@ class _PendingTileState extends State<_PendingTile> {
       setState(() => _busy = false);
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Added, but it is still showing as waiting: '
-              '${e.message}'),
+          content: Text(trp('Added, but it is still showing as waiting: {0}', [e.message])),
         ),
       );
     } catch (_) {
@@ -319,9 +317,9 @@ class _PendingTileState extends State<_PendingTile> {
       if (!mounted) return;
       setState(() => _busy = false);
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('That note could not be saved on this phone. '
-              'Check there is free space and try again.'),
+        SnackBar(
+          content: Text(tr('That note could not be saved on this phone. '
+              'Check there is free space and try again.')),
         ),
       );
     }
@@ -384,7 +382,7 @@ class _PendingTileState extends State<_PendingTile> {
                   ),
                   child: Text(
                     firstLetterOf(share.fromLabel),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: NestColor.pen,
@@ -398,7 +396,7 @@ class _PendingTileState extends State<_PendingTile> {
                     children: [
                       Text(
                         share.title.trim().isEmpty
-                            ? 'Untitled note'
+                            ? tr('Untitled note')
                             : share.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -415,13 +413,13 @@ class _PendingTileState extends State<_PendingTile> {
                 // A note from somebody you share no group with used to arrive
                 // with no way to answer it. This is that way.
                 IconButton(
-                  tooltip: 'Message ${share.fromLabel}',
+                  tooltip: trp('Message {0}', [share.fromLabel]),
                   icon: const Icon(Icons.forum_outlined, size: 20),
                   color: NestColor.pen,
                   onPressed: _busy ? null : _message,
                 ),
                 IconButton(
-                  tooltip: 'Report or block',
+                  tooltip: tr('Report or block'),
                   icon: const Icon(Icons.more_vert_rounded, size: 20),
                   color: NestColor.inkFaint,
                   onPressed: _busy
@@ -462,7 +460,7 @@ class _PendingTileState extends State<_PendingTile> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: NestColor.inkSoft,
                     ),
-                    child: const Text('No thanks'),
+                    child: Text(tr('No thanks')),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -470,7 +468,7 @@ class _PendingTileState extends State<_PendingTile> {
                   flex: 2,
                   child: FilledButton(
                     onPressed: _busy ? null : _accept,
-                    child: Text(_busy ? 'Working…' : 'Accept'),
+                    child: Text(_busy ? tr('Working…') : tr('Accept')),
                   ),
                 ),
               ],

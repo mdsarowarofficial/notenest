@@ -11,6 +11,7 @@ import '../cloud/cloud_page.dart';
 import '../groups/groups_page.dart';
 import 'chat_page.dart';
 import 'message_request.dart';
+import '../../l10n/strings.dart';
 
 /// Every conversation, in two sections.
 ///
@@ -35,14 +36,14 @@ class ChatsPage extends StatelessWidget {
     if (embedded) return body;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chats')),
+      appBar: AppBar(title: Text(tr('Chats'))),
       floatingActionButton: ListenableBuilder(
         listenable: cloud,
         builder: (context, _) => cloud.isSignedIn
             ? FloatingActionButton.extended(
                 onPressed: () => showFindPersonSheet(context),
                 icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-                label: const Text('Message someone'),
+                label: Text(tr('Message someone')),
               )
             : const SizedBox.shrink(),
       ),
@@ -59,11 +60,11 @@ class ChatsPage extends StatelessWidget {
               padding: const EdgeInsets.all(22),
               child: NestEmptyState(
                 icon: Icons.cloud_queue_rounded,
-                title: 'Connect a cloud account first',
-                message: 'A conversation lives somewhere both phones can see, '
+                title: tr('Connect a cloud account first'),
+                message: tr('A conversation lives somewhere both phones can see, '
                     'so it needs an account. Everything already on this device '
-                    'keeps working either way.',
-                actionLabel: 'Cloud account',
+                    'keeps working either way.'),
+                actionLabel: tr('Cloud account'),
                 onAction: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CloudPage()),
                 ),
@@ -127,11 +128,11 @@ class _ThreadsState extends State<_Threads> {
                   const _RequestsBanner(),
                   NestEmptyState(
                     icon: Icons.forum_outlined,
-                  title: 'No conversations yet',
-                  message: 'Every group has a conversation of its own. Make a '
+                  title: tr('No conversations yet'),
+                  message: tr('Every group has a conversation of its own. Make a '
                       'group or join one, and talking starts there — or '
-                      'message one person by their email address.',
-                  actionLabel: 'Groups',
+                      'message one person by their email address.'),
+                  actionLabel: tr('Groups'),
                   onAction: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const GroupsPage()),
                   ),
@@ -145,21 +146,21 @@ class _ThreadsState extends State<_Threads> {
               children: [
                 const _RequestsBanner(),
                 if (groups.isNotEmpty) ...[
-                  const Text('GROUPS', style: nestEyebrow),
+                  Text(tr('GROUPS'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   for (final g in groups) _GroupRow(group: g),
                   const SizedBox(height: 22),
                 ],
                 if (direct.isNotEmpty) ...[
-                  const Text('PEOPLE', style: nestEyebrow),
+                  Text(tr('PEOPLE'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   for (final t in direct) _DirectRow(thread: t),
                 ] else if (groups.isNotEmpty) ...[
-                  const Text('PEOPLE', style: nestEyebrow),
+                  Text(tr('PEOPLE'), style: nestEyebrow),
                   const SizedBox(height: 8),
                   Text(
-                    'Open a group, tap somebody in its member list, and you '
-                    'can talk to them on their own.',
+                    tr('Open a group, tap somebody in its member list, and you '
+                    'can talk to them on their own.'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -196,8 +197,8 @@ class _RequestsBanner extends StatelessWidget {
             ),
             leading: const Icon(Icons.mark_email_unread_outlined),
             title: Text(waiting > 0
-                ? 'Message requests ($waiting)'
-                : 'Message requests'),
+                ? trp('Message requests ({0})', [waiting])
+                : tr('Message requests')),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MessageRequestsPage()),
@@ -231,7 +232,7 @@ class _GroupRow extends StatelessWidget {
           // says what the group is instead of sitting there blank.
           subtitle: thread?.lastText.isNotEmpty == true
               ? '${thread!.lastFromName}: ${thread.lastText}'
-              : '${group.memberLabel} · no messages yet',
+              : trp('{0} · no messages yet', [group.memberLabel]),
           when: thread?.lastAt,
           unread: thread?.isUnreadFor(cloud.uid) ?? false,
           onTap: () => Navigator.of(context).push(
@@ -259,18 +260,16 @@ class _DirectRow extends StatelessWidget {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Remove from your list?'),
-        content: Text('The conversation with $name disappears from your list '
-            'only. Their copy and the messages are not deleted, and it comes '
-            'back if either of you writes again.'),
+        title: Text(tr('Remove from your list?')),
+        content: Text(trp('The conversation with {0} disappears from your list only. Their copy and the messages are not deleted, and it comes back if either of you writes again.', [name])),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Remove'),
+            child: Text(tr('Remove')),
           ),
         ],
       ),
@@ -293,16 +292,16 @@ class _DirectRow extends StatelessWidget {
         // up here under the old one.
         final name = person?.name.trim().isNotEmpty == true
             ? person!.name
-            : (person?.email ?? 'Someone');
+            : (person?.email ?? tr('Someone'));
 
         return _Row(
           initials: person?.initials ?? '?',
           colour: NestColor.pen,
           title: name,
           subtitle: thread.lastText.isEmpty
-              ? 'No messages yet'
+              ? tr('No messages yet')
               : (thread.lastFromUid == me
-                  ? 'You: ${thread.lastText}'
+                  ? trp('You: {0}', [thread.lastText])
                   : thread.lastText),
           when: thread.lastAt,
           unread: thread.isUnreadFor(me),
@@ -418,7 +417,7 @@ class _Row extends StatelessWidget {
                       Container(
                         width: 9,
                         height: 9,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: NestColor.pen,
                           shape: BoxShape.circle,
                         ),
@@ -488,7 +487,7 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
         _busy = false;
         _found = person;
         _error = person == null
-            ? 'Nobody with that address has a NoteNest cloud account yet.'
+            ? tr('Nobody with that address has a NoteNest cloud account yet.')
             : null;
       });
     } on CloudException catch (e) {
@@ -515,9 +514,9 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: NestColor.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 26),
         child: SingleChildScrollView(
@@ -537,13 +536,13 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Message someone',
+                tr('Message someone'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 4),
               Text(
-                'For somebody you are not in a group with. Anybody in a group '
-                'with you can be reached from its member list instead.',
+                tr('For somebody you are not in a group with. Anybody in a group '
+                'with you can be reached from its member list instead.'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 18),
@@ -555,8 +554,8 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
                       autofocus: true,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Their email',
+                      decoration: InputDecoration(
+                        labelText: tr('Their email'),
                         hintText: 'classmate@example.com',
                       ),
                       onSubmitted: (_) => _look(),
@@ -567,7 +566,7 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
                     height: 48,
                     child: OutlinedButton(
                       onPressed: _busy ? null : _look,
-                      child: const Text('Find'),
+                      child: Text(tr('Find')),
                     ),
                   ),
                 ],
@@ -579,7 +578,7 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
                   decoration: BoxDecoration(
                     color: NestColor.o(NestColor.redPen, 0.08),
                     borderRadius: BorderRadius.circular(NestRadius.chip),
-                    border: const Border(
+                    border: Border(
                       left: BorderSide(color: NestColor.redPen, width: 3),
                     ),
                   ),
@@ -597,7 +596,7 @@ class _FindPersonSheetState extends State<_FindPersonSheet> {
                     onPressed: _busy ? null : () => _open(found),
                     icon: const Icon(Icons.forum_outlined, size: 18),
                     label: Text(
-                      'Message ${found.name.trim().isEmpty ? found.email : found.name}',
+                      trp('Message {0}', [found.name.trim().isEmpty ? found.email : found.name]),
                     ),
                   ),
                 ),

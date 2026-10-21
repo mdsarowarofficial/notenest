@@ -15,6 +15,7 @@ import '../chat/chat_page.dart';
 import '../groups/group_detail.dart';
 import 'post_composer.dart';
 import 'post_detail.dart';
+import '../../l10n/strings.dart';
 
 /// One class: what was posted, the work set, and who is in it.
 ///
@@ -46,15 +47,15 @@ class _ClassroomPageState extends State<ClassroomPage> {
         final group = groupSnap.data;
         if (group == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Class')),
+            appBar: AppBar(title: Text(tr('Class'))),
             body: Center(
               child: groupSnap.connectionState == ConnectionState.waiting
                   ? const CircularProgressIndicator()
-                  : const Padding(
-                      padding: EdgeInsets.all(30),
+                  : Padding(
+                      padding: const EdgeInsets.all(30),
                       child: Text(
-                        'This class is no longer there, or you are not in it '
-                        'any more.',
+                        tr('This class is no longer there, or you are not in it '
+                        'any more.'),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -70,7 +71,7 @@ class _ClassroomPageState extends State<ClassroomPage> {
               title: Text(group.name, overflow: TextOverflow.ellipsis),
               actions: [
                 IconButton(
-                  tooltip: 'Class chat',
+                  tooltip: tr('Class chat'),
                   icon: const Icon(Icons.forum_outlined),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -83,7 +84,7 @@ class _ClassroomPageState extends State<ClassroomPage> {
                   ),
                 ),
                 IconButton(
-                  tooltip: teaching ? 'Class settings' : 'About this class',
+                  tooltip: teaching ? tr('Class settings') : tr('About this class'),
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -92,16 +93,16 @@ class _ClassroomPageState extends State<ClassroomPage> {
                   ),
                 ),
               ],
-              bottom: const TabBar(
-                labelStyle: TextStyle(
+              bottom: TabBar(
+                labelStyle: const TextStyle(
                   fontFamily: NestFont.display,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
                 tabs: [
-                  Tab(text: 'Stream'),
-                  Tab(text: 'Classwork'),
-                  Tab(text: 'People'),
+                  Tab(text: tr('Stream')),
+                  Tab(text: tr('Classwork')),
+                  Tab(text: tr('People')),
                 ],
               ),
             ),
@@ -113,7 +114,7 @@ class _ClassroomPageState extends State<ClassroomPage> {
                       ),
                     ),
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text('Post'),
+                    label: Text(tr('Post')),
                   )
                 : null,
             body: StreamBuilder<List<ClassPost>>(
@@ -124,8 +125,8 @@ class _ClassroomPageState extends State<ClassroomPage> {
                     padding: const EdgeInsets.all(22),
                     child: NestEmptyState(
                       icon: Icons.error_outline_rounded,
-                      title: 'Could not load the class',
-                      message: '${postSnap.error}',
+                      title: tr('Could not load the class'),
+                      message: trp('{0}', [postSnap.error]),
                     ),
                   );
                 }
@@ -184,12 +185,12 @@ class _StreamTab extends StatelessWidget {
             padding: const EdgeInsets.only(top: 20),
             child: NestEmptyState(
               icon: Icons.campaign_outlined,
-              title: 'Nothing posted yet',
+              title: tr('Nothing posted yet'),
               message: teaching
-                  ? 'Tap Post to share an announcement, slides or a PDF, or '
-                      'to set an assignment with a deadline.'
-                  : 'Announcements, materials and assignments from your '
-                      'teacher will show up here.',
+                  ? tr('Tap Post to share an announcement, slides or a PDF, or '
+                      'to set an assignment with a deadline.')
+                  : tr('Announcements, materials and assignments from your '
+                      'teacher will show up here.'),
             ),
           )
         else
@@ -210,7 +211,7 @@ class _Banner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [NestColor.pen, NestColor.penDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -231,7 +232,7 @@ class _Banner extends StatelessWidget {
           ),
           if (group.subject.trim().isNotEmpty)
             Text(group.subject,
-                style: const TextStyle(color: NestColor.penPale)),
+                style: TextStyle(color: NestColor.penPale)),
           const SizedBox(height: 12),
           if (teaching)
             InkWell(
@@ -239,31 +240,31 @@ class _Banner extends StatelessWidget {
                 Clipboard.setData(
                     ClipboardData(text: prettyJoinCode(group.joinCode)));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Class code copied.')),
+                  SnackBar(content: Text(tr('Class code copied.'))),
                 );
               },
               child: Row(
                 children: [
-                  const Text('Class code  ',
+                  Text('Class code  ',
                       style: TextStyle(color: NestColor.penPale)),
                   Text(
                     prettyJoinCode(group.joinCode),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
+                      letterSpacing: ls(1.5),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.copy_rounded,
+                  Icon(Icons.copy_rounded,
                       size: 16, color: NestColor.penPale),
                 ],
               ),
             )
           else
             Text(
-              'Taught by ${group.ownerName.isEmpty ? 'your teacher' : group.ownerName}',
+              trp('Taught by {0}', [group.ownerName.isEmpty ? tr('your teacher') : group.ownerName]),
               style: const TextStyle(color: Colors.white),
             ),
         ],
@@ -289,7 +290,7 @@ class _Upcoming extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('DUE SOON', style: nestEyebrow),
+          Text(tr('DUE SOON'), style: nestEyebrow),
           const SizedBox(height: 4),
           for (final p in posts)
             InkWell(
@@ -298,7 +299,7 @@ class _Upcoming extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    const Icon(Icons.assignment_outlined,
+                    Icon(Icons.assignment_outlined,
                         size: 18, color: NestColor.warmDeep),
                     const SizedBox(width: 8),
                     Expanded(
@@ -311,7 +312,7 @@ class _Upcoming extends StatelessWidget {
                     ),
                     Text(
                       formatDue(p.dueAt!),
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: NestColor.warmDeep, fontSize: 12.5),
                     ),
                   ],
@@ -358,7 +359,7 @@ class _PostCard extends StatelessWidget {
     };
 
     final headline = post.kind == PostKind.announcement
-        ? '${post.authorName.isEmpty ? 'Teacher' : post.authorName} posted'
+        ? trp('{0} posted', [post.authorName.isEmpty ? tr('Teacher') : post.authorName])
         : '${post.kind.label}: ${post.title}';
 
     return Padding(
@@ -395,7 +396,7 @@ class _PostCard extends StatelessWidget {
                           if (post.dueAt != null)
                             'Due ${formatDue(post.dueAt!)}',
                           if (post.files.isNotEmpty)
-                            '${post.files.length} ${post.files.length == 1 ? 'file' : 'files'}',
+                            '${num_(post.files.length)} ${tr(post.files.length == 1 ? 'file' : 'files')}',
                         ].join(' · '),
                         style: t.bodySmall,
                       ),
@@ -436,7 +437,7 @@ String _shortDate(DateTime d) {
     'Nov',
     'Dec',
   ];
-  return '${d.day} ${months[d.month - 1]}';
+  return localDate('${d.day} ${months[d.month - 1]}');
 }
 
 // --------------------------------------------------------------- classwork
@@ -461,10 +462,10 @@ class _ClassworkTab extends StatelessWidget {
         children: [
           NestEmptyState(
             icon: Icons.assignment_outlined,
-            title: 'No classwork yet',
+            title: tr('No classwork yet'),
             message: teaching
-                ? 'Materials and assignments you post are listed here by topic.'
-                : 'Materials and assignments are listed here by topic.',
+                ? tr('Materials and assignments you post are listed here by topic.')
+                : tr('Materials and assignments are listed here by topic.'),
           ),
         ],
       );
@@ -490,7 +491,7 @@ class _ClassworkTab extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
             child: Text(
-              topic.isEmpty ? 'OTHER' : topic.toUpperCase(),
+              topic.isEmpty ? tr('OTHER') : topic.toUpperCase(),
               style: nestEyebrow.copyWith(color: NestColor.pen, fontSize: 12),
             ),
           ),
@@ -545,9 +546,9 @@ class _WorkRow extends StatelessWidget {
             maxLines: 2, overflow: TextOverflow.ellipsis, style: t.titleSmall),
         subtitle: Text(
           post.dueAt != null
-              ? 'Due ${formatDue(post.dueAt!)}'
+              ? trp('Due {0}', [formatDue(post.dueAt!)])
               : isWork
-                  ? 'No due date'
+                  ? tr('No due date')
                   : '${post.files.length} ${post.files.length == 1 ? 'file' : 'files'}',
           style: t.bodySmall,
         ),
@@ -634,15 +635,15 @@ class _PeopleTabState extends State<_PeopleTab> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 14, 18, 100),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 6, 4, 6),
-              child: Text('TEACHER', style: nestEyebrow),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+              child: Text(tr('TEACHER'), style: nestEyebrow),
             ),
             for (final p in teacher) _PersonRow(person: p),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 18, 4, 6),
               child: Text(
-                'STUDENTS · ${students.length}',
+                trp('STUDENTS · {0}', [students.length]),
                 style: nestEyebrow,
               ),
             ),
@@ -651,9 +652,8 @@ class _PeopleTabState extends State<_PeopleTab> {
                 padding: const EdgeInsets.all(8),
                 child: Text(
                   widget.teaching
-                      ? 'Nobody has joined yet. Share the class code '
-                          '${prettyJoinCode(widget.group.joinCode)}.'
-                      : 'Nobody else has joined yet.',
+                      ? trp('Nobody has joined yet. Share the class code {0}.', [prettyJoinCode(widget.group.joinCode)])
+                      : tr('Nobody else has joined yet.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -677,7 +677,7 @@ class _PersonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = person.name.isEmpty ? 'Unnamed' : person.name;
+    final name = person.name.isEmpty ? tr('Unnamed') : person.name;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: InitialsTile(

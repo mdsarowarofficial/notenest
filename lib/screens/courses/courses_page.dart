@@ -5,6 +5,7 @@ import '../../models/subject.dart';
 import '../../theme/nest_theme.dart';
 import '../subjects/subject_form.dart';
 import 'course_page.dart';
+import '../../l10n/strings.dart';
 
 /// Every course, searchable and filterable by semester, with archived ones
 /// kept at the bottom where they can be restored.
@@ -40,11 +41,11 @@ class _CoursesPageState extends State<CoursesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: NestColor.paper,
-      appBar: AppBar(title: const Text('All courses')),
+      appBar: AppBar(title: Text(tr('All courses'))),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showSubjectForm(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add course'),
+        label: Text(tr('Add course')),
       ),
       body: ListenableBuilder(
         listenable: _repo,
@@ -65,9 +66,9 @@ class _CoursesPageState extends State<CoursesPage> {
               TextField(
                 controller: _search,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Search courses',
-                  prefixIcon: Icon(Icons.search_rounded),
+                decoration: InputDecoration(
+                  hintText: tr('Search courses'),
+                  prefixIcon: const Icon(Icons.search_rounded),
                   isDense: true,
                 ),
               ),
@@ -81,7 +82,7 @@ class _CoursesPageState extends State<CoursesPage> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: const Text('All'),
+                          label: Text(tr('All')),
                           selected: _semester == null,
                           onSelected: (_) => setState(() => _semester = null),
                         ),
@@ -90,7 +91,7 @@ class _CoursesPageState extends State<CoursesPage> {
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ChoiceChip(
-                            label: Text('Semester $n'),
+                            label: Text(trp('Semester {0}', [n])),
                             selected: _semester == n,
                             onSelected: (_) => setState(() => _semester = n),
                           ),
@@ -105,8 +106,8 @@ class _CoursesPageState extends State<CoursesPage> {
                   padding: const EdgeInsets.all(24),
                   child: Text(
                     all.isEmpty
-                        ? 'No courses yet. Tap "Add course".'
-                        : 'No courses match.',
+                        ? tr('No courses yet. Tap "Add course".')
+                        : tr('No courses match.'),
                     textAlign: TextAlign.center,
                     style: t.bodyMedium,
                   ),
@@ -114,7 +115,7 @@ class _CoursesPageState extends State<CoursesPage> {
               for (final s in active) _tile(context, s),
               if (archived.isNotEmpty) ...[
                 const SizedBox(height: 14),
-                const Text('ARCHIVED', style: nestEyebrow),
+                Text(tr('ARCHIVED'), style: nestEyebrow),
                 const SizedBox(height: 8),
                 for (final s in archived) _tile(context, s),
               ],
@@ -135,18 +136,17 @@ class _CoursesPageState extends State<CoursesPage> {
           backgroundColor: s.color,
           child: Text(
             s.code.isEmpty ? '?' : s.code[0].toUpperCase(),
-            style: const TextStyle(color: NestColor.ink),
+            style: const TextStyle(color: NestColor.onHighlight),
           ),
         ),
         title: Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          '${s.code} · ${s.noteCount} ${s.noteCount == 1 ? 'note' : 'notes'}'
-          '${s.semesterNo == null ? '' : ' · Semester ${s.semesterNo}'}',
+          trp('{0} · {1} {2}{3}', [s.code, num_(s.noteCount), (s.noteCount == 1 ? tr('note') : tr('notes')), s.semesterNo == null ? '' : trp(' · Semester {0}', [s.semesterNo])]),
         ),
         trailing: s.archived
             ? TextButton(
                 onPressed: () => _repo.unarchiveSubject(s.id!),
-                child: const Text('Restore'),
+                child: Text(tr('Restore')),
               )
             : const Icon(Icons.chevron_right_rounded),
         onTap: () => Navigator.of(context).push(

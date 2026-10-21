@@ -68,3 +68,6 @@ firebase-debug.log
 **/*.keystore
 **/*.p12
 **/*.pepk
+
+# Cloud Functions
+functions/node_modules/

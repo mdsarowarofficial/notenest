@@ -122,7 +122,12 @@ class PaperSheet extends StatelessWidget {
             height: PageRenderer.a4HeightPt,
             child: Padding(
               padding: EdgeInsets.all(marginPt),
-              child: child,
+              // A page is paper whatever the app is wearing: text that does
+              // not set its own colour must be black here, not the night ink.
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(color: Color(0xFF111111)),
+                child: child,
+              ),
             ),
           ),
         ),

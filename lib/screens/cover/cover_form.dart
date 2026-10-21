@@ -7,6 +7,7 @@ import '../../data/note_repository.dart';
 import '../../models/cover_spec.dart';
 import '../../theme/nest_theme.dart';
 import 'university_picker.dart';
+import '../../l10n/strings.dart';
 
 /// The controls under the cover page preview.
 ///
@@ -67,24 +68,24 @@ class _CoverFormState extends State<CoverForm> {
 
   /// Every field in the order the form asks for them. The ids are stable so a
   /// controller keeps its text when the labels change with the kind.
-  static final _fields = <_Field>[
+  static List<_Field> get _fields => <_Field>[
     _Field(
       id: 'institution',
-      label: 'Institution',
+      label: tr('Institution'),
       hint: 'Daffodil International University',
       read: (s) => s.institution,
       write: (s, v) => s.copyWith(institution: v),
     ),
     _Field(
       id: 'department',
-      label: 'Department or faculty',
-      hint: 'Department of Computer Science and Engineering',
+      label: tr('Department or faculty'),
+      hint: tr('Department of Computer Science and Engineering'),
       read: (s) => s.department,
       write: (s, v) => s.copyWith(department: v),
     ),
     _Field(
       id: 'courseCode',
-      label: 'Course code',
+      label: tr('Course code'),
       hint: 'CSE 112',
       read: (s) => s.courseCode,
       write: (s, v) => s.copyWith(courseCode: v),
@@ -93,7 +94,7 @@ class _CoverFormState extends State<CoverForm> {
     ),
     _Field(
       id: 'courseTitle',
-      label: 'Course title',
+      label: tr('Course title'),
       hint: 'Data Structures',
       read: (s) => s.courseTitle,
       write: (s, v) => s.copyWith(courseTitle: v),
@@ -101,13 +102,13 @@ class _CoverFormState extends State<CoverForm> {
     ),
     _Field(
       id: 'studentName',
-      label: 'Your name',
+      label: tr('Your name'),
       read: (s) => s.studentName,
       write: (s, v) => s.copyWith(studentName: v),
     ),
     _Field(
       id: 'studentId',
-      label: 'Your ID',
+      label: tr('Your ID'),
       hint: '221-15-1234',
       read: (s) => s.studentId,
       write: (s, v) => s.copyWith(studentId: v),
@@ -116,14 +117,14 @@ class _CoverFormState extends State<CoverForm> {
     ),
     _Field(
       id: 'program',
-      label: 'Program',
+      label: tr('Program'),
       hint: 'BSc in CSE',
       read: (s) => s.program,
       write: (s, v) => s.copyWith(program: v),
     ),
     _Field(
       id: 'batch',
-      label: 'Batch',
+      label: tr('Batch'),
       hint: '63rd',
       read: (s) => s.batch,
       write: (s, v) => s.copyWith(batch: v),
@@ -131,7 +132,7 @@ class _CoverFormState extends State<CoverForm> {
     ),
     _Field(
       id: 'section',
-      label: 'Section',
+      label: tr('Section'),
       hint: 'B',
       read: (s) => s.section,
       write: (s, v) => s.copyWith(section: v),
@@ -140,33 +141,33 @@ class _CoverFormState extends State<CoverForm> {
     ),
     _Field(
       id: 'session',
-      label: 'Session or semester',
+      label: tr('Session or semester'),
       hint: 'Spring 2026',
       read: (s) => s.session,
       write: (s, v) => s.copyWith(session: v),
     ),
     _Field(
       id: 'teacherName',
-      label: 'Teacher\'s name',
+      label: tr('Teacher\'s name'),
       read: (s) => s.teacherName,
       write: (s, v) => s.copyWith(teacherName: v),
     ),
     _Field(
       id: 'teacherDesignation',
-      label: 'Designation',
-      hint: 'Assistant Professor',
+      label: tr('Designation'),
+      hint: tr('Assistant Professor'),
       read: (s) => s.teacherDesignation,
       write: (s, v) => s.copyWith(teacherDesignation: v),
     ),
     _Field(
       id: 'teacherDepartment',
-      label: 'Their department',
+      label: tr('Their department'),
       read: (s) => s.teacherDepartment,
       write: (s, v) => s.copyWith(teacherDepartment: v),
     ),
     _Field(
       id: 'teacherInstitution',
-      label: 'Their institution',
+      label: tr('Their institution'),
       read: (s) => s.teacherInstitution,
       write: (s, v) => s.copyWith(teacherInstitution: v),
     ),
@@ -209,7 +210,7 @@ class _CoverFormState extends State<CoverForm> {
     return OutlinedButton.icon(
       onPressed: _findUniversity,
       icon: const Icon(Icons.travel_explore_rounded, size: 18),
-      label: const Text('Find my university'),
+      label: Text(tr('Find my university')),
       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
     );
   }
@@ -233,8 +234,8 @@ class _CoverFormState extends State<CoverForm> {
       if (mounted) {
         setState(() {
           _pickingLogo = false;
-          _logoError = 'That file could not be read as an image. '
-              'A PNG with a transparent background looks best.';
+          _logoError = tr('That file could not be read as an image. '
+              'A PNG with a transparent background looks best.');
         });
       }
     }
@@ -262,7 +263,7 @@ class _CoverFormState extends State<CoverForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ------------------------------------------------ what and how
-        const Text('WHAT ARE YOU HANDING IN', style: nestEyebrow),
+        Text(tr('WHAT ARE YOU HANDING IN'), style: nestEyebrow),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -300,7 +301,7 @@ class _CoverFormState extends State<CoverForm> {
         ],
 
         const SizedBox(height: 18),
-        const Text('LOOK', style: nestEyebrow),
+        Text(tr('LOOK'), style: nestEyebrow),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -340,7 +341,7 @@ class _CoverFormState extends State<CoverForm> {
         ),
         const SizedBox(height: 14),
         _OptionRow(
-          label: 'Mix your own',
+          label: tr('Mix your own'),
           selected: _mixing,
           onTap: () => setState(() => _mixing = !_mixing),
         ),
@@ -377,14 +378,14 @@ class _CoverFormState extends State<CoverForm> {
                 onPressed: () => widget.onChanged(
                   spec.copyWith(clearCustomAccent: true),
                 ),
-                child: const Text('Back to the swatches'),
+                child: Text(tr('Back to the swatches')),
               ),
             ),
         ],
 
         if (spec.template == CoverTemplate.framed) ...[
           const SizedBox(height: 14),
-          const Text('SPACING', style: nestEyebrow),
+          Text(tr('SPACING'), style: nestEyebrow),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -399,7 +400,7 @@ class _CoverFormState extends State<CoverForm> {
             ],
           ),
           const SizedBox(height: 14),
-          const Text('SIGNATURE BLOCKS', style: nestEyebrow),
+          Text(tr('SIGNATURE BLOCKS'), style: nestEyebrow),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -415,7 +416,7 @@ class _CoverFormState extends State<CoverForm> {
             ],
           ),
           const SizedBox(height: 14),
-          const Text('BORDER', style: nestEyebrow),
+          Text(tr('BORDER'), style: nestEyebrow),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -438,13 +439,13 @@ class _CoverFormState extends State<CoverForm> {
             value: spec.showBorder,
             onChanged: (v) => widget.onChanged(spec.copyWith(showBorder: v)),
             contentPadding: EdgeInsets.zero,
-            title: const Text('Border around the page',
-                style: TextStyle(fontSize: 14)),
+            title: Text(tr('Border around the page'),
+                style: const TextStyle(fontSize: 14)),
           ),
         ],
 
         const SizedBox(height: 12),
-        const Text('YOUR LOGO', style: nestEyebrow),
+        Text(tr('YOUR LOGO'), style: nestEyebrow),
         const SizedBox(height: 8),
         _LogoTile(
           logo: _repo.brandLogo,
@@ -467,13 +468,13 @@ class _CoverFormState extends State<CoverForm> {
             value: spec.showWatermark,
             onChanged: (v) => widget.onChanged(spec.copyWith(showWatermark: v)),
             contentPadding: EdgeInsets.zero,
-            title: const Text('Faded watermark behind the text',
-                style: TextStyle(fontSize: 14)),
+            title: Text(tr('Faded watermark behind the text'),
+                style: const TextStyle(fontSize: 14)),
           ),
         ],
 
         const SizedBox(height: 12),
-        const Text('DATE OF SUBMISSION', style: nestEyebrow),
+        Text(tr('DATE OF SUBMISSION'), style: nestEyebrow),
         const SizedBox(height: 8),
         InkWell(
           onTap: _pickDate,
@@ -486,12 +487,12 @@ class _CoverFormState extends State<CoverForm> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.event_rounded, size: 18, color: NestColor.pen),
+                Icon(Icons.event_rounded, size: 18, color: NestColor.pen),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     spec.submittedOn == null
-                        ? 'Not shown on the page'
+                        ? tr('Not shown on the page')
                         : coverDateLabel(spec.submittedOn!),
                     style: const TextStyle(fontSize: 14),
                   ),
@@ -500,7 +501,7 @@ class _CoverFormState extends State<CoverForm> {
                   TextButton(
                     onPressed: () =>
                         widget.onChanged(spec.copyWith(clearDate: true)),
-                    child: const Text('Clear'),
+                    child: Text(tr('Clear')),
                   ),
               ],
             ),
@@ -621,7 +622,7 @@ class _TextField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: NestColor.inkSoft,
@@ -757,7 +758,7 @@ class _LogoTile extends StatelessWidget {
               boxShadow: NestShadow.resting,
             ),
             child: mark == null
-                ? const Icon(Icons.school_outlined,
+                ? Icon(Icons.school_outlined,
                     size: 22, color: NestColor.inkFaint)
                 : Image.memory(mark, fit: BoxFit.contain),
           ),
@@ -767,7 +768,7 @@ class _LogoTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  mark == null ? 'No logo yet' : 'Logo set',
+                  mark == null ? tr('No logo yet') : tr('Logo set'),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 2),
@@ -775,10 +776,10 @@ class _LogoTile extends StatelessWidget {
                   mark == null
                       // Said plainly, because "why doesn't it know my
                       // university's logo?" is the obvious question.
-                      ? 'Logos belong to the universities, so the app cannot '
+                      ? tr('Logos belong to the universities, so the app cannot '
                           'ship them. Add yours once and it goes on every '
-                          'cover page from now on.'
-                      : 'Used in the corner and, faded, as the watermark.',
+                          'cover page from now on.')
+                      : tr('Used in the corner and, faded, as the watermark.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -801,14 +802,14 @@ class _LogoTile extends StatelessWidget {
                     mark == null ? Icons.add_rounded : Icons.edit_outlined,
                     size: 19,
                   ),
-                  tooltip: mark == null ? 'Add a logo' : 'Change it',
+                  tooltip: mark == null ? tr('Add a logo') : tr('Change it'),
                 ),
                 if (mark != null)
                   IconButton(
                     onPressed: onRemove,
                     icon: const Icon(Icons.delete_outline_rounded, size: 19),
                     color: NestColor.redPen,
-                    tooltip: 'Remove',
+                    tooltip: tr('Remove'),
                   ),
               ],
             ),
@@ -849,7 +850,7 @@ class _OptionRow extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: NestColor.pen,

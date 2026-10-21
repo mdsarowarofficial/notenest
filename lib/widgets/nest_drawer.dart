@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/subject.dart';
 import '../theme/nest_theme.dart';
 import 'nest_marks.dart';
+import '../l10n/strings.dart';
 
 /// A workspace destination in the lower half of the drawer.
 class NestDrawerLink {
@@ -113,7 +114,7 @@ class NestDrawer extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 12),
                           children: [
                             _sectionLabel(
-                              'SUBJECTS',
+                              tr('SUBJECTS'),
                               trailing: subjects.isEmpty
                                   ? null
                                   : '${subjects.length}',
@@ -126,7 +127,7 @@ class NestDrawer extends StatelessWidget {
                               ),
                             _addSubjectRow(context),
                             const SizedBox(height: 8),
-                            _sectionLabel('WORKSPACE'),
+                            _sectionLabel(tr('WORKSPACE')),
                             for (var i = 0; i < links.length; i++)
                               _staggered(
                                 subjects.length + i,
@@ -180,11 +181,11 @@ class NestDrawer extends StatelessWidget {
                       )
                     : Text(
                   _initials(userName),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    letterSpacing: 0.4,
+                    letterSpacing: ls(0.4),
                   ),
                 ),
               ),
@@ -199,11 +200,11 @@ class NestDrawer extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 2),
-                    const Text('VIEW PROFILE', style: nestEyebrow),
+                    Text(tr('VIEW PROFILE'), style: nestEyebrow),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
+              Icon(Icons.chevron_right_rounded,
                   size: 20, color: NestColor.inkFaint),
             ],
           ),
@@ -220,21 +221,21 @@ class NestDrawer extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.school_rounded,
+                  Icon(Icons.school_rounded,
                       size: 17, color: NestColor.pen),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       semester,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: NestColor.ink,
                       ),
                     ),
                   ),
-                  const Icon(Icons.unfold_more_rounded,
+                  Icon(Icons.unfold_more_rounded,
                       size: 17, color: NestColor.inkFaint),
                 ],
               ),
@@ -244,10 +245,10 @@ class NestDrawer extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('MASTERED', style: nestEyebrow),
+                Text(tr('MASTERED'), style: nestEyebrow),
                 const Spacer(),
                 Text(
-                  '${(mastered * 100).round()}%',
+                  trp('{0}%', [(mastered * 100).round()]),
                   style: nestEyebrow.copyWith(color: NestColor.pen),
                 ),
               ],
@@ -263,7 +264,7 @@ class NestDrawer extends StatelessWidget {
                   value: v,
                   minHeight: 6,
                   backgroundColor: NestColor.paperDeep,
-                  valueColor: const AlwaysStoppedAnimation(NestColor.pen),
+                  valueColor: AlwaysStoppedAnimation(NestColor.pen),
                 ),
               ),
             ),
@@ -348,7 +349,7 @@ class NestDrawer extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${s.noteCount}',
+                    trp('{0}', [s.noteCount]),
                     style: nestEyebrow.copyWith(
                       fontSize: 11,
                       color: NestColor.inkSoft,
@@ -401,7 +402,7 @@ class NestDrawer extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${l.badge}',
+                    trp('{0}', [l.badge]),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
@@ -428,25 +429,25 @@ class NestDrawer extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                lastSynced ?? (synced ? 'Synced' : 'Not synced yet'),
+                lastSynced ?? (synced ? tr('Synced') : tr('Not synced yet')),
                 overflow: TextOverflow.ellipsis,
                 style: nestEyebrow.copyWith(
-                  letterSpacing: 0.2,
+                  letterSpacing: ls(0.2),
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             IconButton(
               onPressed: () => onSelectLink(
-                const NestDrawerLink(
+                NestDrawerLink(
                   id: 'settings',
-                  label: 'Settings',
+                  label: tr('Settings'),
                   icon: Icons.settings_rounded,
                 ),
               ),
-              icon: const Icon(Icons.settings_rounded,
+              icon: Icon(Icons.settings_rounded,
                   size: 20, color: NestColor.inkSoft),
-              tooltip: 'Settings',
+              tooltip: tr('Settings'),
             ),
           ],
         ),
@@ -469,10 +470,10 @@ class NestDrawer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Icon(Icons.add_rounded, size: 18, color: NestColor.pen),
+                Icon(Icons.add_rounded, size: 18, color: NestColor.pen),
                 const SizedBox(width: 8),
-                const Text(
-                  'Add subject',
+                Text(
+                  tr('Add subject'),
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
@@ -488,7 +489,7 @@ class NestDrawer extends StatelessWidget {
   Widget _emptyHint(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
         child: Text(
-          'No subjects yet. Add one to start filing notes.',
+          tr('No subjects yet. Add one to start filing notes.'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
       );

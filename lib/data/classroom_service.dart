@@ -8,6 +8,7 @@ import '../models/cloud_profile.dart';
 import '../models/study_group.dart';
 import 'cloud_service.dart';
 import 'drive_service.dart';
+import '../l10n/strings.dart';
 
 /// A file picked on the phone, waiting to go to Drive.
 class PendingFile {
@@ -269,14 +270,12 @@ class ClassroomService {
     required int missingCount,
   }) async {
     final due =
-        post.dueAt == null ? '' : ' It is due ${formatDue(post.dueAt!)}.';
+        post.dueAt == null ? '' : trp(' It is due {0}.', [formatDue(post.dueAt!)]);
     await _cloud.sendMessage(
       chatId: groupChatId(classGroup.id),
       kind: MessageKind.text,
       groupId: classGroup.id,
-      text: 'Reminder: "${post.title}" is still waiting on '
-          '$missingCount ${missingCount == 1 ? 'student' : 'students'}.$due '
-          'Open the class → Classwork to hand it in.',
+      text: trp('Reminder: "{0}" is still waiting on {1} {2}.{3} Open the class → Classwork to hand it in.', [post.title, missingCount, missingCount == 1 ? tr('student') : tr('students'), due]),
     );
   }
 

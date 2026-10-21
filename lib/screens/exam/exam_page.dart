@@ -10,6 +10,7 @@ import '../../widgets/note_tile.dart';
 import '../notes/note_detail.dart';
 import 'calendar_page.dart';
 import 'exam_form.dart';
+import '../../l10n/strings.dart';
 
 /// Exam Mode. Requirement 12, and the Gantt's "Exam Mode, countdown,
 /// progress tracking".
@@ -96,11 +97,11 @@ class _ExamPageState extends State<ExamPage> {
             padding: const EdgeInsets.only(bottom: 90),
             child: NestEmptyState(
               icon: Icons.timer_rounded,
-              title: 'No dates yet',
-              message: 'Add an exam, a quiz or an assignment deadline. '
+              title: tr('No dates yet'),
+              message: tr('Add an exam, a quiz or an assignment deadline. '
                   'NoteNest will count the days down and work out which notes '
-                  'to revise first.',
-              actionLabel: 'Add a date',
+                  'to revise first.'),
+              actionLabel: tr('Add a date'),
               onAction: _addDate,
             ),
           );
@@ -133,19 +134,19 @@ class _ExamPageState extends State<ExamPage> {
               children: [
                 Expanded(
                   child: Text(
-                    'Exam mode',
+                    tr('Exam mode'),
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
                 IconButton(
                   onPressed: _openCalendar,
                   icon: const Icon(Icons.calendar_month_rounded),
-                  tooltip: 'Academic calendar',
+                  tooltip: tr('Academic calendar'),
                 ),
                 IconButton(
                   onPressed: _addDate,
                   icon: const Icon(Icons.add_circle_outline_rounded),
-                  tooltip: 'Add a date',
+                  tooltip: tr('Add a date'),
                 ),
               ],
             ),
@@ -206,16 +207,16 @@ class _ExamPageState extends State<ExamPage> {
               const SizedBox(height: 22),
               Row(
                 children: [
-                  const Expanded(
-                    child: Text('REVISE IN THIS ORDER', style: nestEyebrow),
+                  Expanded(
+                    child: Text(tr('REVISE IN THIS ORDER'), style: nestEyebrow),
                   ),
-                  Text('${queue.length}', style: nestEyebrow),
+                  Text(trp('{0}', [queue.length]), style: nestEyebrow),
                 ],
               ),
               const SizedBox(height: 2),
               Text(
-                'Starred notes first, then the ones marked Review, then '
-                'whatever you have not opened in longest.',
+                tr('Starred notes first, then the ones marked Review, then '
+                'whatever you have not opened in longest.'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 4),
@@ -237,8 +238,8 @@ class _ExamPageState extends State<ExamPage> {
                     ),
                     child: Text(
                       _showWholeQueue
-                          ? 'Show fewer'
-                          : 'Show all ${queue.length}',
+                          ? tr('Show fewer')
+                          : trp('Show all {0}', [queue.length]),
                     ),
                   ),
                 ),
@@ -253,10 +254,9 @@ class _ExamPageState extends State<ExamPage> {
                 ),
                 child: Text(
                   subject == null
-                      ? 'There are no notes to revise yet. Anything you write '
-                          'will show up here in revision order.'
-                      : 'No notes filed under ${subject.code} yet. Notes you '
-                          'add to that subject will show up here.',
+                      ? tr('There are no notes to revise yet. Anything you write '
+                          'will show up here in revision order.')
+                      : trp('No notes filed under {0} yet. Notes you add to that subject will show up here.', [subject.code]),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -272,7 +272,7 @@ class _ExamPageState extends State<ExamPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          'PAST DATES · ${past.length}',
+                          trp('PAST DATES · {0}', [past.length]),
                           style: nestEyebrow,
                         ),
                       ),
@@ -401,7 +401,7 @@ class _CountdownCard extends StatelessWidget {
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined, size: 18),
-                tooltip: 'Edit this date',
+                tooltip: tr('Edit this date'),
               ),
             ],
           ),
@@ -449,9 +449,8 @@ class _CountdownCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     exam.reminderIsDue
-                        ? 'Reminder is showing on Today.'
-                        : 'Reminder set for '
-                            '${reminderLabel(exam.remindDays).toLowerCase()}.',
+                        ? tr('Reminder is showing on Today.')
+                        : trp('Reminder set for {0}.', [reminderLabel(exam.remindDays).toLowerCase()]),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -489,9 +488,9 @@ class _ProgressBlock extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(child: Text('PROGRESS', style: nestEyebrow)),
+            Expanded(child: Text(tr('PROGRESS'), style: nestEyebrow)),
             Text(
-              '$mastered of $total mastered',
+              trp('{0} of {1} mastered', [mastered, total]),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -515,14 +514,13 @@ class _ProgressBlock extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.flag_outlined, size: 15, color: NestColor.pen),
+              Icon(Icons.flag_outlined, size: 15, color: NestColor.pen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   days <= 0
-                      ? 'All $perDay left for today.'
-                      : 'Today: $perDay '
-                          '${perDay == 1 ? 'note' : 'notes'} to stay on track.',
+                      ? trp('All {0} left for today.', [perDay])
+                      : trp('Today: {0} {1} to stay on track.', [perDay, perDay == 1 ? tr('note') : tr('notes')]),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
@@ -624,7 +622,7 @@ class _MasterToggle extends StatelessWidget {
             size: 22,
             color: done ? NestColor.mint : NestColor.inkFaint,
           ),
-          tooltip: done ? 'Put back for review' : 'Mark mastered',
+          tooltip: done ? tr('Put back for review') : tr('Mark mastered'),
         ),
       ],
     );
@@ -653,7 +651,7 @@ class _PastRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            const Icon(Icons.history_rounded,
+            Icon(Icons.history_rounded,
                 size: 16, color: NestColor.inkFaint),
             const SizedBox(width: 12),
             Expanded(
@@ -664,15 +662,14 @@ class _PastRow extends StatelessWidget {
                     exam.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: NestColor.inkSoft,
                     ),
                   ),
                   Text(
-                    '${exam.kind.label} · '
-                    '${countdownLabel(exam.daysAway)}',
+                    trp('{0} · {1}', [exam.kind.label, countdownLabel(exam.daysAway)]),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -682,7 +679,7 @@ class _PastRow extends StatelessWidget {
               onPressed: onEdit,
               visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.more_horiz_rounded, size: 18),
-              tooltip: 'Edit or remove',
+              tooltip: tr('Edit or remove'),
             ),
           ],
         ),

@@ -8,6 +8,7 @@ import '../../models/note.dart';
 import '../../models/transcript.dart';
 import '../../theme/nest_theme.dart';
 import '../../widgets/nest_level_meter.dart';
+import '../../l10n/strings.dart';
 
 /// Records a lecture and files it against a note. Requirement 8.1.
 ///
@@ -71,8 +72,64 @@ class _RecordPageState extends State<RecordPage> {
     if (mounted) Navigator.pop(context);
   }
 
+  /// Which subject a new recording is filed under. Asked before the recorder
+  /// stops, so closing the sheet changes nothing and the lecture carries on.
+  /// Returns the subject's id, [_noSubject], or null if the sheet was closed.
+  static const _noSubject = -1;
+
+  Future<int?> _askSubject() {
+    final subjects = _repo.subjects();
+    return showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: NestColor.card,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 4),
+                child: Text(
+                  tr('File this recording under'),
+                  style: Theme.of(sheetContext).textTheme.titleMedium,
+                ),
+              ),
+              for (final s in subjects)
+                ListTile(
+                  leading: CircleAvatar(radius: 7, backgroundColor: s.color),
+                  title: Text(s.name),
+                  subtitle: Text(s.code),
+                  onTap: () => Navigator.pop(sheetContext, s.id),
+                ),
+              ListTile(
+                leading: const Icon(Icons.folder_off_outlined),
+                title: Text(tr('No subject yet')),
+                onTap: () => Navigator.pop(sheetContext, _noSubject),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (_saving) return;
+
+    // A recording started from inside a note, or from a subject, already knows
+    // where it belongs. Only a loose one needs asking.
+    int? subjectId = widget.initialSubjectId;
+    if (widget.existing == null &&
+        subjectId == null &&
+        _repo.subjects().isNotEmpty) {
+      final picked = await _askSubject();
+      if (picked == null || !mounted) return;
+      subjectId = picked == _noSubject ? null : picked;
+    }
+
     setState(() => _saving = true);
 
     final recording = await _recorder.stop();
@@ -81,8 +138,8 @@ class _RecordPageState extends State<RecordPage> {
     if (recording == null) {
       setState(() {
         _saving = false;
-        _message = 'Nothing was recorded, so there is nothing to keep. Tap '
-            'the microphone to start again.';
+        _message = tr('Nothing was recorded, so there is nothing to keep. Tap '
+            'the microphone to start again.');
       });
       return;
     }
@@ -91,8 +148,8 @@ class _RecordPageState extends State<RecordPage> {
     // from inside a note, otherwise a fresh one.
     final note = widget.existing ??
         await _repo.createNote(
-          title: 'Lecture recording',
-          subjectId: widget.initialSubjectId,
+          title: tr('Lecture recording'),
+          subjectId: subjectId,
         );
 
     await _repo.addAttachment(
@@ -114,20 +171,19 @@ class _RecordPageState extends State<RecordPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: NestColor.card,
-        title: const Text('Throw this recording away?'),
+        title: Text(tr('Throw this recording away?')),
         content: Text(
-          '${formatClock(_recorder.elapsed)} has been recorded and has not '
-          'been saved to a note yet.',
+          trp('{0} has been recorded and has not been saved to a note yet.', [formatClock(_recorder.elapsed)]),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep recording'),
+            child: Text(tr('Keep recording')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: NestColor.redPen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Throw away'),
+            child: Text(tr('Throw away')),
           ),
         ],
       ),
@@ -147,8 +203,8 @@ class _RecordPageState extends State<RecordPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Record the lecture',
+          title: Text(
+            tr('Record the lecture'),
             style: TextStyle(
               fontFamily: NestFont.display,
               fontSize: 19,
@@ -167,10 +223,10 @@ class _RecordPageState extends State<RecordPage> {
                   children: [
                     if (_message != null) _Notice(text: _message!),
                     if (unsupported && _message == null)
-                      const _Notice(
-                        text: 'Recording saves a file, so it needs the phone '
+                      _Notice(
+                        text: tr('Recording saves a file, so it needs the phone '
                             'app. In the browser build you can still use '
-                            'Dictate, which writes straight into the note.',
+                            'Dictate, which writes straight into the note.'),
                       ),
                     // The timer, the meter and the buttons add up to more than
                     // a short phone has, especially once a notice is showing.
@@ -199,7 +255,7 @@ class _RecordPageState extends State<RecordPage> {
                             ),
                             icon: const Icon(Icons.delete_outline_rounded,
                                 size: 18),
-                            label: const Text('Discard'),
+                            label: Text(tr('Discard')),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -214,7 +270,7 @@ class _RecordPageState extends State<RecordPage> {
                             onPressed:
                                 _saving || !_recorder.isActive ? null : _save,
                             icon: const Icon(Icons.check_rounded, size: 18),
-                            label: Text(_saving ? 'Saving…' : 'Save'),
+                            label: Text(_saving ? tr('Saving…') : tr('Save')),
                           ),
                         ),
                       ],
@@ -240,10 +296,10 @@ extension on _RecordPageState {
         const SizedBox(height: 12),
         Text(
           _recorder.isPaused
-              ? 'PAUSED'
+              ? tr('PAUSED')
               : _recorder.isRecording
-                  ? 'RECORDING'
-                  : 'READY',
+                  ? tr('RECORDING')
+                  : tr('READY'),
           style: nestEyebrow.copyWith(
             color: _recorder.isRecording
                 ? NestColor.redPen
@@ -253,12 +309,12 @@ extension on _RecordPageState {
         const SizedBox(height: 10),
         Text(
           formatClock(_recorder.elapsed),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: NestFont.mono,
             fontSize: 54,
             height: 1,
             fontWeight: FontWeight.w700,
-            letterSpacing: -1,
+            letterSpacing: ls(-1),
             color: NestColor.ink,
           ),
         ),
@@ -270,12 +326,12 @@ extension on _RecordPageState {
         const SizedBox(height: 12),
         Text(
           _recorder.isRecording
-              ? 'The line moves with your voice, so you can see it is hearing '
-                  'the room.'
+              ? tr('The line moves with your voice, so you can see it is hearing '
+                  'the room.')
               : _recorder.isPaused
-                  ? 'Paused. The time stops where it is and carries on when '
-                      'you resume.'
-                  : 'Nothing is being recorded yet.',
+                  ? tr('Paused. The time stops where it is and carries on when '
+                      'you resume.')
+                  : tr('Nothing is being recorded yet.'),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -332,7 +388,7 @@ class _Notice extends StatelessWidget {
       decoration: BoxDecoration(
         color: NestColor.o(NestColor.redPen, 0.08),
         borderRadius: BorderRadius.circular(NestRadius.tile),
-        border: const Border(
+        border: Border(
           left: BorderSide(color: NestColor.redPen, width: 3),
         ),
       ),

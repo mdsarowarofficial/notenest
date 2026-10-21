@@ -24,6 +24,7 @@ import 'dart:typed_data';
 import 'attachment.dart';
 import 'note.dart';
 import 'note_query.dart';
+import '../l10n/strings.dart';
 
 /// Why a file could not be opened as a shared note.
 enum BundleError { notJson, wrongFormat, tooNew, missingNote, tooBig, corrupt }
@@ -32,22 +33,22 @@ extension BundleErrorMessage on BundleError {
   String get message {
     switch (this) {
       case BundleError.notJson:
-        return 'This file is not a NoteNest note. Pick the .notenest file your '
-            'classmate sent you.';
+        return tr('This file is not a NoteNest note. Pick the .notenest file your '
+            'classmate sent you.');
       case BundleError.wrongFormat:
-        return 'This file is not a NoteNest note, or it was damaged on the '
-            'way. Ask for it to be sent again.';
+        return tr('This file is not a NoteNest note, or it was damaged on the '
+            'way. Ask for it to be sent again.');
       case BundleError.tooNew:
-        return 'This note was shared from a newer version of NoteNest. Update '
-            'the app and try again.';
+        return tr('This note was shared from a newer version of NoteNest. Update '
+            'the app and try again.');
       case BundleError.missingNote:
-        return 'The file opened but holds no note.';
+        return tr('The file opened but holds no note.');
       case BundleError.tooBig:
-        return 'This note is larger than NoteNest will import. Ask for it to '
-            'be shared without its attachments.';
+        return tr('This note is larger than NoteNest will import. Ask for it to '
+            'be shared without its attachments.');
       case BundleError.corrupt:
-        return 'Part of this file could not be read. Ask for it to be sent '
-            'again.';
+        return tr('Part of this file could not be read. Ask for it to be sent '
+            'again.');
     }
   }
 }
@@ -169,7 +170,7 @@ class NoteBundle {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
-    final stem = base.isEmpty ? 'note' : base;
+    final stem = base.isEmpty ? tr('note') : base;
     return '${stem.length > 40 ? stem.substring(0, 40) : stem}.notenest';
   }
 
@@ -256,14 +257,14 @@ class NoteBundle {
     final sharedBy = _text(parsed['sharedBy'], maxName);
 
     return NoteBundle(
-      title: title.isEmpty ? 'Shared note' : title,
+      title: title.isEmpty ? tr('Shared note') : title,
       body: body,
       topic: topic.isEmpty ? null : topic,
       tags: tags,
       type: NoteTypeData.fromKey(_string(note['type'])),
       subjectName: subjectName.isEmpty ? null : subjectName,
       subjectCode: subjectCode.isEmpty ? null : subjectCode,
-      sharedBy: sharedBy.isEmpty ? 'A classmate' : sharedBy,
+      sharedBy: sharedBy.isEmpty ? tr('A classmate') : sharedBy,
       policy: SharePolicyData.fromKey(_string(parsed['policy'])),
       files: files,
       writtenAt: _date(note['writtenAt']),

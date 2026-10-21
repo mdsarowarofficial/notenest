@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../data/note_repository.dart';
 import '../models/note.dart';
+import '../models/transcript.dart' show formatClock;
 import '../theme/nest_theme.dart';
 import 'nest_mark_tile.dart';
+import '../l10n/strings.dart';
+import '../models/note_markup.dart';
 
 /// One note in a list. Used by Today, Notes, Shared, Search and Trash, so a
 /// note looks the same everywhere it appears — and changing it here changes
@@ -21,11 +24,16 @@ class NoteTile extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.showRule = true,
+    this.highlight = const [],
   });
 
   final Note note;
   final VoidCallback? onTap;
   final Widget? trailing;
+
+  /// Search words to mark wherever they appear in the title and the preview.
+  /// Lower-case, as [NoteQuery.terms] gives them.
+  final List<String> highlight;
 
   /// Kept for the screens that already pass it. Cards need no rule between
   /// them, so this now only decides whether there is a gap below.
@@ -37,7 +45,8 @@ class NoteTile extends StatelessWidget {
         ? null
         : NoteRepository.instance.subjectById(note.subjectId!);
     final t = Theme.of(context).textTheme;
-    final body = note.body.trim().replaceAll('\n', ' ');
+    final body = plainText(note.body).trim().replaceAll('\n', ' ');
+    final checks = checkProgress(note.body);
 
     return Padding(
       padding: EdgeInsets.only(bottom: showRule ? 12 : 0),
@@ -77,7 +86,7 @@ class NoteTile extends StatelessWidget {
                               subject.code,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: NestFont.body,
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
@@ -89,8 +98,8 @@ class NoteTile extends StatelessWidget {
                       ],
                       const Spacer(),
                       if (note.important)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
                           child: Icon(
                             Icons.star_rounded,
                             size: 16,
@@ -99,7 +108,7 @@ class NoteTile extends StatelessWidget {
                         ),
                       Text(
                         relativeDay(note.updatedAt),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: NestFont.body,
                           fontSize: 11,
                           color: NestColor.inkFaint,
@@ -125,22 +134,71 @@ class NoteTile extends StatelessWidget {
                           ),
                         ),
                       Expanded(
-                        child: Text(
-                          note.title.isEmpty ? 'Untitled note' : note.title,
+                        child: Text.rich(
+                          highlightedText(
+                            note.title.isEmpty ? tr('Untitled note') : note.title,
+                            highlight,
+                            t.titleSmall,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: t.titleSmall,
                         ),
                       ),
                     ],
                   ),
+                  if (checks.total > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          checks.done == checks.total
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          size: 15,
+                          color: checks.done == checks.total
+                              ? NestColor.mint
+                              : NestColor.pen,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          trp('{0} of {1} done', [checks.done, checks.total]),
+                          style: TextStyle(
+                            fontFamily: NestFont.body,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: checks.done == checks.total
+                                ? NestColor.mintDeep
+                                : NestColor.pen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (note.audioMs > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.graphic_eq_rounded,
+                            size: 15, color: NestColor.pen),
+                        const SizedBox(width: 5),
+                        Text(
+                          trp('{0} recording', [formatClock(Duration(milliseconds: note.audioMs))]),
+                          style: TextStyle(
+                            fontFamily: NestFont.body,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: NestColor.pen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (body.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      body,
+                    Text.rich(
+                      highlightedText(body, highlight, t.bodySmall),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: t.bodySmall,
                     ),
                   ],
                   if (note.tags.isNotEmpty) ...[
@@ -165,7 +223,7 @@ class NoteTile extends StatelessWidget {
                             ),
                             child: Text(
                               tag,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: NestFont.body,
                                 fontSize: 11,
                                 color: NestColor.inkSoft,
@@ -174,8 +232,8 @@ class NoteTile extends StatelessWidget {
                           ),
                         if (note.tags.length > 3)
                           Text(
-                            '+${note.tags.length - 3}',
-                            style: const TextStyle(
+                            trp('+{0}', [note.tags.length - 3]),
+                            style: TextStyle(
                               fontFamily: NestFont.body,
                               fontSize: 11,
                               color: NestColor.inkFaint,
@@ -192,6 +250,50 @@ class NoteTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// [text] with every occurrence of a search word marked in the app's
+/// highlighter yellow. Case-insensitive; with no words it is plain text.
+TextSpan highlightedText(String text, List<String> terms, TextStyle? style) {
+  final words = terms.where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return TextSpan(text: text, style: style);
+
+  final lower = text.toLowerCase();
+  // Lower-casing can change a string's length for a few scripts, in which case
+  // the offsets would no longer line up; plain text is the safe answer there.
+  if (lower.length != text.length) return TextSpan(text: text, style: style);
+
+  // Mark every character a word covers, then cut the text where that changes.
+  final marked = List<bool>.filled(text.length, false);
+  for (final w in words) {
+    var from = 0;
+    while (true) {
+      final at = lower.indexOf(w, from);
+      if (at < 0) break;
+      for (var i = at; i < at + w.length; i++) {
+        marked[i] = true;
+      }
+      from = at + w.length;
+    }
+  }
+
+  final hit = (style ?? const TextStyle()).copyWith(
+    backgroundColor: NestColor.o(NestColor.highlight, 0.55),
+    fontWeight: FontWeight.w700,
+    color: NestColor.ink,
+  );
+  final spans = <TextSpan>[];
+  var start = 0;
+  for (var i = 1; i <= text.length; i++) {
+    if (i == text.length || marked[i] != marked[start]) {
+      spans.add(TextSpan(
+        text: text.substring(start, i),
+        style: marked[start] ? hit : null,
+      ));
+      start = i;
+    }
+  }
+  return TextSpan(style: style, children: spans);
 }
 
 IconData _typeIcon(NoteType type) {
@@ -284,7 +386,7 @@ class StatusDot extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             status.label,
-            style: nestEyebrow.copyWith(color: color, letterSpacing: 0.8),
+            style: nestEyebrow.copyWith(color: color, letterSpacing: ls(0.8)),
           ),
         ],
       ],

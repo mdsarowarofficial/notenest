@@ -7,6 +7,7 @@ library;
 
 import 'exam.dart';
 import 'task.dart';
+import '../l10n/strings.dart';
 
 class PlannedReminder {
   const PlannedReminder({
@@ -33,6 +34,7 @@ DateTime adjustForQuietHours(DateTime at) {
 const _taskBase = 1000000;
 const _examBase = 2000000;
 const idleId = 3000000;
+const reviewId = 4000000;
 const maxPlanned = 40;
 
 List<PlannedReminder> planReminders({
@@ -42,6 +44,7 @@ List<PlannedReminder> planReminders({
   required Set<String> disabledGroups,
   bool idleNudge = false,
   int idleDays = 3,
+  List<DateTime> reviewDue = const [],
 }) {
   final out = <PlannedReminder>[];
 
@@ -56,7 +59,7 @@ List<PlannedReminder> planReminders({
       if (!at.isAfter(now)) continue;
       out.add(PlannedReminder(
         id: _taskBase + t.id!,
-        title: useEarly ? 'Due in an hour' : 'Task due now',
+        title: useEarly ? tr('Due in an hour') : tr('Task due now'),
         body: t.title,
         at: at,
       ));
@@ -73,7 +76,7 @@ List<PlannedReminder> planReminders({
         if (at.isAfter(now)) {
           out.add(PlannedReminder(
             id: _examBase + e.id! * 2,
-            title: '${e.title} in $lead days',
+            title: trp('{0} in {1} days', [e.title, lead]),
             body: e.kind.label,
             at: at,
           ));
@@ -83,7 +86,7 @@ List<PlannedReminder> planReminders({
       if (onDay.isAfter(now)) {
         out.add(PlannedReminder(
           id: _examBase + e.id! * 2 + 1,
-          title: '${e.title} is today',
+          title: trp('{0} is today', [e.title]),
           body: e.kind.label,
           at: onDay,
         ));
@@ -94,6 +97,26 @@ List<PlannedReminder> planReminders({
   out.sort((a, b) => a.at.compareTo(b.at));
   final capped = out.take(maxPlanned).toList();
 
+  // Notes coming round for review: one evening reminder on the first day any
+  // is due (today, if some already are), saying how many will be waiting.
+  if (reviewDue.isNotEmpty && !disabledGroups.contains('reviews')) {
+    final first = reviewDue.reduce((a, b) => a.isBefore(b) ? a : b);
+    var day = DateTime(first.year, first.month, first.day);
+    final today = DateTime(now.year, now.month, now.day);
+    if (day.isBefore(today)) day = today;
+    var at = DateTime(day.year, day.month, day.day, 18);
+    if (!at.isAfter(now)) at = at.add(const Duration(days: 1));
+    final waiting = reviewDue.where((d) => !d.isAfter(at)).length;
+    capped.add(PlannedReminder(
+      id: reviewId,
+      title: tr('Notes to review'),
+      body: waiting == 1
+          ? tr('1 note is ready for review.')
+          : trp('{0} notes are ready for review.', [waiting]),
+      at: at,
+    ));
+  }
+
   // One quiet nudge, a few days after the app was last opened. Opening the
   // app rebuilds the plan, which pushes this back; it only ever rings for
   // someone who has stayed away.
@@ -101,8 +124,8 @@ List<PlannedReminder> planReminders({
     final day = now.add(Duration(days: idleDays));
     capped.add(PlannedReminder(
       id: idleId,
-      title: 'Your notes are waiting',
-      body: 'Pick up where you left off.',
+      title: tr('Your notes are waiting'),
+      body: tr('Pick up where you left off.'),
       at: DateTime(day.year, day.month, day.day, 18),
     ));
   }

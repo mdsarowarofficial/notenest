@@ -5,6 +5,8 @@
 /// twice — how a conversation's address is worked out.
 library;
 
+import '../l10n/strings.dart';
+
 /// What kind of conversation this is.
 ///
 /// Both kinds live in the same collection and use the same message code. The
@@ -268,7 +270,7 @@ class ChatMessage {
   bool get hasBlob => blobId.isNotEmpty;
 
   String get fromLabel =>
-      fromName.trim().isEmpty ? 'Someone' : fromName.trim();
+      fromName.trim().isEmpty ? tr('Someone') : fromName.trim();
 
   /// The one line shown in the conversation list.
   String get preview {
@@ -276,11 +278,29 @@ class ChatMessage {
       case MessageKind.text:
         return text.trim();
       case MessageKind.note:
+        return '📄 ${title.trim().isEmpty ? tr('A note') : title.trim()}';
+      case MessageKind.image:
+        return tr('🖼 Photo');
+      case MessageKind.voice:
+        return tr('🎤 Voice message');
+      case MessageKind.system:
+        return text.trim();
+    }
+  }
+
+  /// [preview] in English, always. This is what gets written to the cloud as
+  /// the thread's last line, and the other person's phone may be set to a
+  /// different language from the one the sender is using.
+  String get storedPreview {
+    switch (kind) {
+      case MessageKind.text:
+        return text.trim();
+      case MessageKind.note:
         return '📄 ${title.trim().isEmpty ? 'A note' : title.trim()}';
       case MessageKind.image:
-        return '🖼 Photo';
+        return tr('🖼 Photo');
       case MessageKind.voice:
-        return '🎤 Voice message';
+        return tr('🎤 Voice message');
       case MessageKind.system:
         return text.trim();
     }
@@ -350,10 +370,9 @@ const typingWriteEvery = Duration(seconds: 3);
 /// What is wrong with a message about to be sent, or null when nothing is.
 String? messageProblem(String raw) {
   final text = raw.trim();
-  if (text.isEmpty) return 'Nothing to send.';
+  if (text.isEmpty) return tr('Nothing to send.');
   if (text.length > maxMessageLength) {
-    return 'That is longer than a message can be '
-        '($maxMessageLength characters).';
+    return trp('That is longer than a message can be ({0} characters).', [maxMessageLength]);
   }
   return null;
 }
@@ -374,14 +393,14 @@ String dayHeading(DateTime at, {DateTime? now}) {
   final days = DateTime.utc(today.year, today.month, today.day)
       .difference(DateTime.utc(at.year, at.month, at.day))
       .inDays;
-  if (days == 0) return 'Today';
-  if (days == 1) return 'Yesterday';
+  if (days == 0) return tr('Today');
+  if (days == 1) return tr('Yesterday');
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   final base = '${at.day} ${months[at.month - 1]}';
-  return at.year == today.year ? base : '$base ${at.year}';
+  return localDate(at.year == today.year ? base : '$base ${at.year}');
 }
 
 /// True when two moments fall on different calendar days.
@@ -392,7 +411,7 @@ bool isNewDay(DateTime a, DateTime b) =>
 String clockLabel12(DateTime at) {
   final h = at.hour % 12 == 0 ? 12 : at.hour % 12;
   final m = at.minute.toString().padLeft(2, '0');
-  return '$h:$m ${at.hour < 12 ? 'AM' : 'PM'}';
+  return localDate('$h:$m ${at.hour < 12 ? 'AM' : 'PM'}');
 }
 
 /// When a conversation last had something in it, for the list.
@@ -410,13 +429,13 @@ String whenLabel(DateTime at, {DateTime? now}) {
   if (at.year == yesterday.year &&
       at.month == yesterday.month &&
       at.day == yesterday.day) {
-    return 'Yesterday';
+    return tr('Yesterday');
   }
 
   if (at.year == today.year) {
-    return '${at.day}/${at.month}';
+    return localDate('${at.day}/${at.month}');
   }
-  return '${at.day}/${at.month}/${at.year}';
+  return localDate('${at.day}/${at.month}/${at.year}');
 }
 
 /// "Rafi is typing…", or "Rafi and 2 others are typing…".
@@ -426,11 +445,11 @@ String whenLabel(DateTime at, {DateTime? now}) {
 String? typingLabel(List<String> names) {
   final people = names.where((n) => n.trim().isNotEmpty).toList();
   if (people.isEmpty) return null;
-  if (people.length == 1) return '${people.first} is typing…';
+  if (people.length == 1) return trp('{0} is typing…', [people.first]);
   if (people.length == 2) {
-    return '${people.first} and ${people[1]} are typing…';
+    return trp('{0} and {1} are typing…', [people.first, people[1]]);
   }
-  return '${people.first} and ${people.length - 1} others are typing…';
+  return trp('{0} and {1} others are typing…', [people.first, people.length - 1]);
 }
 
 // ------------------------------------------------------ message requests
