@@ -54,7 +54,8 @@ class _RecordPageState extends State<RecordPage> {
   Future<void> _begin() async {
     final failure = await _recorder.start();
     if (!mounted) return;
-    if (failure != null) setState(() => _message = failure.message);
+    // An earlier refusal must not stay on screen once recording works.
+    setState(() => _message = failure?.message);
   }
 
   Future<void> _togglePause() async {

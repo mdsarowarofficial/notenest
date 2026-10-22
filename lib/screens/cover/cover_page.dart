@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/auth_repository.dart';
 import '../../data/document_service.dart';
 import '../../data/note_repository.dart';
 import '../../data/page_renderer.dart';
@@ -38,6 +39,11 @@ class _CoverPageScreenState extends State<CoverPageScreen> {
     _spec = CoverSpec.decode(_repo.coverDraft);
     if (_spec.studentName.trim().isEmpty && _repo.userName.isNotEmpty) {
       _spec = _spec.copyWith(studentName: _repo.userName);
+    }
+    // The university typed when the account was made is the institution.
+    final school = AuthRepository.instance.currentUser?.institution ?? '';
+    if (_spec.institution.trim().isEmpty && school.trim().isNotEmpty) {
+      _spec = _spec.copyWith(institution: school.trim());
     }
     if (_spec.session.trim().isEmpty && (_repo.semesterLabel ?? '').isNotEmpty) {
       _spec = _spec.copyWith(session: _repo.semesterLabel);

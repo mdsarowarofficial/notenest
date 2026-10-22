@@ -81,6 +81,18 @@ void main() {
   });
 
   group('toggleInline', () {
+    test('a second tap at the end of a bold word steps out of it', () {
+      final opened = toggleInline(v('', 0), '**');
+      expect(opened.text, '****');
+      // type "x" between the marks
+      const typed = TextEditingValue(
+        text: '**x**',
+        selection: TextSelection.collapsed(offset: 3),
+      );
+      final out = toggleInline(typed, '**');
+      expect(out.text, '**x**');
+      expect(out.selection.baseOffset, 5);
+    });
     test('wraps a selection and unwraps it again', () {
       final bold = toggleInline(v('hello world', 6, 11), '**');
       expect(bold.text, 'hello **world**');

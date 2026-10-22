@@ -1,7 +1,7 @@
 name: notenest
 description: NoteNest — personal academic workspace for students.
 publish_to: "none"
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   # Raised from 3.0.0 for Activity 06: the audio and speech packages below

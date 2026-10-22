@@ -506,9 +506,14 @@ class _HomeShellState extends State<HomeShell> {
 
     // Photo and PDF both need a note to attach to, so one is created first and
     // the editor opens on it with the file already in place.
+    //
+    // With no subject chosen in the drawer the editor shows the first subject
+    // as if it were picked, so the note has to be filed there too; otherwise it
+    // looks filed and is not, and no subject chip ever appears on it.
+    final subjects = _repo.subjects();
     final note = await _repo.createNote(
       title: kind == CaptureKind.photo ? tr('Handwritten note') : tr('PDF note'),
-      subjectId: subject?.id,
+      subjectId: subject?.id ?? (subjects.isNotEmpty ? subjects.first.id : null),
     );
     if (!mounted) return;
 

@@ -1027,6 +1027,7 @@ class _CourseCards extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final subjects = repo.subjects();
 
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1045,9 +1046,9 @@ class _CourseCards extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          // Room for a two-line course name plus the count line, with the
-          // text sizes people actually use.
-          height: 132,
+          // Room for a two-line course name plus the count line, growing with
+          // the phone's text size so large text is not pushed out of the card.
+          height: 132 * textScale,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: subjects.length,
@@ -1070,7 +1071,7 @@ class _CourseCards extends StatelessWidget {
                     ),
                   ),
                   child: Container(
-                    width: 150,
+                    width: 150 + (textScale - 1) * 70,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: NestColor.card,
@@ -1089,6 +1090,8 @@ class _CourseCards extends StatelessWidget {
                           ),
                           child: Text(
                             s.code.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: t.labelSmall
                                 ?.copyWith(color: NestColor.onHighlight),
                           ),

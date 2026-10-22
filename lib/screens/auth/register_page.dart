@@ -187,6 +187,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return Scaffold(
       body: PaperBackground(
+        themeToggle: true,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(

@@ -145,7 +145,10 @@ class _SearchPageState extends State<SearchPage> {
             },
             decoration: InputDecoration(
               hintText: tr('Search titles, notes and tags'),
+              filled: false,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               isDense: true,
               suffixIcon: _input.text.isEmpty
                   ? null

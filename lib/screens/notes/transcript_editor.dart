@@ -187,7 +187,10 @@ class _TranscriptEditorPageState extends State<TranscriptEditorPage> {
             ),
             decoration: InputDecoration(
               hintText: tr('Note title'),
+              filled: false,
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
           ),

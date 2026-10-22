@@ -296,7 +296,10 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
               ),
               decoration: InputDecoration(
                 hintText: tr('Note title'),
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -427,7 +430,10 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
               ),
               decoration: InputDecoration(
                 hintText: tr('Write your note...'),
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
             ),

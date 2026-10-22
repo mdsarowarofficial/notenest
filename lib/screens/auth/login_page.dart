@@ -305,6 +305,7 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       body: PaperBackground(
+        themeToggle: true,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(

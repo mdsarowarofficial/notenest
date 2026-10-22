@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../theme/nest_theme.dart';
+import '../theme/theme_controller.dart';
 
 /// The stationery that drifts behind the entrance screens.
 enum Stationery { pen, pencil, diary, book, sticky, clip, highlighter, ruler }
@@ -13,9 +15,17 @@ enum Stationery { pen, pencil, diary, book, sticky, clip, highlighter, ruler }
 /// repeats visibly. A pale scrim sits over them, so the form in front stays
 /// easy to read no matter which object floats behind it.
 class PaperBackground extends StatefulWidget {
-  const PaperBackground({super.key, required this.child});
+  const PaperBackground({
+    super.key,
+    required this.child,
+    this.themeToggle = false,
+  });
 
   final Widget child;
+
+  /// Shows a light/dark switch in the corner, for screens reached before
+  /// Settings is (sign in, register).
+  final bool themeToggle;
 
   @override
   State<PaperBackground> createState() => _PaperBackgroundState();
@@ -92,10 +102,39 @@ class _PaperBackgroundState extends State<PaperBackground>
 
         // Keeps every object quiet enough to read over.
         Positioned.fill(
-          child: ColoredBox(color: NestColor.o(Colors.white, 0.34)),
+          child: ColoredBox(
+            color: NestColor.isDark
+                ? NestColor.o(NestColor.paper, 0.72)
+                : NestColor.o(Colors.white, 0.34),
+          ),
         ),
 
         widget.child,
+
+        if (widget.themeToggle)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: NestColor.o(NestColor.card, 0.92),
+                    foregroundColor: NestColor.ink,
+                  ),
+                  tooltip: tr('Light / dark'),
+                  icon: Icon(
+                    NestColor.isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                  ),
+                  onPressed: () => ThemeController.instance.set(
+                    NestColor.isDark ? ThemeChoice.light : ThemeChoice.dark,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

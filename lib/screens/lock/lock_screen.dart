@@ -28,12 +28,21 @@ class LockGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppLock.instance,
-      builder: (context, _) => Stack(
-        children: [
-          child,
-          if (AppLock.instance.locked) const Positioned.fill(child: LockScreen()),
-        ],
-      ),
+      builder: (context, _) {
+        final locked = AppLock.instance.locked;
+        return Stack(
+          children: [
+            // Covering the app is not enough: a screen reader and keyboard
+            // focus still reach whatever is underneath, so while locked the
+            // app below is hidden from both.
+            ExcludeSemantics(
+              excluding: locked,
+              child: ExcludeFocus(excluding: locked, child: child),
+            ),
+            if (locked) const Positioned.fill(child: LockScreen()),
+          ],
+        );
+      },
     );
   }
 }

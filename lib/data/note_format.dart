@@ -23,6 +23,24 @@ TextEditingValue toggleInline(TextEditingValue v, String mark) {
       e + m <= t.length &&
       t.substring(s - m, s) == mark &&
       t.substring(e, e + m) == mark;
+  // Cursor sitting just before the closing mark of a word being formatted:
+  // another tap means "I am done with bold", so step past the mark instead of
+  // opening a second empty pair.
+  if (s == e && !wrapped && e + m <= t.length && t.substring(e, e + m) == mark) {
+    final lineStart = t.lastIndexOf('\n', (s - 1).clamp(0, t.length)) + 1;
+    final before = t.substring(lineStart, s);
+    final pattern = switch (mark) {
+      '*' => RegExp(r'(?<!\*)\*(?!\*)'),
+      '**' => RegExp(r'(?<!\*)\*\*(?!\*)'),
+      _ => RegExp(RegExp.escape(mark)),
+    };
+    if (pattern.allMatches(before).length.isOdd) {
+      return TextEditingValue(
+        text: t,
+        selection: TextSelection.collapsed(offset: s + m),
+      );
+    }
+  }
   if (wrapped) {
     return TextEditingValue(
       text: t.substring(0, s - m) + t.substring(s, e) + t.substring(e + m),

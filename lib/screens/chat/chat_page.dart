@@ -685,7 +685,10 @@ class _Composer extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: tr('Message'),
                   counterText: '',
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/auth_repository.dart';
 import '../../data/account_sync.dart';
@@ -276,6 +277,29 @@ class SettingsPage extends StatelessWidget {
                       // Back to the notebook, where the tour starts on its own
                       // because it is no longer marked as seen.
                       Navigator.of(context).popUntil((r) => r.isFirst);
+                    },
+                  ),
+                  _Row(
+                    icon: Icons.privacy_tip_outlined,
+                    tint: NestColor.tintPen,
+                    ink: NestColor.penDeep,
+                    title: tr('Privacy policy'),
+                    value: tr('What NoteNest stores and who can see it'),
+                    onTap: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final ok = await launchUrl(
+                        Uri.parse(
+                          'https://mdsarowarofficial.github.io/notenest/privacy-policy.html',
+                        ),
+                        mode: LaunchMode.externalApplication,
+                      );
+                      if (!ok) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(tr('Could not open the browser.')),
+                          ),
+                        );
+                      }
                     },
                   ),
                   _Row(

@@ -18,7 +18,7 @@ extension ThemeChoiceData on ThemeChoice {
 
   static ThemeChoice fromKey(String? key) => ThemeChoice.values.firstWhere(
         (c) => c.name == key,
-        orElse: () => ThemeChoice.system,
+        orElse: () => ThemeChoice.light,
       );
 }
 
@@ -38,7 +38,7 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
 
   static const _key = 'theme_mode';
 
-  ThemeChoice _choice = ThemeChoice.system;
+  ThemeChoice _choice = ThemeChoice.light;
   ThemeChoice get choice => _choice;
 
   /// Reads the saved choice and sets the palette. Called before the first
@@ -55,7 +55,7 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
         _choice = ThemeChoiceData.fromKey(rows.first['value'] as String?);
       }
     } catch (_) {
-      // A settings table that cannot be read leaves the app on "system".
+      // A settings table that cannot be read leaves the app on light.
     }
     NestColor.use(_resolve());
     WidgetsBinding.instance.addObserver(this);
