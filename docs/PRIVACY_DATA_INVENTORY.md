@@ -64,10 +64,9 @@ typed**, so nobody can register under someone else's address.
 * **The project owner**, through the Firebase console. Every note shared, every
   message sent, is readable there. This is inherent to the architecture and
   must be in the privacy policy.
-* **Nobody else.** There is no analytics SDK, no advertising SDK, no crash
-  reporter and no third-party tracker — verified against `pubspec.yaml`, where
-  the only network dependencies are `firebase_core`, `firebase_auth` and
-  `cloud_firestore`.
+* **Google, as Firebase Crashlytics** (added 2026-11-04): anonymous crash
+  reports only. No analytics SDK, no advertising SDK and no third-party
+  tracker.
 
 ### Data sent to Google outside Firebase
 
@@ -119,6 +118,7 @@ otherwise device-only — and it is disclosed in the policy.
 | Messages — in-app | collected, **shared with the people in the conversation** |
 | Location, contacts, financial, health | **none** |
 | Third-party advertising or analytics | **none** |
+| Crash logs and diagnostics (Crashlytics) | **collected, not shared, optional=no**; purpose: App functionality / analytics-diagnostics. In Play's form: *App info and performance → Crash logs* and *Diagnostics*, plus *Device or other IDs* (installation ID) |
 | Data used for tracking | **no** |
 
 ## Privacy policy

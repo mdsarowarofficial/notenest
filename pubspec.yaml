@@ -1,7 +1,7 @@
 name: notenest
 description: NoteNest — personal academic workspace for students.
 publish_to: "none"
-version: 1.0.2+4
+version: 1.0.2+5
 
 environment:
   # Raised from 3.0.0 for Activity 06: the audio and speech packages below
@@ -82,6 +82,7 @@ dependencies:
   flutter_timezone: ^5.1.1
   local_auth: ^3.0.2
   firebase_messaging: ^16.7.0
+  firebase_crashlytics: ^5.4.1
 
   # Optional, for the intended typefaces. After adding it, open
   # lib/theme/nest_theme.dart and set the NestFont values.

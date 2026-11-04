@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'data/app_database.dart';
 import 'data/auth_repository.dart';
 import 'data/cloud_service.dart';
+import 'data/crash_reporter.dart';
 import 'data/note_repository.dart';
 import 'data/reminder_service.dart';
 import 'screens/auth/login_page.dart';
@@ -28,9 +29,11 @@ Future<void> main() async {
   // that escapes a future is logged rather than left unseen.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
+    CrashReporter.flutterError(details);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('Uncaught error: $error\n$stack');
+    CrashReporter.error(error, stack);
     return true;
   };
   ErrorWidget.builder = (details) => const _BrokenSpot();

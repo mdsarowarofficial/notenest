@@ -31,6 +31,10 @@ plugins {
     // the usual cause of "plugin is not compatible" build failures. 4.5.0 is
     // the current release.
     id("com.google.gms.google-services") version("4.5.0") apply false
+
+    // Uploads the symbol files Crashlytics needs to read a crash report from
+    // a release build. Does nothing at runtime on its own.
+    id("com.google.firebase.crashlytics") version("3.0.6") apply false
 }
 
 include(":app")

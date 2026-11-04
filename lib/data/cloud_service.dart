@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../firebase_options.dart';
 import '../models/chat.dart';
+import 'crash_reporter.dart';
 import '../models/cloud_profile.dart';
 import '../models/note_share.dart';
 import '../models/study_group.dart';
@@ -201,6 +202,7 @@ class CloudService extends ChangeNotifier {
     );
     _ready = true;
     _startupError = null;
+    await CrashReporter.enable();
 
     // Firebase remembers a signed-in account across restarts, so a returning
     // student should already be connected — but only if it is *their* cloud
