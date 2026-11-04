@@ -1,111 +1,55 @@
 # NoteNest — Play Store release checklist
 
-State as of this audit. Nothing is ticked that was not actually verified, and
-"verified by reading" is distinguished from "verified by running".
+State on 2026-11-04, version 1.0.2+4. "Verified" means run, not just read.
+(The earlier version of this file, from the October audit, said NOT READY for
+reasons that have since been fixed; it was replaced rather than patched.)
 
-## Build and signing
-
-| Item | State | Evidence |
-|---|---|---|
-| Application ID | **done** — `com.notenest.app` | `android/app/build.gradle.kts`. Was `com.example.notenest`, which Play rejects |
-| `namespace` matches | done | same file; `MainActivity.kt` moved to `com/notenest/app/` and the old package deleted |
-| Firebase registered for the new ID | **done** | `google-services.json` contains `com.notenest.app` |
-| Version | `1.0.0+1` | `pubspec.yaml` |
-| Upload keystore exists | **done** | created with the Android Studio JDK's `keytool`, RSA 2048, 10,000 days |
-| `key.properties` | **done** | four values; written by a script that never printed the password |
-| Keystore kept out of git | **verified** | `git status` after the commit listed neither `key.properties` nor the `.jks`; `.gitignore` carries `**/key.properties`, `**/*.jks`, `**/*.keystore`, `**/*.p12`, `**/*.pepk` |
-| Keystore backed up off this laptop | **UNKNOWN** | only the owner can confirm. Lose it and the app can never be updated |
-| Release does not fall back to debug signing | **done this audit** (NN-04) | a missing key now throws; `-PallowDebugSigning=true` is the deliberate opt-out |
-| Release APK builds | **was passing** before this audit's changes | `app-release.apk`, 84.5 MB |
-| Release AAB built | **NOT RUN** | `flutter build appbundle --release` |
-| Release build tested on a real device | **NOT RUN** | the single most important unrun check |
-| `minSdk` / `targetSdk` | Flutter defaults | **unverified against Play's current target-API requirement** — check the Play Console, which states the current minimum |
-| Code shrinking | off, deliberately | R8 removes reflection-reached classes (sqflite's channel, Syncfusion's viewer, firebase_auth's providers). Keep rules were never written or tested, and a release-only crash is the worst class of bug |
-| APK size | 84.5 MB | three ABIs in one file. An AAB cuts this to roughly a third per device, which is reason enough to ship the AAB |
-
-## Icon, splash, appearance
+## Code and build
 
 | Item | State |
 |---|---|
-| Adaptive icon | **done** — `mipmap-anydpi-v26` + 108dp foregrounds at five densities + background colour |
-| Legacy and round icons | done, five densities each |
-| Manifest label | **done** — `NoteNest` (was `notenest`) |
-| Native splash colour | done — the icon's yellow, so there is no white flash |
-| Web icons and favicon | done |
-| Icon legibility at 48 px | **verified by rendering** — the fold and the highlighted line both survive |
+| Application ID `com.notenest.app`, Firebase registered for it | done |
+| Release signed with the upload key, no debug fallback | done (verified: build fails without `key.properties`) |
+| `flutter analyze` | clean (verified 2026-11-04) |
+| Tests | 283 pass (verified 2026-11-04) |
+| Firestore rules tests (`firestore-tests`, `npm test`) | 34 pass at last run; rules published by the owner |
+| `targetSdk` 36, `minSdk` 24 (Flutter 3.47 defaults) | meets Play's current target requirement |
+| `allowBackup=false` | done |
+| Sign-in, offline sign-in message, offline sign-up, setup flow, note save, session restore | run on the emulator 2026-11-04 |
+| Login/sign-up can no longer hang on an unexpected error | fixed 2026-11-04 |
+| Release AAB | built 2026-11-04 as 1.0.2+4 |
 
-## Policy — the blockers
-
-| Requirement | State | What it needs |
-|---|---|---|
-| **Privacy policy URL** | **MISSING — blocker** | Host one. Contents are specified in `PRIVACY_DATA_INVENTORY.md`. GitHub Pages is free and sufficient |
-| **In-app account deletion** | **done this audit** (NN-05) | Profile → Delete account. Also needs a **web deletion request page**, which Play asks for alongside the in-app route |
-| **Data Safety form** | not filled | answers are tabulated in `PRIVACY_DATA_INVENTORY.md` |
-| **UGC: report content** | **MISSING — blocker** | the app has chat; Play requires an in-app way to report a message |
-| **UGC: block a user** | **MISSING — blocker** | and a way to block the person who sent it |
-| **UGC: a content policy** | missing | a short acceptable-use statement, shown or linked |
-| Content rating questionnaire | not done | the chat feature changes the answers; fill it after the UGC work |
-| Target audience | not set | must be 13+. The app is not designed for children and should not say it is |
-| Ads declaration | none — correct | no advertising SDK exists |
-| App access for reviewers | **needed** | the reviewer cannot see sharing, groups or chat without an account. Provide a test cloud account and password in the Play Console's App Access section, or the review stalls |
-| Third-party licences | **partly** | the two bundled fonts ship with their OFL files. Flutter package licences are not surfaced anywhere in the app — a "Licences" entry using `showLicensePage` would close this |
-
-### What the UGC work actually requires
-
-Scoped here so it is not vague. Not implemented; this is the specification.
-
-1. **Block** — a per-person list held locally. A blocked person's messages are
-   hidden, their shares do not reach the inbox, and a direct chat with them
-   cannot be opened. Local is enough and needs no new rules.
-2. **Report** — on a message and on a thread. Writes to a new `reports`
-   collection: reporter uid, reported uid, chat id, message id, a copy of the
-   text, a reason, a timestamp. Rules: `create` only, by a signed-in user whose
-   own uid is the reporter; **no read, no update, no delete** by anyone,
-   because only the owner reads it in the console.
-3. **A visible route for the owner to act** — at minimum a support email in the
-   listing and a stated response time.
-4. **An acceptable-use line** in the privacy policy or beside the chat.
-
-Until 1 and 2 exist, a student being harassed can only leave the group. That is
-both a policy failure and a real one.
-
-## Listing
+## Policy
 
 | Item | State |
 |---|---|
-| App name | NoteNest |
-| Short and full description | not written |
-| Screenshots (phone, at least 2) | not taken — take them after the real-device test, from the release build |
-| Feature graphic 1024×500 | not made |
-| Category | Education |
-| Contact email | **must be a real monitored address** |
-| What claims the listing may make | only what exists. **Teacher assignments do not exist.** Scheduled reminders are not implemented as real notifications |
+| Privacy policy text | done, `docs/privacy-policy.html` — **owner must confirm GitHub Pages serves it** |
+| In-app account deletion | done (Profile → Delete account) |
+| Web page / URL for deletion requests | **owner**: Play asks for a link; the policy gives an email only |
+| Report and block | done; rules published |
+| Data safety form | **owner**: answers in `PRIVACY_DATA_INVENTORY.md` |
+| Content rating | **owner**: chat/UGC changes the answers |
+| Target audience | **owner**: 13+ |
+| Reviewer test account (App access) | **owner**: make a real cloud account and put its login in the console |
+| Contact email | **owner**: must be monitored and match the policy |
+| Google logo on the Google button | not added; Google's branding guide wants their asset |
 
-## Order of work
+## Owner-only steps
 
-1. Run every BLOCKED check in `TEST_PLAN.md` §1. Nothing below matters until the
-   code compiles and the 188 tests pass.
-2. Test §5 (group chat) and §7 (sign-in with a pre-audit account). Those two
-   rule and password changes are the ones that could break a working app.
-3. Install the release APK on a real phone and work through §8.
-4. Build and test the AAB.
-5. Write and host the privacy policy.
-6. Build block and report.
-7. Turn on App Check and a Firestore usage alert.
-8. Fill the Data Safety form and the content rating.
-9. Screenshots, descriptions, test account for reviewers.
-10. Internal testing track first — not production.
+1. Enable the Google Drive API in Google Cloud project `notenest-740b5` and add
+   the `drive.file` scope to the OAuth consent screen.
+2. Phone-test the cloud features with two accounts: email confirmation, Google
+   sign-in, chat, message requests, classes and assignments, report/block,
+   Drive backup and restore, account delete, fingerprint lock.
+3. Back up the keystore and `key.properties` somewhere off this laptop.
+4. Upload the AAB to **Internal testing** first.
+5. After the first upload: add the Play app-signing SHA-1 in Firebase,
+   re-download `google-services.json`, rebuild, upload again.
+6. Listing text, phone screenshots (at least 2), feature graphic 1024×500.
+7. Closed testing, then Production.
 
-## Honest verdict
+## Deliberately off
 
-**NOT READY**, and not close on the policy side.
-
-The engineering is in decent shape: the critical directory leak is closed, the
-password hashing is a recognised algorithm with its implementation verified
-against a reference, account deletion exists, and the release cannot be signed
-with a debug key by accident any more.
-
-What stands between this and a responsible public release is not more code
-quality. It is that nothing in this audit has been compiled, that there is no
-privacy policy, and that an app where students message each other ships without
-a way to report or block anybody.
+Push notifications (`PushService.enabled = false`). Turning them on needs the
+Blaze plan, `firebase deploy --only functions`, and a two-phone test
+(`docs/PUSH_SETUP.md`). Do not mention push in the listing.

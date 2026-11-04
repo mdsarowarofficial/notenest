@@ -68,7 +68,11 @@ List<PlannedReminder> planReminders({
 
   if (!disabledGroups.contains('exams')) {
     for (final e in exams) {
-      if (e.id == null || e.isPast) continue;
+      if (e.id == null) continue;
+      // Judged against the `now` passed in, not the real clock, so the plan is
+      // the same function of its inputs everywhere (and testable).
+      final examDay = DateTime(e.date.year, e.date.month, e.date.day);
+      if (examDay.isBefore(DateTime(now.year, now.month, now.day))) continue;
       final lead = e.remindDays;
       if (lead != null && lead > 0) {
         final day = e.date.subtract(Duration(days: lead));

@@ -43,6 +43,10 @@ class _LoginPageState extends State<LoginPage> {
   bool _busy = false;
   bool _obscure = true;
 
+  /// A reason from the cloud that beats "no account found": the phone is
+  /// offline, or Firebase is rate-limiting this address.
+  String? _cloudNotice;
+
   @override
   void dispose() {
     _email.dispose();
@@ -62,11 +66,18 @@ class _LoginPageState extends State<LoginPage> {
   /// said first.
   Future<AuthError?> _signInFromCloud({bool rekeyExisting = false}) async {
     final cloud = CloudService.instance;
-    if (!await cloud.waitUntilReady()) return AuthError.emailNotFound;
+    if (!await cloud.waitUntilReady()) {
+      _cloudNotice =
+          tr('No connection to Firebase. Check your internet and try again.');
+      return AuthError.emailNotFound;
+    }
 
     try {
       await cloud.signIn(email: _email.text, password: _password.text);
-    } on CloudException {
+    } on CloudException catch (e) {
+      if (e.isNetwork || e.code == 'too-many-requests') {
+        _cloudNotice = e.message;
+      }
       return AuthError.emailNotFound;
     }
 
@@ -131,8 +142,8 @@ class _LoginPageState extends State<LoginPage> {
             Text(
               // Said out loud rather than discovered later. A password that
               // only ever existed on one device cannot be mailed back.
-              'If you never connected a cloud account, there is nothing to '
-              'send: that password was only ever stored on this device.',
+              tr('If you never connected a cloud account, there is nothing to '
+              'send: that password was only ever stored on this device.'),
               style: Theme.of(dialogContext).textTheme.bodySmall,
             ),
           ],
@@ -222,7 +233,22 @@ class _LoginPageState extends State<LoginPage> {
       _error = null;
       _busy = true;
     });
+    try {
+      await _attempt();
+    } catch (e) {
+      // Anything unexpected — a timeout, a plugin error — must give the button
+      // back, or the screen stays on "Opening your notebook..." until the app
+      // is restarted.
+      if (!mounted) return;
+      setState(() {
+        _error = tr('That did not work. Try again in a moment.');
+        _busy = false;
+      });
+    }
+  }
 
+  Future<void> _attempt() async {
+    _cloudNotice = null;
     var failure = await AuthRepository.instance.signIn(
       email: _email.text,
       password: _password.text,
@@ -268,7 +294,7 @@ class _LoginPageState extends State<LoginPage> {
     final problem = failure;
     if (problem != null) {
       setState(() {
-        _error = problem.message;
+        _error = _cloudNotice ?? problem.message;
         _busy = false;
       });
       return;

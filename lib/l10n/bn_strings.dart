@@ -2,6 +2,10 @@
 // English text on the left, Bangla on the right.
 
 const Map<String, String> bnStrings = {
+  'Your choice is saved now. Phone reminders for tasks and exams can be switched on any time in the notifications settings.': 'আপনার পছন্দ এখন সংরক্ষিত। কাজ ও পরীক্ষার ফোন রিমাইন্ডার যেকোনো সময় নোটিফিকেশন সেটিংস থেকে চালু করা যাবে।',
+  'When do you plan to revise? Saved on your profile as your own routine.': 'কখন পড়তে চান? আপনার নিজের রুটিন হিসেবে প্রোফাইলে রাখা হলো।',
+  'Your notebook is ready. This email already has a cloud account, so a new one was not made. Connect it from Settings → Cloud account, using the password of that account.': 'আপনার নোটবুক তৈরি। এই ইমেইলে আগে থেকেই একটি ক্লাউড অ্যাকাউন্ট আছে, তাই নতুন একটি বানানো হয়নি। সেটিংস → ক্লাউড অ্যাকাউন্ট থেকে ওই অ্যাকাউন্টের পাসওয়ার্ড দিয়ে যুক্ত করুন।',
+  'If you never connected a cloud account, there is nothing to send: that password was only ever stored on this device.': 'আপনি যদি কখনো ক্লাউড অ্যাকাউন্ট যুক্ত না করে থাকেন, তবে পাঠানোর কিছু নেই: সেই পাসওয়ার্ড শুধু এই ডিভাইসেই রাখা ছিল।',
   ' It is due {0}.': ' এর শেষ সময় {0}।',
   ' {0} already here were left as they were.': ' এখানে আগে থেকে থাকা {0}টি যেমন ছিল তেমনই রাখা হয়েছে।',
   ' · Semester {0}': ' · সেমিস্টার {0}',

@@ -93,8 +93,7 @@ class _SetupFlowState extends State<SetupFlow> {
       // coming. So the question now asks what it can honestly ask, the answer
       // is shown back on the profile as their own stated routine, and when
       // scheduled reminders are built this is the setting that will drive them.
-      hint: tr('When do you plan to revise? Noted for you — NoteNest does not '
-          'send alerts yet.'),
+      hint: tr('When do you plan to revise? Saved on your profile as your own routine.'),
     ),
   ];
 
@@ -513,8 +512,8 @@ class _SetupFlowState extends State<SetupFlow> {
               ),
             const SizedBox(height: 4),
             Text(
-              tr('Your choice is saved now. Reminders start arriving once '
-              'notifications are added to the app.'),
+              tr('Your choice is saved now. Phone reminders for tasks and exams can be '
+              'switched on any time in the notifications settings.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

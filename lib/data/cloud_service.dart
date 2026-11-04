@@ -1670,9 +1670,14 @@ class CloudService extends ChangeNotifier {
     try {
       await action();
     } on FirebaseAuthException catch (e) {
-      throw CloudException(describeAuthError(e.code));
+      throw CloudException(describeAuthError(e.code), code: e.code);
     } on FirebaseException catch (e) {
-      throw CloudException(describeStoreError(e.code));
+      throw CloudException(describeStoreError(e.code), code: e.code);
+    } on TimeoutException {
+      // Not a Firebase error, so it used to escape every screen's catch and
+      // leave a spinner running for ever.
+      throw CloudException(describeAuthError('network-request-failed'),
+          code: 'network-request-failed');
     } finally {
       _busy = false;
       notifyListeners();
@@ -1732,9 +1737,17 @@ enum RequestKind {
 }
 
 class CloudException implements Exception {
-  const CloudException(this.message);
+  const CloudException(this.message, {this.code});
 
   final String message;
+
+  /// Firebase's own error code when there was one (`network-request-failed`,
+  /// `too-many-requests`, ...), so a screen can tell "offline" from "refused".
+  final String? code;
+
+  /// True when the failure was the connection rather than the answer.
+  bool get isNetwork =>
+      code == 'network-request-failed' || code == 'unavailable';
 
   @override
   String toString() => message;

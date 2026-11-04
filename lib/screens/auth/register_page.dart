@@ -115,7 +115,21 @@ class _RegisterPageState extends State<RegisterPage> {
       _error = null;
       _busy = true;
     });
+    try {
+      await _attempt();
+    } catch (e) {
+      // Give the button back on anything unexpected, or the form stays stuck.
+      if (!mounted) return;
+      setState(() {
+        _error = tr('That did not work. Try again in a moment.');
+        _busy = false;
+      });
+    }
+  }
 
+  String? _cloudCode;
+
+  Future<void> _attempt() async {
     final failure = await AuthRepository.instance.register(
       name: _name.text,
       email: _email.text,
@@ -159,6 +173,7 @@ class _RegisterPageState extends State<RegisterPage> {
         // here is sharing, chat and assignments, and the student should know
         // which of the two happened.
         _cloudNote = e.message;
+        _cloudCode = e.code;
       }
     }
 
@@ -168,7 +183,9 @@ class _RegisterPageState extends State<RegisterPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            trp('Your notebook is ready, but the cloud account was not made: {0} Connect it later from Settings → Cloud account, with the same email and password.', [_cloudNote]),
+            _cloudCode == 'email-already-in-use'
+                ? tr('Your notebook is ready. This email already has a cloud account, so a new one was not made. Connect it from Settings → Cloud account, using the password of that account.')
+                : trp('Your notebook is ready, but the cloud account was not made: {0} Connect it later from Settings → Cloud account, with the same email and password.', [_cloudNote]),
           ),
           duration: const Duration(seconds: 7),
         ),
