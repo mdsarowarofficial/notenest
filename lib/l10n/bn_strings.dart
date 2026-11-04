@@ -2,6 +2,10 @@
 // English text on the left, Bangla on the right.
 
 const Map<String, String> bnStrings = {
+  'Turn on': 'চালু করুন',
+  'Not now': 'এখন নয়',
+  'NoteNest can save a fresh copy to your Google Drive once a day, when you open the app with a connection. You can switch this off any time on this page.': 'অ্যাপ খুললে ও ইন্টারনেট থাকলে নোটনেস্ট দিনে একবার আপনার গুগল ড্রাইভে নতুন কপি রাখতে পারে। এই পাতা থেকে যেকোনো সময় এটি বন্ধ করা যাবে।',
+  'Back up every day?': 'প্রতিদিন ব্যাকআপ নেবেন?',
   'Your choice is saved now. Phone reminders for tasks and exams can be switched on any time in the notifications settings.': 'আপনার পছন্দ এখন সংরক্ষিত। কাজ ও পরীক্ষার ফোন রিমাইন্ডার যেকোনো সময় নোটিফিকেশন সেটিংস থেকে চালু করা যাবে।',
   'When do you plan to revise? Saved on your profile as your own routine.': 'কখন পড়তে চান? আপনার নিজের রুটিন হিসেবে প্রোফাইলে রাখা হলো।',
   'Your notebook is ready. This email already has a cloud account, so a new one was not made. Connect it from Settings → Cloud account, using the password of that account.': 'আপনার নোটবুক তৈরি। এই ইমেইলে আগে থেকেই একটি ক্লাউড অ্যাকাউন্ট আছে, তাই নতুন একটি বানানো হয়নি। সেটিংস → ক্লাউড অ্যাকাউন্ট থেকে ওই অ্যাকাউন্টের পাসওয়ার্ড দিয়ে যুক্ত করুন।',

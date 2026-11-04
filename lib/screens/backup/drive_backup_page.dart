@@ -66,8 +66,33 @@ class _DriveBackupPageState extends State<DriveBackupPage> {
       });
 
   Future<void> _backUp() => _run(tr('Backing up…'), () async {
+        // Asked once, right after the very first backup: that is the moment the
+        // student has just seen it work, and the one at which "do this for me
+        // every day" is an easy yes. Never asked again if they say no; the
+        // switch below stays where it is.
+        final firstEver = _repo.lastBackupAt == null && !_repo.autoBackup;
         await DriveBackup.backUp();
         if (mounted) setState(() => _connected = true);
+        if (firstEver && mounted) {
+          final yes = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(tr('Back up every day?')),
+              content: Text(tr('NoteNest can save a fresh copy to your Google Drive once a day, when you open the app with a connection. You can switch this off any time on this page.')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(tr('Not now')),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(tr('Turn on')),
+                ),
+              ],
+            ),
+          );
+          if (yes == true) await _repo.saveBackupState(auto: true);
+        }
         return tr('Backed up to Google Drive.');
       });
 
