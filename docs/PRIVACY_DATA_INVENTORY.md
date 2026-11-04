@@ -96,10 +96,9 @@ confirms, and must be disclosed in the Data Safety form too. The reason is
 honest and should be given honestly: messages and accepted notes are in other
 people's conversations and notebooks, and the rules let nobody delete a message.
 
-**Android backup.** The manifest leaves `allowBackup` at its default, so
-Android's Auto Backup may copy the app's database and files to the user's own
-Google account. That is what lets notes survive a change of phone — notes are
-otherwise device-only — and it is disclosed in the policy.
+**Android backup.** `android:allowBackup` is `false` (changed before the first
+release), so Android Auto Backup does not copy the app's database. Notes leave
+the phone only through the student's own Google Drive backup, or by sharing.
 
 ## Data Safety form — the answers this evidence supports
 
